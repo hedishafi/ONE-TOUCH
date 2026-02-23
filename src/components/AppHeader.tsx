@@ -46,7 +46,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
   return (
     <Box
       style={{
-        background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)`,
+        background: '#FFFFFF',
         padding: '0 24px',
         height: 64,
         display: 'flex',
@@ -55,7 +55,8 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        boxShadow: '0 2px 12px rgba(27, 42, 74, 0.3)',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+        borderBottom: '1px solid #F1F3F5',
       }}
     >
       {/* Left: Logo + Burger */}
@@ -64,7 +65,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
           <Burger
             opened={mobileMenuOpened}
             onClick={onBurgerClick}
-            color={COLORS.white}
+            color={COLORS.navyBlue}
             size="sm"
           />
         )}
@@ -74,15 +75,16 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
               width: 36,
               height: 36,
               borderRadius: 10,
-              background: COLORS.lemonYellow,
+              background: `linear-gradient(135deg, ${COLORS.lemonYellow} 0%, #FFD700 100%)`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: `0 2px 8px rgba(245, 230, 66, 0.25)`,
             }}
           >
             <IconShieldCheck size={20} color={COLORS.navyBlue} stroke={2.5} />
           </Box>
-          <Text fw={800} size="lg" c="white" style={{ letterSpacing: '-0.5px' }}>
+          <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px' }}>
             ONE TOUCH
           </Text>
         </Group>
@@ -113,7 +115,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
             color="lemon"
             variant="filled"
             size="lg"
-            style={{ cursor: 'pointer', color: COLORS.navyBlue }}
+            style={{ cursor: 'pointer', color: COLORS.navyBlue, fontWeight: 600 }}
             onClick={() =>
               navigate(isProvider ? ROUTES.providerWallet : ROUTES.clientWallet)
             }
@@ -134,12 +136,12 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
         >
           <ActionIcon
             variant="subtle"
-            color="white"
+            color={COLORS.navyBlue}
             size="lg"
             onClick={openNotif}
             aria-label="Notifications"
           >
-            <IconBell size={20} color="white" />
+            <IconBell size={20} />
           </ActionIcon>
         </Indicator>
 
@@ -150,10 +152,10 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
               <Avatar src={avatarSrc} radius="xl" size="sm" color="teal">
                 {displayName[0]}
               </Avatar>
-              <Text size="sm" c="white" fw={500} visibleFrom="sm">
+              <Text size="sm" c={COLORS.navyBlue} fw={500} visibleFrom="sm">
                 {displayName.split(' ')[0]}
               </Text>
-              <IconChevronDown size={14} color="white" />
+              <IconChevronDown size={14} color={COLORS.navyBlue} />
             </Group>
           </Menu.Target>
           <Menu.Dropdown>

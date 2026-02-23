@@ -1,7 +1,6 @@
-import { AppShell, NavLink, Stack, Box, Text, ScrollArea, useMantineTheme } from '@mantine/core';
+import { AppShell, NavLink, Stack, Box, Text, ScrollArea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { AppHeader } from './AppHeader';
 import { AIHelpCenter } from './AIHelpCenter';
 import { COLORS } from '../utils/constants';
@@ -22,32 +21,48 @@ export function DashboardLayout({ children, navItems, title }: DashboardLayoutPr
     <AppShell
       header={{ height: 64 }}
       navbar={{
-        width: 240,
+        width: 260,
         breakpoint: 'sm',
         collapsed: { mobile: !opened },
       }}
       padding="md"
+      style={{ backgroundColor: '#FFFFFF' }}
     >
-      <AppShell.Header>
+      <AppShell.Header
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #F1F3F5',
+        }}
+      >
         <AppHeader onBurgerClick={toggle} mobileMenuOpened={opened} />
       </AppShell.Header>
 
       <AppShell.Navbar
         style={{
-          background: `linear-gradient(180deg, ${COLORS.navyBlue} 0%, ${COLORS.navyDark} 100%)`,
-          border: 'none',
+          background: '#FFFFFF',
+          borderRight: '1px solid #F1F3F5',
         }}
       >
         <AppShell.Section p="md">
-          <Text size="xs" c="rgba(255,255,255,0.5)" fw={600} tt="uppercase" ls={1}>
+          <Text
+            size="xs"
+            fw={700}
+            tt="uppercase"
+            style={{
+              color: COLORS.navyBlue,
+              letterSpacing: 0.5,
+              fontSize: '11px',
+            }}
+          >
             {title}
           </Text>
         </AppShell.Section>
 
         <AppShell.Section grow component={ScrollArea}>
           <Stack gap={4} px="sm">
-            {navItems.map(item => {
+            {navItems.map((item) => {
               const isActive = location.pathname === item.path;
+
               return (
                 <NavLink
                   key={item.path}
@@ -58,15 +73,20 @@ export function DashboardLayout({ children, navItems, title }: DashboardLayoutPr
                   styles={{
                     root: {
                       borderRadius: 10,
-                      color: isActive ? COLORS.navyBlue : 'rgba(255,255,255,0.75)',
-                      backgroundColor: isActive ? COLORS.lemonYellow : 'transparent',
-                      fontWeight: isActive ? 700 : 400,
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? COLORS.navyBlue : '#6C757D',
+                      backgroundColor: isActive ? 'rgba(0, 128, 128, 0.08)' : 'transparent',
+                      borderLeft: isActive ? `3px solid ${COLORS.tealBlue}` : 'none',
+                      paddingLeft: isActive ? '15px' : '18px',
+                      transition: 'all 0.2s ease',
                       '&:hover': {
-                        backgroundColor: isActive ? COLORS.lemonYellow : 'rgba(255,255,255,0.08)',
-                        color: isActive ? COLORS.navyBlue : 'white',
+                        backgroundColor: 'rgba(0, 128, 128, 0.04)',
+                        color: COLORS.tealBlue,
                       },
                     },
-                    label: { fontSize: 14 },
+                    label: {
+                      fontSize: 14,
+                    },
                   }}
                 />
               );
@@ -75,10 +95,29 @@ export function DashboardLayout({ children, navItems, title }: DashboardLayoutPr
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main bg="#F5F6FA">
-        <Box maw="100%" style={{ position: 'relative' }}>
+      <AppShell.Main
+        style={{
+          backgroundColor: '#FFFFFF',
+        }}
+      >
+        <Box
+          style={{
+            position: 'relative',
+            padding: '8px',
+            animation: 'fadeIn 0.3s ease',
+          }}
+        >
+          <style>
+            {`
+              @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(8px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+            `}
+          </style>
           {children}
         </Box>
+
         <AIHelpCenter />
       </AppShell.Main>
     </AppShell>

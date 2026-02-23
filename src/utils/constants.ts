@@ -1,17 +1,18 @@
 // ─── COLOR PALETTE ─────────────────────────────────────────────────────────────
 export const COLORS = {
-  navyBlue: '#1B2A4A',
-  navyDark: '#0F1E38',
-  navyLight: '#2D4070',
+  navyBlue: '#000080',
+  navyDark: '#000060',
+  navyLight: '#003366',
   lemonYellow: '#F5E642',
-  lemonLight: '#FFF176',
-  tealBlue: '#00B4D8',
-  tealDark: '#0096B4',
-  tealLight: '#48CAE4',
+  lemonLight: '#FFF9C4',
+  tealBlue: '#008080',
+  tealDark: '#006666',
+  tealLight: '#00A0A0',
   white: '#FFFFFF',
   offWhite: '#F8F9FA',
   gray: '#6C757D',
   lightGray: '#E9ECEF',
+  bgGray: '#F5F6F7',
   success: '#2ECC71',
   warning: '#F39C12',
   error: '#E74C3C',
@@ -57,9 +58,9 @@ export const MOCK_OTP = '123456';
 
 // ─── LANGUAGES ────────────────────────────────────────────────────────────────
 export const SUPPORTED_LANGUAGES = [
-  { code: 'en', label: 'English', flag: '🇺🇸' },
-  { code: 'am', label: 'አማርኛ', flag: '🇪🇹' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'en', label: 'English', nativeLabel: 'English', flag: '🇬🇧' },
+  { code: 'am', label: 'አማርኛ', nativeLabel: 'Amharic', flag: '🇪🇹' },
+  { code: 'om', label: 'Afan Oromo', nativeLabel: 'Afaan Oromoo', flag: '🇪🇹' },
 ];
 
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
