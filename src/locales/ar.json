@@ -1,0 +1,153 @@
+{
+  "brand": {
+    "name": "ONE TOUCH",
+    "tagline": "خدمات فورية، مزودون موثوقون"
+  },
+  "nav": {
+    "login": "تسجيل الدخول",
+    "signup": "إنشاء حساب",
+    "logout": "تسجيل الخروج",
+    "home": "الرئيسية"
+  },
+  "landing": {
+    "hero_title": "تواصل مع مزودي الخدمات الموثوقين",
+    "hero_subtitle": "ابحث عن مزودي خدمة موثَّقين بالقرب منك في ثوانٍ. آمن، فوري، وشفاف.",
+    "cta_browse": "استعرض الخدمات",
+    "feature_instant": "تواصل فوري",
+    "feature_instant_desc": "تواصل مع المزودين القريبين في الوقت الفعلي بنقرة واحدة.",
+    "feature_secure": "مدفوعات آمنة",
+    "feature_secure_desc": "مدفوعات محمية بضمان لا تُفرج عنها إلا عند إتمام العمل.",
+    "feature_verified": "مزودون موثَّقون",
+    "feature_verified_desc": "جميع المزودين يخضعون للتحقق من الهوية قبل الانضمام للمنصة.",
+    "feature_voip": "مكالمات مجانية داخل التطبيق",
+    "feature_voip_desc": "اتصل بالمزودين مجاناً دون الكشف عن رقم هاتفك."
+  },
+  "auth": {
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "phone": "رقم الهاتف",
+    "login": "دخول",
+    "signup": "إنشاء حساب",
+    "no_account": "ليس لديك حساب؟",
+    "have_account": "لديك حساب بالفعل؟",
+    "forgot_password": "نسيت كلمة المرور؟"
+  },
+  "role": {
+    "select_role": "اختر دورك",
+    "client": "عميل",
+    "client_desc": "استعرض واحجز مزودي خدمة موثَّقين بالقرب منك.",
+    "provider": "مزود خدمة",
+    "provider_desc": "قدِّم خدماتك ووسِّع قاعدة عملائك.",
+    "continue": "متابعة"
+  },
+  "register": {
+    "individual": "عميل فردي",
+    "business": "عميل أعمال",
+    "upload_id": "رفع بطاقة الهوية",
+    "upload_selfie": "رفع صورة سيلفي",
+    "upload_docs": "رفع وثائق الأعمال",
+    "extracting": "جارٍ استخراج البيانات من المستند...",
+    "otp_phone": "التحقق من الهاتف",
+    "otp_email": "التحقق من البريد الإلكتروني",
+    "otp_sent": "تم إرسال رمز التحقق إلى",
+    "otp_enter": "أدخل رمز التحقق المكون من 6 أرقام",
+    "verify": "تحقق",
+    "complete": "إتمام التسجيل"
+  },
+  "client": {
+    "dashboard": "لوحة التحكم",
+    "browse": "استعرض الخدمات",
+    "history": "سجل الحجوزات",
+    "saved": "المزودون المحفوظون",
+    "wallet": "المحفظة",
+    "loyalty": "الولاء والمكافآت",
+    "settings": "الإعدادات",
+    "call_free": "اتصال مجاني",
+    "book_again": "احجز مجدداً بلمسة واحدة",
+    "no_providers": "لا يوجد مزودون قريبون",
+    "search_placeholder": "ابحث عن مزودين..."
+  },
+  "provider": {
+    "dashboard": "لوحة التحكم",
+    "jobs": "المهام النشطة",
+    "earnings": "الأرباح",
+    "profile": "الملف الشخصي",
+    "wallet": "المحفظة",
+    "loyalty": "مستوى الولاء",
+    "settings": "الإعدادات",
+    "online": "متصل",
+    "offline": "غير متصل",
+    "start_work": "بدء العمل",
+    "complete_work": "إتمام العمل",
+    "accept": "قبول",
+    "decline": "رفض"
+  },
+  "job": {
+    "pending_agreement": "في انتظار الاتفاق",
+    "active": "نشط",
+    "in_progress": "قيد التنفيذ",
+    "completed": "مكتمل",
+    "cancelled": "ملغى",
+    "disputed": "متنازع عليه",
+    "confirm_price": "تأكيد السعر",
+    "pay_escrow": "الدفع والحجز في الضمان",
+    "confirm_completion": "تأكيد الإتمام",
+    "rate_provider": "تقييم المزود"
+  },
+  "wallet": {
+    "balance": "رصيد المحفظة",
+    "transactions": "سجل المعاملات",
+    "deposit": "إضافة رصيد",
+    "withdraw": "سحب",
+    "cashback": "استرداد نقدي",
+    "commission": "عمولة"
+  },
+  "loyalty": {
+    "your_tier": "مستوى ولائك",
+    "progress": "التقدم نحو المستوى التالي",
+    "benefits": "مزاياك",
+    "bronze": "برونز",
+    "silver": "فضي",
+    "gold": "ذهبي",
+    "rising_pro": "محترف صاعد",
+    "trusted_pro": "محترف موثوق",
+    "elite_pro": "محترف نخبة"
+  },
+  "admin": {
+    "dashboard": "لوحة الإدارة",
+    "users": "إدارة المستخدمين",
+    "commissions": "إعدادات العمولة",
+    "categories": "إدارة الفئات",
+    "fraud": "مراقبة الاحتيال",
+    "disputes": "حل النزاعات",
+    "transactions": "المعاملات",
+    "analytics": "التحليلات",
+    "content": "إدارة المحتوى",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "suspend": "تعليق",
+    "resolve": "حل"
+  },
+  "help": {
+    "title": "مركز المساعدة",
+    "placeholder": "اسألني أي شيء...",
+    "send": "إرسال",
+    "greeting": "مرحباً! أنا مساعدك في ONE TOUCH. كيف يمكنني مساعدتك اليوم؟",
+    "suggestions": "أسئلة سريعة:"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "close": "إغلاق",
+    "loading": "جارٍ التحميل...",
+    "error": "حدث خطأ ما",
+    "success": "نجح الأمر!",
+    "confirm": "تأكيد",
+    "search": "بحث",
+    "filter": "فلتر",
+    "sort": "ترتيب",
+    "view_all": "عرض الكل",
+    "no_data": "لا توجد بيانات",
+    "back": "رجوع"
+  }
+}

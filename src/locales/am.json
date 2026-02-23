@@ -1,0 +1,153 @@
+{
+  "brand": {
+    "name": "ONE TOUCH",
+    "tagline": "ፈጣን አገልግሎቶች፣ ታማኝ አቅራቢዎች"
+  },
+  "nav": {
+    "login": "ግባ",
+    "signup": "ተመዝገብ",
+    "logout": "ውጣ",
+    "home": "ዋና ገጽ"
+  },
+  "landing": {
+    "hero_title": "ታማኝ አቅራቢዎችን ያገናኙ",
+    "hero_subtitle": "በሰከንዶች ውስጥ ቅርብዎን ያሉ የተረጋገጡ አቅራቢዎችን ያግኙ። ደህንነቱ የተጠበቀ፣ ፈጣን እና ግልጽ።",
+    "cta_browse": "አገልግሎቶችን ያስሱ",
+    "feature_instant": "ፈጣን ግንኙነት",
+    "feature_instant_desc": "በአንድ ንካ ቅርበዎን ካሉ አቅራቢዎች ጋር ያገናኙ።",
+    "feature_secure": "ደህንነቱ የተጠበቀ ክፍያ",
+    "feature_secure_desc": "ክፍያ ሥራ ሲጠናቀቅ ብቻ ይሰጣል።",
+    "feature_verified": "የተረጋገጡ አቅራቢዎች",
+    "feature_verified_desc": "ሁሉም አቅራቢዎች ወደ መድረኩ ከመቀላቀላቸው በፊት ማንነታቸው ተረጋግጧል።",
+    "feature_voip": "ነፃ የቀጥታ ጥሪ",
+    "feature_voip_desc": "ስልክ ቁጥርዎን ሳያጋልጡ አቅራቢዎቹን ነፃ ይደውሉ።"
+  },
+  "auth": {
+    "email": "ኢሜይል አድራሻ",
+    "password": "የይለፍ ቃል",
+    "phone": "ስልክ ቁጥር",
+    "login": "ግባ",
+    "signup": "መለያ ፍጠር",
+    "no_account": "መለያ የሌለዎት?",
+    "have_account": "አስቀድሞ መለያ አለዎት?",
+    "forgot_password": "የይለፍ ቃል ረሱ?"
+  },
+  "role": {
+    "select_role": "ሚናዎን ይምረጡ",
+    "client": "ደንበኛ",
+    "client_desc": "ቅርበዎን ያሉ ታማኝ አቅራቢዎችን ያስሱ እና ያዙ።",
+    "provider": "አቅራቢ",
+    "provider_desc": "አገልግሎቶችዎን ያቅርቡ እና ደንበኞቻቸውን ያሳድጉ።",
+    "continue": "ቀጥል"
+  },
+  "register": {
+    "individual": "የግል ደንበኛ",
+    "business": "የንግድ ደንበኛ",
+    "upload_id": "መታወቂያ ያስተላልፉ",
+    "upload_selfie": "ሴልፊ ያስተላልፉ",
+    "upload_docs": "የንግድ ሰነዶችን ያስተላልፉ",
+    "extracting": "ሰነዱን ውስጥ ከሚቃኙ...",
+    "otp_phone": "ስልክ ማረጋገጫ",
+    "otp_email": "ኢሜይል ማረጋገጫ",
+    "otp_sent": "OTP ተልኳል ወደ",
+    "otp_enter": "6-አሃዝ OTP ያስገቡ",
+    "verify": "አረጋግጥ",
+    "complete": "ምዝገባ ጠናቅ"
+  },
+  "client": {
+    "dashboard": "ዳሽቦርድ",
+    "browse": "አገልግሎቶችን ያስሱ",
+    "history": "የቦታ ማስያዝ ታሪክ",
+    "saved": "የተቀመጡ አቅራቢዎች",
+    "wallet": "ዋሌት",
+    "loyalty": "ታማኝነት እና ሽልማቶች",
+    "settings": "ቅንብሮች",
+    "call_free": "ነፃ ደውል",
+    "book_again": "በአንድ ንካ እንደገና ያዙ",
+    "no_providers": "ቅርብ አቅራቢዎች አልተገኙም",
+    "search_placeholder": "አቅራቢዎችን ፈልግ..."
+  },
+  "provider": {
+    "dashboard": "ዳሽቦርድ",
+    "jobs": "ንቁ ሥራዎች",
+    "earnings": "ገቢ",
+    "profile": "መገለጫ",
+    "wallet": "ዋሌት",
+    "loyalty": "የታማኝነት ደረጃ",
+    "settings": "ቅንብሮች",
+    "online": "ኦንላይን",
+    "offline": "ኦፍላይን",
+    "start_work": "ሥራ ጀምር",
+    "complete_work": "ሥራ ጨርስ",
+    "accept": "ተቀበል",
+    "decline": "አትቀበል"
+  },
+  "job": {
+    "pending_agreement": "ስምምነት ጠብቋል",
+    "active": "ንቁ",
+    "in_progress": "በሂደት ላይ",
+    "completed": "ተጠናቋል",
+    "cancelled": "ተሰርዟል",
+    "disputed": "ክርክር አለ",
+    "confirm_price": "ዋጋ አረጋግጥ",
+    "pay_escrow": "ክፈል እና ደህንነቱ ተጠብቆ አስቀምጥ",
+    "confirm_completion": "ጨርሷልን አረጋግጥ",
+    "rate_provider": "አቅራቢዎን ይምቱ"
+  },
+  "wallet": {
+    "balance": "የዋሌት ቀሪ",
+    "transactions": "የግብይት ታሪክ",
+    "deposit": "ሙላ",
+    "withdraw": "አውጣ",
+    "cashback": "ካሽባክ",
+    "commission": "ኮሚሽን"
+  },
+  "loyalty": {
+    "your_tier": "የታማኝነት ደረጃዎ",
+    "progress": "ወደ ቀጣይ ደረጃ",
+    "benefits": "ጥቅሞቻዎ",
+    "bronze": "ነሐስ",
+    "silver": "ብር",
+    "gold": "ወርቅ",
+    "rising_pro": "ብቅ ባይ ሙያተኛ",
+    "trusted_pro": "ታማኝ ሙያተኛ",
+    "elite_pro": "ምርጥ ሙያተኛ"
+  },
+  "admin": {
+    "dashboard": "አስተዳዳሪ ዳሽቦርድ",
+    "users": "የተጠቃሚ አስተዳደር",
+    "commissions": "ኮሚሽን ቅንብሮች",
+    "categories": "ምድብ አስተዳደር",
+    "fraud": "ማጭበርበር ክትትል",
+    "disputes": "አለመግባባት ፍቺ",
+    "transactions": "ግብይቶች",
+    "analytics": "ትንታኔ",
+    "content": "ይዘት አስተዳደር",
+    "approve": "ፍቀድ",
+    "reject": "ተቃወም",
+    "suspend": "አቁም",
+    "resolve": "ፍታ"
+  },
+  "help": {
+    "title": "የእርዳታ ማዕከል",
+    "placeholder": "ሁሉንም ጠይቀኝ...",
+    "send": "ላክ",
+    "greeting": "ሰላም! የ ONE TOUCH ረዳትዎ ነኝ። ዛሬ እንዴት ልረዳዎ እችላለሁ?",
+    "suggestions": "ፈጣን ጥያቄዎች:"
+  },
+  "common": {
+    "save": "አስቀምጥ",
+    "cancel": "ሰርዝ",
+    "close": "ዝጋ",
+    "loading": "እየጫነ...",
+    "error": "ስህተት ተፈጥሯል",
+    "success": "ተሳካ!",
+    "confirm": "አረጋግጥ",
+    "search": "ፈልግ",
+    "filter": "ማጣሪያ",
+    "sort": "ደርድር",
+    "view_all": "ሁሉም ይመልከቱ",
+    "no_data": "ምንም መረጃ የለም",
+    "back": "ተመለስ"
+  }
+}

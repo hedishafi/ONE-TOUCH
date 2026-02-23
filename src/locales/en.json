@@ -1,0 +1,153 @@
+{
+  "brand": {
+    "name": "ONE TOUCH",
+    "tagline": "Instant Services, Trusted Providers"
+  },
+  "nav": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "home": "Home"
+  },
+  "landing": {
+    "hero_title": "Connect with Trusted Providers",
+    "hero_subtitle": "Find verified service providers near you in seconds. Safe, instant, and transparent.",
+    "cta_browse": "Browse Services",
+    "feature_instant": "Instant Connection",
+    "feature_instant_desc": "Connect with nearby providers in real-time with one tap.",
+    "feature_secure": "Secure Payments",
+    "feature_secure_desc": "Escrow-protected payments released only on job completion.",
+    "feature_verified": "Verified Providers",
+    "feature_verified_desc": "All providers are identity-verified before joining the platform.",
+    "feature_voip": "Free In-App Calling",
+    "feature_voip_desc": "Call providers for free without revealing your phone number."
+  },
+  "auth": {
+    "email": "Email Address",
+    "password": "Password",
+    "phone": "Phone Number",
+    "login": "Login",
+    "signup": "Create Account",
+    "no_account": "Don't have an account?",
+    "have_account": "Already have an account?",
+    "forgot_password": "Forgot Password?"
+  },
+  "role": {
+    "select_role": "Select Your Role",
+    "client": "Client",
+    "client_desc": "Browse and book verified service providers near you.",
+    "provider": "Service Provider",
+    "provider_desc": "Offer your services and grow your client base.",
+    "continue": "Continue"
+  },
+  "register": {
+    "individual": "Individual Client",
+    "business": "Business Client",
+    "upload_id": "Upload Government ID",
+    "upload_selfie": "Upload Selfie",
+    "upload_docs": "Upload Business Documents",
+    "extracting": "Extracting data from document...",
+    "otp_phone": "Phone Verification",
+    "otp_email": "Email Verification",
+    "otp_sent": "OTP sent to",
+    "otp_enter": "Enter 6-digit OTP",
+    "verify": "Verify",
+    "complete": "Complete Registration"
+  },
+  "client": {
+    "dashboard": "Dashboard",
+    "browse": "Browse Services",
+    "history": "Booking History",
+    "saved": "Saved Providers",
+    "wallet": "Wallet",
+    "loyalty": "Loyalty & Rewards",
+    "settings": "Settings",
+    "call_free": "Call Free",
+    "book_again": "Book Again in One Touch",
+    "no_providers": "No providers found nearby",
+    "search_placeholder": "Search providers..."
+  },
+  "provider": {
+    "dashboard": "Dashboard",
+    "jobs": "Active Jobs",
+    "earnings": "Earnings",
+    "profile": "Profile",
+    "wallet": "Wallet",
+    "loyalty": "Loyalty Level",
+    "settings": "Settings",
+    "online": "Online",
+    "offline": "Offline",
+    "start_work": "Start Work",
+    "complete_work": "Complete Work",
+    "accept": "Accept",
+    "decline": "Decline"
+  },
+  "job": {
+    "pending_agreement": "Pending Agreement",
+    "active": "Active",
+    "in_progress": "In Progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "disputed": "Disputed",
+    "confirm_price": "Confirm Price",
+    "pay_escrow": "Pay & Secure in Escrow",
+    "confirm_completion": "Confirm Completion",
+    "rate_provider": "Rate Your Provider"
+  },
+  "wallet": {
+    "balance": "Wallet Balance",
+    "transactions": "Transaction History",
+    "deposit": "Top Up",
+    "withdraw": "Withdraw",
+    "cashback": "Cashback",
+    "commission": "Commission"
+  },
+  "loyalty": {
+    "your_tier": "Your Loyalty Tier",
+    "progress": "Progress to Next Tier",
+    "benefits": "Your Benefits",
+    "bronze": "Bronze",
+    "silver": "Silver",
+    "gold": "Gold",
+    "rising_pro": "Rising Pro",
+    "trusted_pro": "Trusted Pro",
+    "elite_pro": "Elite Pro"
+  },
+  "admin": {
+    "dashboard": "Admin Dashboard",
+    "users": "User Management",
+    "commissions": "Commission Settings",
+    "categories": "Category Management",
+    "fraud": "Fraud Monitoring",
+    "disputes": "Dispute Resolution",
+    "transactions": "Transactions",
+    "analytics": "Analytics",
+    "content": "Content Management",
+    "approve": "Approve",
+    "reject": "Reject",
+    "suspend": "Suspend",
+    "resolve": "Resolve"
+  },
+  "help": {
+    "title": "Help Center",
+    "placeholder": "Ask me anything...",
+    "send": "Send",
+    "greeting": "Hi! I'm your ONE TOUCH assistant. How can I help you today?",
+    "suggestions": "Quick questions:"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "success": "Success!",
+    "confirm": "Confirm",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "view_all": "View All",
+    "no_data": "No data available",
+    "back": "Back"
+  }
+}
