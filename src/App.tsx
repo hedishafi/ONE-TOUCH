@@ -5,6 +5,9 @@ import { ROUTES } from './utils/constants';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { Services } from './pages/Services';
+import { HowItWorks } from './pages/HowItWorks';
+import { About } from './pages/About';
 
 // Registration flow
 import {
@@ -53,6 +56,9 @@ function App() {
       <Routes>
         {/* ── Public ─────────────────────────────────────────────── */}
         <Route path={ROUTES.landing} element={<Landing />} />
+        <Route path={ROUTES.services} element={<Services />} />
+        <Route path={ROUTES.howItWorks} element={<HowItWorks />} />
+        <Route path={ROUTES.about} element={<About />} />
         <Route path={ROUTES.login} element={<Login />} />
         <Route path={ROUTES.signup} element={<Signup />} />
 
