@@ -3,7 +3,7 @@ import {
 } from '@mantine/core';
 import { IconShieldCheck, IconX } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useMediaQuery } from '@mantine/hooks';
@@ -41,7 +41,26 @@ const NAV_STYLE = `
 export function LandingNavbar() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const [prevScrollY, setPrevScrollY] = useState(0);
   const isMobile = useMediaQuery('(max-width: 768px)');
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > prevScrollY && currentScrollY > 100) {
+        // Scrolling down
+        setIsNavVisible(false);
+      } else {
+        // Scrolling up
+        setIsNavVisible(true);
+      }
+      setPrevScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [prevScrollY]);
 
   const navLinks = [
     { label: 'Browse Services', path: ROUTES.services },
@@ -67,6 +86,8 @@ export function LandingNavbar() {
           background: 'rgba(255,255,255,0.95)',
           borderBottom: '1px solid rgba(0,0,137,0.08)',
           boxShadow: '0 2px 16px rgba(0,0,137,0.05)',
+          transform: isNavVisible ? 'translateY(0)' : 'translateY(-100%)',
+          transition: 'transform 0.3s ease-in-out',
         }}
       >
         <Group justify="space-between" align="center" maw={1200} mx="auto">
