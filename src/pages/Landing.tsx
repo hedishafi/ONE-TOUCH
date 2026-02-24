@@ -9,6 +9,7 @@ import {
   IconPhone, IconBrandGooglePlay, IconBrandApple, IconHeadset, IconDeviceMobile,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { AIHelpCenter } from '../components/AIHelpCenter';
@@ -179,6 +180,32 @@ const STEPS = [
 export function Landing() {
   const navigate = useNavigate();
 
+  function CountUp({ end, duration = 1500, decimals = 0, suffix = '' }: { end: number; duration?: number; decimals?: number; suffix?: string }) {
+    const [value, setValue] = useState(0);
+
+    useEffect(() => {
+      let start: number | null = null;
+      const step = (timestamp: number) => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const current = +(progress * end).toFixed(decimals);
+        setValue(current);
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        }
+      };
+      const raf = requestAnimationFrame(step);
+      return () => cancelAnimationFrame(raf);
+    }, [end, duration, decimals]);
+
+    const formatter = new Intl.NumberFormat(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    const suffixColor = (suffix === '%' || suffix === '★' || suffix === '+') ? COLORS.lemonYellow : undefined;
+    return <>
+      <span style={{ fontWeight: 900 }}>{formatter.format(value)}</span>
+      {suffix ? <span style={{ fontWeight: 700, marginLeft: 6, color: suffixColor }}>{suffix}</span> : null}
+    </>;
+  }
+
   return (
     <>
       <style>{ANIMATIONS}</style>
@@ -235,12 +262,24 @@ export function Landing() {
               </Group>
 
               <Group className="afu4" gap="xl" wrap="wrap">
-                {[['10,000+','Happy Users'],['4.8★','Avg Rating'],['98%','Satisfaction']].map(([v,l]) => (
-                  <Box key={l}>
-                    <Text fw={900} size="xl" style={{ color:COLORS.navyBlue }}>{v}</Text>
-                    <Text size="xs" c="dimmed" fw={500}>{l}</Text>
-                  </Box>
-                ))}
+                {[['10,000+','Happy Users'],['4.8★','Avg Rating'],['98%','Satisfaction']].map(([v,l]) => {
+                  const raw = String(v);
+                  const cleaned = raw.replace(/,/g, '');
+                  let main = raw;
+                  let suffix = '';
+                  if (cleaned.endsWith('+')) { main = cleaned.replace('+','').replace(/\B(?=(\d{3})+(?!\d))/g, ',') ; suffix = '+'; }
+                  if (cleaned.indexOf('★') !== -1) { main = cleaned.replace('★',''); suffix = '★'; }
+                  if (cleaned.endsWith('%')) { main = cleaned.replace('%',''); suffix = '%'; }
+                  return (
+                    <Box key={l}>
+                      <Text fw={900} size="xl" style={{ color:COLORS.navyBlue }}>
+                        <span>{main}</span>
+                        {suffix ? <span style={{ color: (suffix==='%'||suffix==='★'||suffix==='+')?COLORS.lemonYellow:undefined, marginLeft:6, fontWeight:700 }}>{suffix}</span> : null}
+                      </Text>
+                      <Text size="xs" c="dimmed" fw={500}>{l}</Text>
+                    </Box>
+                  );
+                })}
               </Group>
             </Stack>
 
@@ -289,7 +328,11 @@ export function Landing() {
                 </Stack>
 
                 <Box mt="md" p="xs" style={{ background:`linear-gradient(135deg,${COLORS.navyBlue}08,${COLORS.tealBlue}08)`,borderRadius:10,textAlign:'center' }}>
-                  <Text size="xs" c={COLORS.tealBlue} fw={600}>{'📍'} Bole, Addis Ababa · 12 providers online</Text>
+                  <Text size="xs" fw={600}>
+                    <span style={{ color: COLORS.tealBlue, marginRight: 6 }}>{'📍'}</span>
+                    <span style={{ color: COLORS.lemonYellow, fontWeight: 700 }}>Bole, Addis Ababa</span>
+                    <span style={{ color: '#6B7280', marginLeft: 8 }}>· 12 providers online</span>
+                  </Text>
                 </Box>
               </Paper>
 
@@ -315,15 +358,45 @@ export function Landing() {
         </Container>
 
         {/* ── STATS BAR ── */}
-        <Box style={{ background:`linear-gradient(135deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)` }} py="lg">
+        <Box style={{ background: '#FBFCFF' }} py="xl">
           <Container size="lg">
             <SimpleGrid cols={{ base:2,sm:4 }}>
-              {STATS.map(s => (
-                <Box key={s.label} ta="center" py="sm">
-                  <Text fw={900} size="2xl" c="white">{s.value}</Text>
-                  <Text size="sm" c="rgba(255,255,255,0.65)" fw={500}>{s.label}</Text>
-                </Box>
-              ))}
+              {STATS.map(s => {
+                // parse value like '2,000+', '15,000+', '4.8★', '98%'
+                const raw = String(s.value);
+                let num = 0;
+                let decimals = 0;
+                let suffix = '';
+                const cleaned = raw.replace(/,/g, '');
+                const percentMatch = cleaned.match(/^(\d+(?:\.\d+)?)%$/);
+                const plusMatch = cleaned.match(/^(\d+(?:\.\d+)?)(\+)?$/);
+
+                if (percentMatch) {
+                  num = parseFloat(percentMatch[1]);
+                  suffix = '%';
+                } else if (/\d+\.\d+/.test(cleaned) && cleaned.indexOf('★') !== -1) {
+                  // rating like 4.8★
+                  num = parseFloat(cleaned.replace('★', ''));
+                  decimals = 1;
+                  suffix = '★';
+                } else if (plusMatch) {
+                  num = parseFloat(plusMatch[1]);
+                  suffix = cleaned.endsWith('+') ? '+' : '';
+                } else {
+                  // fallback: try to extract number
+                  const m = cleaned.match(/(\d+(?:\.\d+)?)/);
+                  if (m) num = parseFloat(m[1]);
+                }
+
+                return (
+                  <Box key={s.label} ta="center" py="sm">
+                      <Text fw={900} size="3xl" c={COLORS.navyBlue} style={{ fontSize: 'clamp(1.8rem, 3.2vw, 2.6rem)' }}>
+                        <CountUp end={num} duration={1400} decimals={decimals} suffix={suffix} />
+                      </Text>
+                    <Text size="sm" c="#6B7280" fw={500}>{s.label}</Text>
+                  </Box>
+                );
+              })}
             </SimpleGrid>
           </Container>
         </Box>
@@ -526,19 +599,50 @@ export function Landing() {
                 {/* Store badges side-by-side */}
                 <Group gap={12} mb={16} wrap="wrap">
                   <Box component="a" href="#" className="store-badge"
-                    style={{ flex:'1 1 140px', display:'inline-flex', alignItems:'center', gap:10, background:'#111', border:'1px solid #222', borderRadius:14, padding:'12px 16px', textDecoration:'none', cursor:'pointer', boxShadow:'0 4px 16px rgba(0,0,0,0.14)' }}>
-                    <IconBrandGooglePlay size={28} color="#34d399" style={{ flexShrink:0 }} />
+                    style={{
+                      flex:'1 1 140px',
+                      display:'inline-flex',
+                      alignItems:'center',
+                      gap:10,
+                      background: 'linear-gradient(90deg, #16a34a 0%, #06b6d4 100%)',
+                      borderRadius:14,
+                      padding:'12px 16px',
+                      textDecoration:'none',
+                      cursor:'pointer',
+                      boxShadow:'0 8px 30px rgba(6, 182, 212, 0.12)',
+                      color: 'white'
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 18px 40px rgba(6,182,212,0.18)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 30px rgba(6,182,212,0.12)'; }}
+                  >
+                    <IconBrandGooglePlay size={28} color="white" style={{ flexShrink:0 }} />
                     <Box>
-                      <Text size="8px" c="rgba(255,255,255,0.5)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Get it on</Text>
+                      <Text size="8px" c="rgba(255,255,255,0.85)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Get it on</Text>
                       <Text size="sm" fw={800} c="white" style={{ lineHeight:1.15 }}>Google Play</Text>
                     </Box>
                   </Box>
 
                   <Box component="a" href="#" className="store-badge"
-                    style={{ flex:'1 1 140px', display:'inline-flex', alignItems:'center', gap:10, background:'#111', border:'1px solid #222', borderRadius:14, padding:'12px 16px', textDecoration:'none', cursor:'pointer', boxShadow:'0 4px 16px rgba(0,0,0,0.14)' }}>
+                    style={{
+                      flex:'1 1 140px',
+                      display:'inline-flex',
+                      alignItems:'center',
+                      gap:10,
+                      background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 100%)',
+                      borderRadius:14,
+                      padding:'12px 16px',
+                      textDecoration:'none',
+                      cursor:'pointer',
+                      boxShadow:'0 8px 30px rgba(37,99,235,0.12)',
+                      color: 'white',
+                      transition: 'transform 180ms ease, box-shadow 180ms ease'
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 18px 40px rgba(124,58,237,0.18)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 30px rgba(37,99,235,0.12)'; }}
+                  >
                     <IconBrandApple size={28} color="white" style={{ flexShrink:0 }} />
                     <Box>
-                      <Text size="8px" c="rgba(255,255,255,0.5)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Download on the</Text>
+                      <Text size="8px" c="rgba(255,255,255,0.95)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Download on the</Text>
                       <Text size="sm" fw={800} c="white" style={{ lineHeight:1.15 }}>App Store</Text>
                     </Box>
                   </Box>
