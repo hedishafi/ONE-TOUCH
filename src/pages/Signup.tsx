@@ -1,77 +1,96 @@
-/**
- * Signup.tsx – Role selection entry point.
- * Replaces the old generic signup form with two distinct paths.
- */
 import {
   Box, Button, Center, Container, Group,
-  Stack, Text, ThemeIcon, Badge,
+  Stack, Text, ThemeIcon,
 } from '@mantine/core';
 import {
-  IconShieldCheck, IconArrowRight, IconUser, IconBriefcase, IconCheck,
+  IconShieldCheck, IconArrowRight, IconUser, IconBriefcase, IconCheck, IconLock,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { AIHelpCenter } from '../components/AIHelpCenter';
 
-const STYLES = `
-@keyframes fadeUp  { from { opacity:0; transform:translateY(24px);          } to { opacity:1; transform:translateY(0);       } }
-@keyframes cardPop { from { opacity:0; transform:translateY(32px) scale(.97);} to { opacity:1; transform:translateY(0) scale(1); } }
-.su-hero  { animation: fadeUp   0.55s 0.05s ease both; }
-.su-card1 { animation: cardPop  0.55s 0.15s ease both; }
-.su-card2 { animation: cardPop  0.55s 0.28s ease both; }
-.su-role-card {
+const S = `
+@keyframes suFadeUp  { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
+@keyframes suCardIn  { from{opacity:0;transform:translateY(28px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+.su-page  { animation: suFadeUp 0.5s ease both; }
+.su-c1    { animation: suCardIn 0.5s 0.1s ease both; }
+.su-c2    { animation: suCardIn 0.5s 0.22s ease both; }
+.su-card {
   cursor: pointer;
-  border: 2px solid #E9ECEF;
-  border-radius: 24px;
-  background: white;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 16px rgba(0,0,128,0.06);
+  border: 1.5px solid #E4E9F2;
+  border-radius: 20px;
+  background: #fff;
+  transition: all 0.22s ease;
+  box-shadow: 0 2px 16px rgba(0,0,128,0.05);
 }
-.su-role-card:hover {
-  border-color: ${COLORS.tealBlue};
-  transform: translateY(-4px);
-  box-shadow: 0 12px 36px rgba(0,128,128,0.16);
+.su-card:hover {
+  border-color: #008080;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 32px rgba(0,128,128,0.13);
 }
 `;
+
+function Benefit({ text }: { text: string }) {
+  return (
+    <Group gap={10} wrap="nowrap">
+      <Box
+        w={20} h={20} style={{ borderRadius: '50%', background: '#E6F4F1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+      >
+        <IconCheck size={11} color="#008080" strokeWidth={3} />
+      </Box>
+      <Text size="sm" c="#4A5568" lh={1.5}>{text}</Text>
+    </Group>
+  );
+}
 
 interface RoleCardProps {
   icon: React.ReactNode;
   label: string;
   subtitle: string;
   benefits: string[];
-  color: string;
+  accentColor: string;
   btnLabel: string;
   animClass: string;
+  tagLabel: string;
   onClick: () => void;
 }
 
-function RoleCard({ icon, label, subtitle, benefits, color, btnLabel, animClass, onClick }: RoleCardProps) {
+function RoleCard({ icon, label, subtitle, benefits, accentColor, btnLabel, animClass, tagLabel, onClick }: RoleCardProps) {
   return (
-    <Box className={`su-role-card ${animClass}`} onClick={onClick} p={36}>
-      <Stack gap="lg" align="center" ta="center">
-        <ThemeIcon size={80} radius="xl" variant="light" color={color as any}>
-          {icon}
-        </ThemeIcon>
-        <Stack gap={6} align="center">
-          <Text fw={800} size="xl" c={COLORS.navyBlue}>{label}</Text>
-          <Text size="sm" c="dimmed" lh={1.65} maw={260}>{subtitle}</Text>
-        </Stack>
-        <Stack gap={10} align="flex-start" w="100%">
-          {benefits.map(b => (
-            <Group key={b} gap="xs" wrap="nowrap">
-              <ThemeIcon size={20} radius="xl" color="teal" variant="light" style={{ flexShrink: 0 }}>
-                <IconCheck size={12} />
-              </ThemeIcon>
-              <Text size="sm" c="dimmed">{b}</Text>
+    <Box className={`su-card ${animClass}`} onClick={onClick} p={32}>
+      <Stack gap={20}>
+        <Group gap={14} align="flex-start">
+          <Box
+            w={52} h={52}
+            style={{ borderRadius: 14, background: `${accentColor}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            {icon}
+          </Box>
+          <Stack gap={3} flex={1}>
+            <Group justify="space-between" align="center">
+              <Text fw={800} size="lg" c={COLORS.navyBlue}>{label}</Text>
+              <Box
+                px={10} py={3}
+                style={{ borderRadius: 20, background: `${accentColor}12`, border: `1px solid ${accentColor}30` }}
+              >
+                <Text size="11px" fw={700} c={accentColor}>{tagLabel}</Text>
+              </Box>
             </Group>
-          ))}
+            <Text size="sm" c="#718096" lh={1.6}>{subtitle}</Text>
+          </Stack>
+        </Group>
+
+        <Box style={{ width: '100%', height: 1, background: '#F0F2F7' }} />
+
+        <Stack gap={10}>
+          {benefits.map(b => <Benefit key={b} text={b} />)}
         </Stack>
+
         <Button
-          fullWidth size="md" radius="xl"
-          color={color as any}
+          fullWidth size="md" radius="xl" mt={4}
+          style={{ background: `linear-gradient(135deg, ${accentColor}, ${accentColor}CC)`, color: 'white', fontWeight: 700 }}
           rightSection={<IconArrowRight size={16} />}
-          mt={4}
         >
           {btnLabel}
         </Button>
@@ -84,106 +103,108 @@ export function Signup() {
   const navigate = useNavigate();
 
   return (
-    <Box
-      style={{
-        minHeight: '100vh',
-        background: `linear-gradient(150deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 45%, ${COLORS.tealBlue}38 100%)`,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <style>{STYLES}</style>
+    <Box style={{ minHeight: '100vh', background: '#F7F8FC', display: 'flex', flexDirection: 'column' }}>
+      <style>{S}</style>
 
-      {/* ── Top bar ──────────────────────────────────────────── */}
-      <Group justify="space-between" p="md" px="xl">
-        <Group gap="sm" onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>
-          <Box
-            w={38} h={38}
-            style={{ borderRadius: 12, background: COLORS.lemonYellow, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <IconShieldCheck size={20} color={COLORS.navyBlue} stroke={2.5} />
-          </Box>
-          <Text fw={800} size="lg" c="white" style={{ letterSpacing: 0.5 }}>ONE TOUCH</Text>
-        </Group>
-        <Group gap="md">
-          <LanguageSwitcher />
-          <Button variant="subtle" color="gray" size="sm" c="white" onClick={() => navigate(ROUTES.login)}>
-            Sign In
-          </Button>
-        </Group>
-      </Group>
-
-      {/* ── Main content ─────────────────────────────────────── */}
-      <Center flex={1} py={48} px="md">
-        <Container size={860} w="100%">
-          <Stack gap={48}>
-
-            {/* Hero */}
-            <Stack gap={12} align="center" ta="center" className="su-hero">
-              <Badge
-                size="lg" radius="xl" variant="light"
-                style={{ background: 'rgba(245,230,66,0.15)', color: COLORS.lemonYellow, borderColor: 'rgba(245,230,66,0.3)' }}
+      {/* ── Navbar ── */}
+      <Box style={{ background: 'white', borderBottom: '1px solid #EEF0F7' }}>
+        <Container size={1000}>
+          <Group justify="space-between" py={16}>
+            <Group gap={10} onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>
+              <Box
+                w={36} h={36}
+                style={{ borderRadius: 10, background: COLORS.navyBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
-                Create your account
-              </Badge>
-              <Text fw={900} style={{ fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', lineHeight: 1.15, letterSpacing: -0.5, color: 'white' }}>
-                How would you like to<br />join ONE TOUCH?
-              </Text>
-              <Text size="md" c="rgba(255,255,255,0.65)" maw={480}>
-                Select the account type that fits your needs. You can always update your profile later.
+                <IconLock size={17} color={COLORS.lemonYellow} strokeWidth={2.5} />
+              </Box>
+              <Text fw={900} size="md" c={COLORS.navyBlue} style={{ letterSpacing: 0.3 }}>ONE TOUCH</Text>
+            </Group>
+            <Group gap={12}>
+              <LanguageSwitcher />
+              <Button variant="subtle" color="gray" size="sm" onClick={() => navigate(ROUTES.login)}>
+                Already have an account?
+              </Button>
+              <Button
+                size="sm" radius="xl"
+                style={{ background: COLORS.navyBlue, color: 'white' }}
+                onClick={() => navigate(ROUTES.login)}
+              >
+                Sign In
+              </Button>
+            </Group>
+          </Group>
+        </Container>
+      </Box>
+
+      {/* ── Content ── */}
+      <Center flex={1} py={52} px={16}>
+        <Container size={820} w="100%">
+          <Stack gap={36} className="su-page">
+
+            {/* Header */}
+            <Stack gap={8} align="center" ta="center">
+              <Group gap={8} justify="center">
+                <Box
+                  w={36} h={36}
+                  style={{ borderRadius: 10, background: '#000080', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <IconShieldCheck size={18} color="#F5E642" strokeWidth={2.5} />
+                </Box>
+                <Text fw={900} size="xl" c={COLORS.navyBlue}>Create your account</Text>
+              </Group>
+              <Text size="sm" c="#718096" maw={440} lh={1.7}>
+                Choose how you'll be using ONE TOUCH. Both paths are secure, verified, and fully trusted.
               </Text>
             </Stack>
 
-            {/* Role cards */}
+            {/* Role cards grid */}
             <Box
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                gap: 24,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: 20,
               }}
             >
               <RoleCard
-                animClass="su-card1"
-                icon={<IconUser size={38} />}
+                animClass="su-c1"
+                icon={<IconUser size={24} color={COLORS.navyBlue} />}
                 label="I Need Services"
-                subtitle="Find and book trusted professionals for any task, quickly and securely."
+                subtitle="Find and book verified professionals for any task, fast and securely."
                 benefits={[
-                  'Browse hundreds of local service providers',
-                  'Book in minutes with transparent pricing',
-                  'Rate and review every experience',
-                  'Secure wallet & loyalty rewards',
+                  'Browse local verified service providers',
+                  'Transparent pricing before you book',
+                  'Secure wallet & loyalty program',
+                  'Rate and review after every job',
                 ]}
-                color="navy"
-                btnLabel="Sign Up as Client"
+                accentColor={COLORS.navyBlue}
+                tagLabel="CLIENT"
+                btnLabel="Continue as Client"
                 onClick={() => navigate(ROUTES.signupClient)}
               />
               <RoleCard
-                animClass="su-card2"
-                icon={<IconBriefcase size={38} />}
+                animClass="su-c2"
+                icon={<IconBriefcase size={24} color={COLORS.tealBlue} />}
                 label="I Offer Services"
-                subtitle="Join as a verified professional and grow your business with ONE TOUCH."
+                subtitle="Join as a verified service provider and grow your professional business."
                 benefits={[
-                  'Identity-verified & trusted ecosystem',
-                  'Set your own services and rates',
+                  'Full identity & biometric verification',
                   'Receive jobs directly on the map',
+                  'Set your services, prices, and schedule',
                   'Transparent earnings & instant wallet',
                 ]}
-                color="teal"
-                btnLabel="Sign Up as Provider"
+                accentColor={COLORS.tealBlue}
+                tagLabel="PROVIDER"
+                btnLabel="Continue as Provider"
                 onClick={() => navigate(ROUTES.signupProvider)}
               />
             </Box>
 
-            {/* Footer */}
-            <Text ta="center" size="xs" c="rgba(255,255,255,0.45)">
-              Already have an account?{' '}
-              <Text
-                span fw={600} c={COLORS.lemonYellow}
-                style={{ cursor: 'pointer' }}
-                onClick={() => navigate(ROUTES.login)}
-              >
-                Sign in here
-              </Text>
+            {/* Footer note */}
+            <Text ta="center" size="xs" c="#A0AEC0">
+              By continuing, you agree to ONE TOUCH's{' '}
+              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.termsOfService)}>Terms of Service</Text>
+              {' '}and{' '}
+              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.privacyPolicy)}>Privacy Policy</Text>.
             </Text>
           </Stack>
         </Container>
