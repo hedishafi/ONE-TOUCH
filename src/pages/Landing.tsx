@@ -769,22 +769,28 @@ export function Landing() {
                 </Text>
                 {/* App store mini badges */}
                 <Stack gap={8}>
-                  {[
-                    { icon: <IconBrandGooglePlay size={14} color="#4ade80" />, sub:'GET IT ON', label:'Google Play' },
-                    { icon: <IconBrandApple size={14} color="white" />, sub:'DOWNLOAD ON THE', label:'App Store' },
-                  ].map(b => (
-                    <Box key={b.label}
-                      style={{ display:'flex', alignItems:'center', gap:8, background:'white', border:`1.5px solid rgba(0,128,128,0.18)`, borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 2px 8px rgba(0,128,128,0.07)' }}
-                      onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background='rgba(6,182,212,0.08)'; el.style.borderColor=COLORS.tealBlue; el.style.transform='translateY(-2px)'; el.style.boxShadow=`0 6px 16px rgba(6,182,212,0.14)`; }}
-                      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background='white'; el.style.borderColor='rgba(0,128,128,0.18)'; el.style.transform=''; el.style.boxShadow='0 2px 8px rgba(0,128,128,0.07)'; }}
-                    >
-                      {b.icon}
-                      <Box>
-                        <Text size="9px" c="#9CA3AF" lh={1}>{b.sub}</Text>
-                        <Text size="xs" c={COLORS.navyBlue} fw={700} lh={1.3}>{b.label}</Text>
-                      </Box>
+                  <Box
+                    style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #16a34a 0%, #06b6d4 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(6,182,212,0.30)' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform='translateY(-2px)'; el.style.boxShadow='0 8px 22px rgba(6,182,212,0.50)'; }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(6,182,212,0.30)'; }}
+                  >
+                    <IconBrandGooglePlay size={15} color="white" />
+                    <Box>
+                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>GET IT ON</Text>
+                      <Text size="xs" c="white" fw={700} lh={1.3}>Google Play</Text>
                     </Box>
-                  ))}
+                  </Box>
+                  <Box
+                    style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #06b6d4 0%, #6366f1 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(99,102,241,0.30)' }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform='translateY(-2px)'; el.style.boxShadow='0 8px 22px rgba(99,102,241,0.50)'; }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(99,102,241,0.30)'; }}
+                  >
+                    <IconBrandApple size={15} color="white" />
+                    <Box>
+                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>DOWNLOAD ON THE</Text>
+                      <Text size="xs" c="white" fw={700} lh={1.3}>App Store</Text>
+                    </Box>
+                  </Box>
                 </Stack>
               </Box>
 
