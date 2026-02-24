@@ -682,19 +682,23 @@ export function Landing() {
                   Need help? Our agents handle bookings, disputes, and refunds. Or chat with our AI assistant for instant answers.
                 </Text>
 
-                {/* Phone number card */}
+                {/* Phone number card (softer background) */}
                 <Box mb={20} p="md"
-                  style={{ background:`linear-gradient(135deg,${COLORS.navyBlue},${COLORS.tealBlue})`, borderRadius:14 }}>
-                  <Text size="xs" c="rgba(255,255,255,0.6)" fw={600} mb={4} style={{ textTransform:'uppercase', letterSpacing:'0.08em' }}>
+                  style={{
+                    background: 'linear-gradient(90deg, rgba(6,182,212,0.10), rgba(99,102,241,0.06))',
+                    borderRadius:14,
+                    border: '1px solid rgba(6,182,212,0.08)'
+                  }}>
+                  <Text size="xs" c={COLORS.navyBlue} fw={700} mb={6} style={{ textTransform:'uppercase', letterSpacing:'0.08em', opacity:0.95 }}>
                     Support hotline
                   </Text>
                   <Group gap={10} align="center">
-                    <IconPhone size={18} color={COLORS.lemonYellow} />
-                    <Text fw={900} c="white" style={{ fontSize:'clamp(1.2rem,2.5vw,1.6rem)', letterSpacing:'-0.5px' }}>
+                    <IconPhone size={18} color={COLORS.tealBlue} />
+                    <Text fw={900} c={COLORS.navyBlue} style={{ fontSize:'clamp(1.1rem,2.2vw,1.5rem)', letterSpacing:'-0.5px' }}>
                       1234
                     </Text>
                   </Group>
-                  <Text size="xs" c="rgba(255,255,255,0.5)" mt={4}>Mon – Sun · 24hrs · Free in-app call</Text>
+                  <Text size="xs" c="#6B7280" mt={4}>Mon – Sun · 24hrs · Free in-app call</Text>
                 </Box>
 
                 {/* Action buttons row */}
@@ -702,14 +706,16 @@ export function Landing() {
                   <Button
                     size="sm"
                     leftSection={<IconPhone size={14} />}
+                    variant="outline"
                     style={{
                       flex:'1 1 auto',
-                      background:`linear-gradient(135deg,${COLORS.tealBlue},#006b6b)`,
-                      color:'white', fontWeight:700, border:'none', borderRadius:12,
-                      transition:'transform 0.18s, box-shadow 0.18s',
+                      color: COLORS.navyBlue,
+                      borderColor: `${COLORS.navyBlue}30`,
+                      fontWeight:700, borderRadius:12, transition:'all 0.18s ease',
+                      background: 'transparent'
                     }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform='translateY(-2px)'; el.style.boxShadow='0 8px 24px rgba(0,128,128,0.35)'; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow=''; }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = `${COLORS.navyBlue}07`; el.style.borderColor = `${COLORS.navyBlue}55`; el.style.transform='translateY(-2px)'; }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background=''; el.style.borderColor=`${COLORS.navyBlue}30`; el.style.transform=''; }}
                     onClick={() => navigate(ROUTES.signup)}
                   >
                     Call Now
