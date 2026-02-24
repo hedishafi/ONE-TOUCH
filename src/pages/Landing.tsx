@@ -153,17 +153,24 @@ export function Landing() {
         <Box px={{ base:'lg',sm:'xl' }} py="md"
           style={{ position:'sticky',top:0,zIndex:200,background:'rgba(255,255,255,0.88)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)',borderBottom:'1px solid rgba(0,0,137,0.08)',boxShadow:'0 2px 16px rgba(0,0,137,0.05)' }}>
           <Group justify="space-between" maw={1140} mx="auto">
+            {/* Logo */}
             <Group gap="xs">
               <Box style={{ width:38,height:38,borderRadius:11,background:`linear-gradient(135deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(0,0,137,0.25)' }}>
                 <IconShieldCheck size={20} color="white" stroke={2.5} />
               </Box>
               <Text fw={800} size="lg" style={{ color:COLORS.navyBlue,letterSpacing:'-0.3px' }}>ONE TOUCH</Text>
             </Group>
+            {/* Centered nav links */}
             <Group gap="lg">
-              <LanguageSwitcher />
-              {['Services','How It Works','About'].map(l => (
+              {['Browse Services','How It Works','About'].map(l => (
                 <Text key={l} size="sm" fw={600} c={COLORS.navyBlue} className="nav-link">{l}</Text>
               ))}
+            </Group>
+            {/* Right side: language, login, signup */}
+            <Group gap="lg">
+              <Box style={{ minWidth: 60 }}>
+                <LanguageSwitcher shortCodes={['en','am']} />
+              </Box>
               <Button variant="subtle" size="sm" style={{ color:COLORS.navyBlue,fontWeight:600 }} onClick={() => navigate(ROUTES.login)}>Login</Button>
               <Button className="btn-teal" size="sm" style={{ color:'white',fontWeight:700 }} onClick={() => navigate(ROUTES.signup)}>Sign Up</Button>
             </Group>
