@@ -6,6 +6,8 @@ import { ScrollToTop } from './components/ScrollToTop';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
+import { ClientSignup } from './pages/ClientSignup';
+import { ProviderSignup } from './pages/ProviderSignup';
 import { Services } from './pages/Services';
 import { ServiceSubcategory } from './pages/ServiceSubcategory';
 import { HowItWorks } from './pages/HowItWorks';
@@ -77,6 +79,8 @@ function App() {
         <Route path={ROUTES.aiBot} element={<AIHelpBot />} />
         <Route path={ROUTES.login} element={<Login />} />
         <Route path={ROUTES.signup} element={<Signup />} />
+        <Route path={ROUTES.signupClient} element={<ClientSignup />} />
+        <Route path={ROUTES.signupProvider} element={<ProviderSignup />} />
 
         {/* ── Registration flows (no auth needed — mid-signup) ──── */}
         <Route path={ROUTES.clientTypeSelect} element={<ClientTypeSelect />} />

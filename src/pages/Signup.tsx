@@ -1,193 +1,194 @@
-import { useState } from 'react';
+/**
+ * Signup.tsx – Role selection entry point.
+ * Replaces the old generic signup form with two distinct paths.
+ */
 import {
-  Box, Button, Center, Container, Group, Paper, PasswordInput,
-  Stack, Text, TextInput, ThemeIcon, SimpleGrid, Badge,
+  Box, Button, Center, Container, Group,
+  Stack, Text, ThemeIcon, Badge,
 } from '@mantine/core';
-import { useForm } from '@mantine/form';
 import {
-  IconShieldCheck, IconArrowRight, IconMail, IconLock,
-  IconPhone, IconUser, IconBriefcase,
+  IconShieldCheck, IconArrowRight, IconUser, IconBriefcase, IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { notifications } from '@mantine/notifications';
-import { useAuthStore } from '../store/authStore';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { AIHelpCenter } from '../components/AIHelpCenter';
-import type { UserRole } from '../types';
+
+const STYLES = `
+@keyframes fadeUp  { from { opacity:0; transform:translateY(24px);          } to { opacity:1; transform:translateY(0);       } }
+@keyframes cardPop { from { opacity:0; transform:translateY(32px) scale(.97);} to { opacity:1; transform:translateY(0) scale(1); } }
+.su-hero  { animation: fadeUp   0.55s 0.05s ease both; }
+.su-card1 { animation: cardPop  0.55s 0.15s ease both; }
+.su-card2 { animation: cardPop  0.55s 0.28s ease both; }
+.su-role-card {
+  cursor: pointer;
+  border: 2px solid #E9ECEF;
+  border-radius: 24px;
+  background: white;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0,0,128,0.06);
+}
+.su-role-card:hover {
+  border-color: ${COLORS.tealBlue};
+  transform: translateY(-4px);
+  box-shadow: 0 12px 36px rgba(0,128,128,0.16);
+}
+`;
+
+interface RoleCardProps {
+  icon: React.ReactNode;
+  label: string;
+  subtitle: string;
+  benefits: string[];
+  color: string;
+  btnLabel: string;
+  animClass: string;
+  onClick: () => void;
+}
+
+function RoleCard({ icon, label, subtitle, benefits, color, btnLabel, animClass, onClick }: RoleCardProps) {
+  return (
+    <Box className={`su-role-card ${animClass}`} onClick={onClick} p={36}>
+      <Stack gap="lg" align="center" ta="center">
+        <ThemeIcon size={80} radius="xl" variant="light" color={color as any}>
+          {icon}
+        </ThemeIcon>
+        <Stack gap={6} align="center">
+          <Text fw={800} size="xl" c={COLORS.navyBlue}>{label}</Text>
+          <Text size="sm" c="dimmed" lh={1.65} maw={260}>{subtitle}</Text>
+        </Stack>
+        <Stack gap={10} align="flex-start" w="100%">
+          {benefits.map(b => (
+            <Group key={b} gap="xs" wrap="nowrap">
+              <ThemeIcon size={20} radius="xl" color="teal" variant="light" style={{ flexShrink: 0 }}>
+                <IconCheck size={12} />
+              </ThemeIcon>
+              <Text size="sm" c="dimmed">{b}</Text>
+            </Group>
+          ))}
+        </Stack>
+        <Button
+          fullWidth size="md" radius="xl"
+          color={color as any}
+          rightSection={<IconArrowRight size={16} />}
+          mt={4}
+        >
+          {btnLabel}
+        </Button>
+      </Stack>
+    </Box>
+  );
+}
 
 export function Signup() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const { signup } = useAuthStore();
-  const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-
-  const form = useForm({
-    initialValues: { email: '', phone: '', password: '', confirmPassword: '' },
-    validate: {
-      email: (v) => (/^\S+@\S+$/.test(v) ? null : 'Invalid email'),
-      phone: (v) => (v.length >= 7 ? null : 'Valid phone required'),
-      password: (v) => (v.length >= 6 ? null : 'Min 6 characters'),
-      confirmPassword: (v, values) => (v === values.password ? null : 'Passwords do not match'),
-    },
-  });
-
-  const handleSubmit = (values: typeof form.values) => {
-    if (!selectedRole) {
-      notifications.show({ title: 'Select a Role', message: 'Please select Client or Provider.', color: 'yellow' });
-      return;
-    }
-    setLoading(true);
-    setTimeout(() => {
-      const result = signup({ email: values.email, password: values.password, phone: values.phone, role: selectedRole });
-      setLoading(false);
-      if (result.success) {
-        notifications.show({ title: 'Account Created!', message: 'Complete your profile to get started.', color: 'teal' });
-        if (selectedRole === 'client') navigate(ROUTES.clientTypeSelect);
-        else navigate(ROUTES.providerRegister);
-      } else {
-        notifications.show({ title: 'Signup Failed', message: result.error, color: 'red' });
-      }
-    }, 800);
-  };
 
   return (
     <Box
       style={{
         minHeight: '100vh',
-        background: `linear-gradient(150deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 40%, ${COLORS.tealBlue}40 100%)`,
+        background: `linear-gradient(150deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 45%, ${COLORS.tealBlue}38 100%)`,
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      {/* Top bar */}
+      <style>{STYLES}</style>
+
+      {/* ── Top bar ──────────────────────────────────────────── */}
       <Group justify="space-between" p="md" px="xl">
         <Group gap="sm" onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>
           <Box
-            w={36}
-            h={36}
-            style={{ borderRadius: 10, background: COLORS.lemonYellow, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            w={38} h={38}
+            style={{ borderRadius: 12, background: COLORS.lemonYellow, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <IconShieldCheck size={18} color={COLORS.navyBlue} stroke={2.5} />
+            <IconShieldCheck size={20} color={COLORS.navyBlue} stroke={2.5} />
           </Box>
-          <Text fw={800} size="lg" c="white">ONE TOUCH</Text>
+          <Text fw={800} size="lg" c="white" style={{ letterSpacing: 0.5 }}>ONE TOUCH</Text>
         </Group>
-        <LanguageSwitcher />
+        <Group gap="md">
+          <LanguageSwitcher />
+          <Button variant="subtle" color="gray" size="sm" c="white" onClick={() => navigate(ROUTES.login)}>
+            Sign In
+          </Button>
+        </Group>
       </Group>
 
-      <Center flex={1} p="md">
-        <Container size={500} w="100%">
-          <Paper shadow="xl" radius="xl" p={40}>
-            <Stack gap="xl">
-              <Stack gap={4} align="center">
-                <ThemeIcon size={56} radius="xl" style={{ background: `${COLORS.tealBlue}15` }} variant="light" color="teal">
-                  <IconShieldCheck size={28} />
-                </ThemeIcon>
-                <Text fw={800} size="xl" c={COLORS.navyBlue}>Create your account</Text>
-                <Text c="dimmed" size="sm">Join ONE TOUCH in seconds</Text>
-              </Stack>
+      {/* ── Main content ─────────────────────────────────────── */}
+      <Center flex={1} py={48} px="md">
+        <Container size={860} w="100%">
+          <Stack gap={48}>
 
-              {/* Role Selection */}
-              <Stack gap="sm">
-                <Text size="sm" fw={600} c={COLORS.navyBlue}>{t('role.select_role')}</Text>
-                <SimpleGrid cols={2} spacing="md">
-                  {[
-                    { role: 'client' as UserRole, label: t('role.client'), desc: t('role.client_desc'), icon: <IconUser size={24} /> },
-                    { role: 'provider' as UserRole, label: t('role.provider'), desc: t('role.provider_desc'), icon: <IconBriefcase size={24} /> },
-                  ].map(item => (
-                    <Box
-                      key={item.role}
-                      p="md"
-                      style={{
-                        borderRadius: 16,
-                        border: `2px solid ${selectedRole === item.role ? COLORS.tealBlue : '#E9ECEF'}`,
-                        background: selectedRole === item.role ? `${COLORS.tealBlue}08` : 'white',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s',
-                      }}
-                      onClick={() => setSelectedRole(item.role)}
-                    >
-                      <Stack gap={6} align="center" ta="center">
-                        <ThemeIcon
-                          size={48}
-                          radius="xl"
-                          color={selectedRole === item.role ? 'teal' : 'gray'}
-                          variant={selectedRole === item.role ? 'filled' : 'light'}
-                        >
-                          {item.icon}
-                        </ThemeIcon>
-                        <Text fw={700} size="sm" c={selectedRole === item.role ? COLORS.tealBlue : COLORS.navyBlue}>
-                          {item.label}
-                        </Text>
-                        <Text size="xs" c="dimmed" lh={1.4}>{item.desc}</Text>
-                      </Stack>
-                    </Box>
-                  ))}
-                </SimpleGrid>
-              </Stack>
-
-              {/* Form */}
-              <form onSubmit={form.onSubmit(handleSubmit)}>
-                <Stack gap="md">
-                  <TextInput
-                    label={t('auth.email')}
-                    placeholder="you@example.com"
-                    leftSection={<IconMail size={16} />}
-                    {...form.getInputProps('email')}
-                  />
-                  <TextInput
-                    label={t('auth.phone')}
-                    placeholder="+1 555 000 000"
-                    leftSection={<IconPhone size={16} />}
-                    {...form.getInputProps('phone')}
-                  />
-                  <SimpleGrid cols={2}>
-                    <PasswordInput
-                      label={t('auth.password')}
-                      placeholder="Min 6 chars"
-                      leftSection={<IconLock size={16} />}
-                      {...form.getInputProps('password')}
-                    />
-                    <PasswordInput
-                      label="Confirm Password"
-                      placeholder="Repeat password"
-                      leftSection={<IconLock size={16} />}
-                      {...form.getInputProps('confirmPassword')}
-                    />
-                  </SimpleGrid>
-                  <Button
-                    type="submit"
-                    fullWidth
-                    size="md"
-                    loading={loading}
-                    rightSection={<IconArrowRight size={16} />}
-                    style={{
-                      background: `linear-gradient(135deg, ${COLORS.tealBlue} 0%, ${COLORS.tealDark} 100%)`,
-                    }}
-                  >
-                    {t('auth.signup')}
-                  </Button>
-                </Stack>
-              </form>
-
-              <Text size="sm" ta="center" c="dimmed">
-                {t('auth.have_account')}{' '}
-                <Text
-                  component="span"
-                  c={COLORS.navyBlue}
-                  fw={600}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(ROUTES.login)}
-                >
-                  {t('nav.login')}
-                </Text>
+            {/* Hero */}
+            <Stack gap={12} align="center" ta="center" className="su-hero">
+              <Badge
+                size="lg" radius="xl" variant="light"
+                style={{ background: 'rgba(245,230,66,0.15)', color: COLORS.lemonYellow, borderColor: 'rgba(245,230,66,0.3)' }}
+              >
+                Create your account
+              </Badge>
+              <Text fw={900} style={{ fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', lineHeight: 1.15, letterSpacing: -0.5, color: 'white' }}>
+                How would you like to<br />join ONE TOUCH?
+              </Text>
+              <Text size="md" c="rgba(255,255,255,0.65)" maw={480}>
+                Select the account type that fits your needs. You can always update your profile later.
               </Text>
             </Stack>
-          </Paper>
+
+            {/* Role cards */}
+            <Box
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gap: 24,
+              }}
+            >
+              <RoleCard
+                animClass="su-card1"
+                icon={<IconUser size={38} />}
+                label="I Need Services"
+                subtitle="Find and book trusted professionals for any task, quickly and securely."
+                benefits={[
+                  'Browse hundreds of local service providers',
+                  'Book in minutes with transparent pricing',
+                  'Rate and review every experience',
+                  'Secure wallet & loyalty rewards',
+                ]}
+                color="navy"
+                btnLabel="Sign Up as Client"
+                onClick={() => navigate(ROUTES.signupClient)}
+              />
+              <RoleCard
+                animClass="su-card2"
+                icon={<IconBriefcase size={38} />}
+                label="I Offer Services"
+                subtitle="Join as a verified professional and grow your business with ONE TOUCH."
+                benefits={[
+                  'Identity-verified & trusted ecosystem',
+                  'Set your own services and rates',
+                  'Receive jobs directly on the map',
+                  'Transparent earnings & instant wallet',
+                ]}
+                color="teal"
+                btnLabel="Sign Up as Provider"
+                onClick={() => navigate(ROUTES.signupProvider)}
+              />
+            </Box>
+
+            {/* Footer */}
+            <Text ta="center" size="xs" c="rgba(255,255,255,0.45)">
+              Already have an account?{' '}
+              <Text
+                span fw={600} c={COLORS.lemonYellow}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(ROUTES.login)}
+              >
+                Sign in here
+              </Text>
+            </Text>
+          </Stack>
         </Container>
       </Center>
+
       <AIHelpCenter />
     </Box>
   );

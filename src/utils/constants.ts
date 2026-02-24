@@ -72,6 +72,8 @@ export const ROUTES = {
   about: '/about',
   login: '/login',
   signup: '/signup',
+  signupClient: '/signup/client',
+  signupProvider: '/signup/provider',
   roleSelect: '/role-select',
   clientTypeSelect: '/register/client-type',
   individualRegister: '/register/individual',
