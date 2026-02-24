@@ -53,6 +53,12 @@ const ANIMATIONS = `
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+@keyframes bgWave {
+  0%   { background-position: 0% 50%; }
+  33%  { background-position: 60% 30%; }
+  66%  { background-position: 100% 70%; }
+  100% { background-position: 0% 50%; }
+}
 @keyframes slideUnderline {
   from { width: 0; }
   to   { width: 100%; }
@@ -395,6 +401,7 @@ export function Landing() {
         </Box>
 
         {/* ── HOW IT WORKS ── */}
+        <Box style={{ background: '#ffffff', position: 'relative' }}>
         <Container size="lg" py={80} px={{ base:'md',sm:'xl' }}>
           <Stack align="center" mb={60} gap="sm">
             <Badge size="lg" style={{ background:`${COLORS.lemonYellow}30`,color:'#7A6B00',border:`1px solid ${COLORS.lemonYellow}`,fontWeight:700 }}>
@@ -424,6 +431,7 @@ export function Landing() {
             ))}
           </SimpleGrid>
         </Container>
+        </Box>
 
         {/* ══════════════════════════════════════════════════════════
             UNIFIED BOTTOM SECTION — Get Started · Download · Call
@@ -433,12 +441,12 @@ export function Landing() {
           px={{ base: 'md', sm: 'xl' }}
           style={{
             background: '#ffffff',
-            borderTop: '1px solid #E9ECEF',
             position: 'relative',
             overflow: 'hidden',
+            borderTop: 'none',
           }}
         >
-          {/* Subtle background blobs */}
+          {/* Background blobs */}
           <Box style={{ position:'absolute', top:-160, right:'10%', width:500, height:500, borderRadius:'50%', background:`radial-gradient(circle, ${COLORS.tealBlue}06 0%, transparent 65%)`, pointerEvents:'none' }} />
           <Box style={{ position:'absolute', bottom:-140, left:'5%', width:440, height:440, borderRadius:'50%', background:`radial-gradient(circle, ${COLORS.navyBlue}05 0%, transparent 65%)`, pointerEvents:'none' }} />
 
@@ -496,8 +504,9 @@ export function Landing() {
                 radius={20}
                 className="feat-card"
                 style={{
-                  background: '#F8F9FA',
-                  border: '1.5px solid #E9ECEF',
+                  background: 'white',
+                  border: '1.5px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 8px 40px rgba(0,0,128,0.08)',
                 }}
               >
                 <Group gap={12} mb="lg" align="center">
@@ -549,14 +558,15 @@ export function Landing() {
                 radius={20}
                 className="feat-card"
                 style={{
-                  background: '#F8F9FA',
-                  border: '1.5px solid #E9ECEF',
+                  background: 'white',
+                  border: '1.5px solid rgba(0,0,0,0.06)',
+                  boxShadow: '0 8px 40px rgba(0,0,128,0.08)',
                 }}
               >
                 <Group gap={12} mb="lg" align="center">
                   <Box style={{ position:'relative', width:44, height:44, borderRadius:14, background:`${COLORS.navyBlue}10`, display:'flex', alignItems:'center', justifyContent:'center' }}>
                     <IconHeadset size={22} color={COLORS.navyBlue} />
-                    <Box style={{ position:'absolute', top:-2, right:-2, width:10, height:10, borderRadius:'50%', background:'#22c55e', border:'2px solid #F8F9FA', boxShadow:'0 0 6px #22c55e' }} />
+                    <Box style={{ position:'absolute', top:-2, right:-2, width:10, height:10, borderRadius:'50%', background:'#22c55e', border:'2px solid white', boxShadow:'0 0 6px #22c55e' }} />
                   </Box>
                   <Box>
                     <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>Call Center</Text>
@@ -622,81 +632,144 @@ export function Landing() {
           </Container>
         </Box>
 
-        {/* ── COMPACT FOOTER ── */}
+        {/* ── PREMIUM FOOTER ── */}
         <Box style={{
-          background: `linear-gradient(135deg, #020C1B 0%, #05142E 50%, #04232E 100%)`,
+          background: `linear-gradient(135deg, #000080 0%, #004080 25%, #008080 50%, #004060 75%, #000080 100%)`,
+          backgroundSize: '300% 300%',
+          animation: 'gradientShift 10s ease infinite',
           position: 'relative',
           overflow: 'hidden',
-          paddingTop: '48px',
-          paddingBottom: '28px',
         }}>
-          {/* Subtle top edge */}
-          <Box style={{ position:'absolute', top:0, left:0, right:0, height:1, background:`linear-gradient(90deg, transparent, ${COLORS.tealBlue}40, transparent)` }} />
 
-          <Container size="lg" style={{ position: 'relative', zIndex: 1 }}>
+          {/* Decorative blobs */}
+          <Box style={{ position:'absolute', top:-80, left:-80, width:320, height:320, borderRadius:'50%', background:`radial-gradient(circle, ${COLORS.tealBlue}08 0%, transparent 70%)`, pointerEvents:'none' }} />
+          <Box style={{ position:'absolute', bottom:-60, right:-60, width:280, height:280, borderRadius:'50%', background:`radial-gradient(circle, ${COLORS.navyBlue}06 0%, transparent 70%)`, pointerEvents:'none' }} />
 
-            {/* Main row: Brand + links */}
-            <Group justify="space-between" align="flex-start" wrap="wrap" gap="xl" mb={36}>
+          {/* Accent top border */}
+          <Box style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg, ${COLORS.navyBlue} 0%, ${COLORS.tealBlue} 50%, ${COLORS.navyBlue} 100%)`, opacity:0.25 }} />
 
-              {/* Brand */}
-              <Box maw={260}>
-                <Group gap="xs" mb={10}>
-                  <Box style={{ width:32, height:32, borderRadius:10, background:COLORS.lemonYellow, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <IconShieldCheck size={16} color={COLORS.navyBlue} />
+          {/* ── UPPER FOOTER ── */}
+          <Container size="lg" style={{ position:'relative', zIndex:1, paddingTop:64, paddingBottom:48 }}>
+            <SimpleGrid cols={{ base:1, sm:2, md:4 }} spacing={40}>
+
+              {/* Brand Column */}
+              <Box>
+                <Group gap={10} mb={16}>
+                  <Box style={{ width:40, height:40, borderRadius:12, background:`linear-gradient(135deg,${COLORS.navyBlue},${COLORS.tealBlue})`, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 16px ${COLORS.tealBlue}30` }}>
+                    <IconShieldCheck size={20} color="white" stroke={2.2} />
                   </Box>
-                  <Text fw={800} size="md" c="white" style={{ letterSpacing:'-0.3px' }}>ONE TOUCH</Text>
+                  <Text fw={900} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>ONE TOUCH</Text>
                 </Group>
-                <Text size="xs" c="rgba(255,255,255,0.45)" lh={1.7}>
-                  Trusted services near you — instantly. Secure, transparent & reliable.
+                <Text size="sm" c="#6B7280" lh={1.8} mb={24}>
+                  Connecting you with trusted local service providers — fast, safe & transparent.
                 </Text>
+                {/* App store mini badges */}
+                <Stack gap={8}>
+                  <Box
+                    onClick={() => {}}
+                    style={{ display:'flex', alignItems:'center', gap:8, background:'white', border:`1.5px solid #E5E7EB`, borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor=COLORS.tealBlue; (e.currentTarget as HTMLElement).style.boxShadow=`0 4px 12px ${COLORS.tealBlue}20`; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#E5E7EB'; (e.currentTarget as HTMLElement).style.boxShadow='0 1px 4px rgba(0,0,0,0.06)'; }}
+                  >
+                    <IconBrandGooglePlay size={16} color="#16a34a" />
+                    <Box><Text size="9px" c="#9CA3AF" lh={1}>GET IT ON</Text><Text size="xs" c={COLORS.navyBlue} fw={700} lh={1.2}>Google Play</Text></Box>
+                  </Box>
+                  <Box
+                    onClick={() => {}}
+                    style={{ display:'flex', alignItems:'center', gap:8, background:'white', border:`1.5px solid #E5E7EB`, borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor=COLORS.tealBlue; (e.currentTarget as HTMLElement).style.boxShadow=`0 4px 12px ${COLORS.tealBlue}20`; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor='#E5E7EB'; (e.currentTarget as HTMLElement).style.boxShadow='0 1px 4px rgba(0,0,0,0.06)'; }}
+                  >
+                    <IconBrandApple size={16} color={COLORS.navyBlue} />
+                    <Box><Text size="9px" c="#9CA3AF" lh={1}>DOWNLOAD ON THE</Text><Text size="xs" c={COLORS.navyBlue} fw={700} lh={1.2}>App Store</Text></Box>
+                  </Box>
+                </Stack>
               </Box>
 
-              {/* Quick Links */}
-              <Group gap={48} wrap="wrap" align="flex-start">
-                {[
-                  { title: 'Company', links: [
-                    { label: 'About', path: ROUTES.about },
+              {/* Product Column */}
+              <Box>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={16} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Product</Text>
+                <Stack gap={10}>
+                  {[
+                    { label: 'Browse Services', path: ROUTES.services },
                     { label: 'How It Works', path: ROUTES.howItWorks },
-                    { label: 'Services', path: ROUTES.services },
-                  ]},
-                  { title: 'Support', links: [
-                    { label: 'Help Center', path: ROUTES.helpCenter },
-                    { label: 'Contact', path: ROUTES.support },
+                    { label: 'Become a Provider', path: ROUTES.signup },
                     { label: 'Dashboard', path: ROUTES.dashboard },
-                  ]},
-                  { title: 'Legal', links: [
-                    { label: 'Privacy', path: ROUTES.privacyPolicy },
-                    { label: 'Terms', path: ROUTES.termsOfService },
-                  ]},
-                ].map(section => (
-                  <Box key={section.title}>
-                    <Text fw={700} size="xs" c="rgba(255,255,255,0.6)" mb={10}
-                      style={{ textTransform:'uppercase', letterSpacing:'0.08em' }}>
-                      {section.title}
-                    </Text>
-                    <Stack gap={6}>
-                      {section.links.map(link => (
-                        <Text key={link.label} size="sm" c="rgba(255,255,255,0.45)" fw={500}
-                          onClick={() => navigate(link.path)}
-                          style={{ cursor:'pointer', transition:'color 0.15s' }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.9)'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='rgba(255,255,255,0.45)'; }}
-                        >
-                          {link.label}
-                        </Text>
-                      ))}
-                    </Stack>
-                  </Box>
-                ))}
-              </Group>
-            </Group>
+                  ].map(link => (
+                    <Text key={link.label} size="sm" c="#6B7280" fw={500}
+                      onClick={() => navigate(link.path)}
+                      style={{ cursor:'pointer', transition:'all 0.18s', display:'inline-flex', alignItems:'center', gap:4, width:'fit-content' }}
+                      onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color=COLORS.navyBlue; el.style.paddingLeft='4px'; }}
+                      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color='#6B7280'; el.style.paddingLeft='0'; }}
+                    >{link.label}</Text>
+                  ))}
+                </Stack>
+              </Box>
 
-            {/* Bottom line */}
-            <Box style={{ height:1, background:'rgba(255,255,255,0.06)' }} mb={16} />
-            <Text size="xs" c="rgba(255,255,255,0.3)" ta="center">
-              © 2026 ONE TOUCH Ethiopia · Made for Addis Ababa with ♥
-            </Text>
+              {/* Company Column */}
+              <Box>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={16} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Company</Text>
+                <Stack gap={10}>
+                  {[
+                    { label: 'About Us', path: ROUTES.about },
+                    { label: 'Help Center', path: ROUTES.helpCenter },
+                    { label: 'Contact & Support', path: ROUTES.support },
+                    { label: 'AI Help Bot', path: ROUTES.aiBot },
+                  ].map(link => (
+                    <Text key={link.label} size="sm" c="#6B7280" fw={500}
+                      onClick={() => navigate(link.path)}
+                      style={{ cursor:'pointer', transition:'all 0.18s', display:'inline-flex', alignItems:'center', gap:4, width:'fit-content' }}
+                      onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color=COLORS.navyBlue; el.style.paddingLeft='4px'; }}
+                      onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color='#6B7280'; el.style.paddingLeft='0'; }}
+                    >{link.label}</Text>
+                  ))}
+                </Stack>
+              </Box>
+
+              {/* Contact + Legal Column */}
+              <Box>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={16} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Contact</Text>
+                <Stack gap={10} mb={28}>
+                  <Group gap={8}>
+                    <IconPhone size={14} color={COLORS.tealBlue} />
+                    <Text size="sm" c={COLORS.navyBlue} fw={700}>1234</Text>
+                  </Group>
+                  <Text size="sm" c="#6B7280" lh={1.6}>Mon – Sun · 24 hrs<br />English & Amharic</Text>
+                </Stack>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={12} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Legal</Text>
+                <Stack gap={8}>
+                  {[
+                    { label: 'Privacy Policy', path: ROUTES.privacyPolicy },
+                    { label: 'Terms of Service', path: ROUTES.termsOfService },
+                  ].map(link => (
+                    <Text key={link.label} size="sm" c="#6B7280" fw={500}
+                      onClick={() => navigate(link.path)}
+                      style={{ cursor:'pointer', transition:'all 0.18s', width:'fit-content' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color=COLORS.navyBlue; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color='#6B7280'; }}
+                    >{link.label}</Text>
+                  ))}
+                </Stack>
+              </Box>
+
+            </SimpleGrid>
           </Container>
+
+          {/* ── BOTTOM BAR ── */}
+          <Box style={{ borderTop:'1px solid #E5E7EB', background:'#E8EDF2' }}>
+            <Container size="lg" style={{ position:'relative', zIndex:1 }}>
+              <Group justify="space-between" align="center" wrap="wrap" gap="md" py={20}>
+                <Text size="xs" c="#9CA3AF">
+                  © 2026 <Text component="span" c={COLORS.navyBlue} fw={600}>ONE TOUCH Ethiopia</Text> · All rights reserved.
+                </Text>
+                <Group gap={6}>
+                  <Box style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', boxShadow:'0 0 6px #22c55e' }} />
+                  <Text size="xs" c="#9CA3AF">All systems operational · Made with ♥ in Addis Ababa</Text>
+                </Group>
+              </Group>
+            </Container>
+          </Box>
+
         </Box>
 
         <AIHelpCenter />

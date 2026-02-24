@@ -62,12 +62,9 @@ export function LandingNavbar() {
         px={{ base: 'md', sm: 'lg', md: 'xl' }}
         py="md"
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 200,
-          background: 'rgba(255,255,255,0.88)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          position: 'relative',
+          zIndex: 10,
+          background: 'rgba(255,255,255,0.95)',
           borderBottom: '1px solid rgba(0,0,137,0.08)',
           boxShadow: '0 2px 16px rgba(0,0,137,0.05)',
         }}
