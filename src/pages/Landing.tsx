@@ -627,23 +627,23 @@ export function Landing() {
                       flex:'1 1 140px',
                       display:'inline-flex',
                       alignItems:'center',
-                      gap:10,
-                      background: 'linear-gradient(90deg, #2563eb 0%, #7c3aed 100%)',
-                      borderRadius:14,
-                      padding:'12px 16px',
+                      gap:12,
+                      background: 'linear-gradient(90deg, #06b6d4 0%, #6366f1 100%)',
+                      borderRadius:16,
+                      padding:'14px 18px',
                       textDecoration:'none',
                       cursor:'pointer',
-                      boxShadow:'0 8px 30px rgba(37,99,235,0.12)',
+                      boxShadow:'0 10px 30px rgba(99,102,241,0.10)',
                       color: 'white',
                       transition: 'transform 180ms ease, box-shadow 180ms ease'
                     }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 18px 40px rgba(124,58,237,0.18)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 30px rgba(37,99,235,0.12)'; }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-5px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 22px 50px rgba(99,102,241,0.16)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 10px 30px rgba(99,102,241,0.10)'; }}
                   >
-                    <IconBrandApple size={28} color="white" style={{ flexShrink:0 }} />
+                    <IconBrandApple size={30} color="white" style={{ flexShrink:0 }} />
                     <Box>
                       <Text size="8px" c="rgba(255,255,255,0.95)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Download on the</Text>
-                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.15 }}>App Store</Text>
+                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.12 }}>App Store</Text>
                     </Box>
                   </Box>
                 </Group>
