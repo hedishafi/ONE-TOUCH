@@ -1,13 +1,21 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from './utils/constants';
+import { ScrollToTop } from './components/ScrollToTop';
 
 // Public pages
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { Services } from './pages/Services';
+import { ServiceSubcategory } from './pages/ServiceSubcategory';
 import { HowItWorks } from './pages/HowItWorks';
 import { About } from './pages/About';
+import { Dashboard } from './pages/Dashboard';
+import { Support } from './pages/Support';
+import { HelpCenter } from './pages/HelpCenter';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { AIHelpBot } from './pages/AIHelpBot';
 
 // Registration flow
 import {
@@ -53,12 +61,20 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* ── Public ─────────────────────────────────────────────── */}
         <Route path={ROUTES.landing} element={<Landing />} />
         <Route path={ROUTES.services} element={<Services />} />
+        <Route path={ROUTES.serviceCategory} element={<ServiceSubcategory />} />
         <Route path={ROUTES.howItWorks} element={<HowItWorks />} />
         <Route path={ROUTES.about} element={<About />} />
+        <Route path={ROUTES.dashboard} element={<Dashboard />} />
+        <Route path={ROUTES.support} element={<Support />} />
+        <Route path={ROUTES.helpCenter} element={<HelpCenter />} />
+        <Route path={ROUTES.privacyPolicy} element={<PrivacyPolicy />} />
+        <Route path={ROUTES.termsOfService} element={<TermsOfService />} />
+        <Route path={ROUTES.aiBot} element={<AIHelpBot />} />
         <Route path={ROUTES.login} element={<Login />} />
         <Route path={ROUTES.signup} element={<Signup />} />
 

@@ -76,6 +76,17 @@ export function Services() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<typeof MOCK_CATEGORIES[0] | null>(null);
 
+  // Smooth scroll to top when toggling views
+  const handleCategorySelect = (cat: typeof MOCK_CATEGORIES[0]) => {
+    setSelectedCategory(cat);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToCategories = () => {
+    setSelectedCategory(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <>
       <style>{ANIMATIONS}</style>
@@ -152,7 +163,7 @@ export function Services() {
               </Stack>
 
               {/* Categories Grid */}
-              <SimpleGrid cols={{ base: 2, xs: 3, sm: 4 }} spacing="lg" mb={60}>
+              <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, md: 4 }} spacing="lg" mb={60}>
                 {MOCK_CATEGORIES.map((cat, i) => (
                   <Paper
                     key={cat.id}
@@ -163,7 +174,7 @@ export function Services() {
                       boxShadow: '0 2px 12px rgba(0,0,137,0.05)', cursor: 'pointer',
                       animationDelay: `${i * 0.08}s`
                     }}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => handleCategorySelect(cat)}
                   >
                     <Stack align="center" ta="center" gap="md">
                       <ThemeIcon size={56} radius="xl"
@@ -196,7 +207,7 @@ export function Services() {
                 {/* Header with back button */}
                 <Group justify="space-between" align="center">
                   <Group gap="md">
-                    <Button variant="subtle" size="sm" onClick={() => setSelectedCategory(null)}
+                    <Button variant="subtle" size="sm" onClick={handleBackToCategories}
                       style={{ padding: 0, color: COLORS.navyBlue }}>
                       <IconArrowLeft size={20} stroke={2.5} />
                     </Button>

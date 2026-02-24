@@ -3,13 +3,12 @@ import {
   Box, Button, Center, Container, Group, Paper, Stack, Text,
   ThemeIcon, SimpleGrid, Stepper, TextInput, FileButton,
   Progress, Alert, PinInput, Badge, Select, Textarea,
-  NumberInput, Checkbox, MultiSelect, Slider,
+  NumberInput, Checkbox, Slider,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconUser, IconBuilding, IconUpload,
   IconCamera, IconScan, IconPhoneCall, IconMail, IconCheck,
-  IconMapPin, IconClock, IconPhoto, IconCurrencyDollar,
-  IconBriefcase,
+  IconMapPin, IconBriefcase,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +18,8 @@ import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { AIHelpCenter } from '../components/AIHelpCenter';
 import { storage, STORAGE_KEYS } from '../utils/storage';
-import type { ClientProfile, ProviderProfile } from '../types';
+import { useAuthStore } from '../store/authStore';
+import type { ClientProfile, ProviderProfile, User } from '../types';
 
 // ─── CLIENT TYPE SELECTION ─────────────────────────────────────────────────────
 export function ClientTypeSelect() {
@@ -132,10 +132,25 @@ export function IndividualClientRegister() {
 
   const verifyEmail = () => {
     if (emailOtp === MOCK_OTP) {
-      // Save mock client profile
+      const userId = `client-${Date.now()}`;
+      
+      // Save user to users list
+      const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+      const newUser: User = {
+        id: userId,
+        email: `user-${Date.now()}@onetouch.et`,
+        phone: '',
+        role: 'client',
+        createdAt: new Date().toISOString(),
+        verificationStatus: 'verified',
+      };
+      users.push(newUser);
+      storage.set(STORAGE_KEYS.users, users);
+
+      // Save client profile
       const profiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
       profiles.push({
-        userId: `client-${Date.now()}`,
+        userId: userId,
         clientType: 'individual',
         fullName: extractedData.fullName,
         idNumber: extractedData.idNumber,
@@ -144,6 +159,11 @@ export function IndividualClientRegister() {
         totalBookings: 0,
       });
       storage.set(STORAGE_KEYS.clientProfiles, profiles);
+      
+      // Authenticate user by setting currentUser in authStore
+      const { login } = useAuthStore.getState();
+      login(newUser.email, '');
+      
       notifications.show({ title: '🎉 Registration Complete!', message: 'Welcome to ONE TOUCH!', color: 'teal' });
       navigate(ROUTES.clientDashboard);
     } else {
@@ -332,6 +352,38 @@ export function BusinessClientRegister() {
 
   const finish = () => {
     if (emailOtp === MOCK_OTP) {
+      const userId = `client-${Date.now()}`;
+      
+      // Save user to users list
+      const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+      const newUser: User = {
+        id: userId,
+        email: `business-${Date.now()}@onetouch.et`,
+        phone: '',
+        role: 'client',
+        createdAt: new Date().toISOString(),
+        verificationStatus: 'verified',
+      };
+      users.push(newUser);
+      storage.set(STORAGE_KEYS.users, users);
+
+      // Save business client profile
+      const profiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
+      profiles.push({
+        userId: userId,
+        clientType: 'business',
+        fullName: extracted.businessName,
+        idNumber: extracted.taxId,
+        loyaltyTier: 'bronze',
+        walletBalance: 0,
+        totalBookings: 0,
+      });
+      storage.set(STORAGE_KEYS.clientProfiles, profiles);
+      
+      // Authenticate user
+      const { login } = useAuthStore.getState();
+      login(newUser.email, '');
+      
       notifications.show({ title: '🎉 Business Account Ready!', message: 'Welcome to ONE TOUCH Business.', color: 'teal' });
       navigate(ROUTES.clientDashboard);
     } else {
@@ -448,6 +500,62 @@ export function ProviderRegister() {
 
   const finish = () => {
     if (emailOtp === MOCK_OTP) {
+      const userId = `provider-${Date.now()}`;
+      
+      // Save user to users list
+      const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+      const newUser: User = {
+        id: userId,
+        email: `provider-${Date.now()}@onetouch.et`,
+        phone: '',
+        role: 'provider',
+        createdAt: new Date().toISOString(),
+        verificationStatus: 'verified',
+      };
+      users.push(newUser);
+      storage.set(STORAGE_KEYS.users, users);
+
+      // Save provider profile
+      const profiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
+      const mockCategoryId = selectedCategory || 'cat-001';
+      profiles.push({
+        userId: userId,
+        fullName: 'Service Provider',
+        idNumber: 'ETH-ID-' + Math.floor(Math.random() * 9000000 + 1000000),
+        selfieUrl: '',
+        idDocumentUrl: '',
+        categoryId: mockCategoryId,
+        subcategoryId: 'sub-001',
+        pricingModel: 'hourly',
+        hourlyRate: hourlyRate,
+        coverageRadius: coverageRadius,
+        lat: 9.0320,
+        lng: 38.7469,
+        portfolioImages: [],
+        isOnline: isOnline,
+        loyaltyTier: 'rising_pro',
+        walletBalance: 0,
+        rating: 5.0,
+        totalJobsCompleted: 0,
+        responseRate: 100,
+        completionRate: 100,
+        bio: bio,
+        availabilitySchedule: {
+          monday: { enabled: true, from: '08:00', to: '18:00' },
+          tuesday: { enabled: true, from: '08:00', to: '18:00' },
+          wednesday: { enabled: true, from: '08:00', to: '18:00' },
+          thursday: { enabled: true, from: '08:00', to: '18:00' },
+          friday: { enabled: true, from: '08:00', to: '18:00' },
+          saturday: { enabled: true, from: '09:00', to: '17:00' },
+          sunday: { enabled: false, from: '09:00', to: '17:00' },
+        },
+      });
+      storage.set(STORAGE_KEYS.providerProfiles, profiles);
+      
+      // Authenticate user
+      const { login } = useAuthStore.getState();
+      login(newUser.email, '');
+      
       notifications.show({ title: '🎉 Provider Profile Created!', message: 'You can now receive jobs on ONE TOUCH.', color: 'teal' });
       navigate(ROUTES.providerDashboard);
     } else {

@@ -67,6 +67,7 @@ export const SUPPORTED_LANGUAGES = [
 export const ROUTES = {
   landing: '/',
   services: '/services',
+  serviceCategory: '/services/:categoryId',
   howItWorks: '/how-it-works',
   about: '/about',
   login: '/login',
@@ -101,4 +102,10 @@ export const ROUTES = {
   adminAnalytics: '/admin/analytics',
   adminContent: '/admin/content',
   savedProviders: '/client/saved',
+  dashboard: '/dashboard',
+  support: '/support',
+  helpCenter: '/help-center',
+  privacyPolicy: '/privacy-policy',
+  termsOfService: '/terms-of-service',
+  aiBot: '/ai-bot',
 };
