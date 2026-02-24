@@ -4,9 +4,9 @@ import {
 } from '@mantine/core';
 import {
   IconShieldCheck, IconBolt, IconMapPin, IconWallet,
-  IconStar, IconArrowRight, IconUsers, IconCar, IconSparkles,
+  IconStar, IconArrowRight, IconCar, IconSparkles,
   IconDroplets, IconTruck, IconHeart, IconSchool, IconDeviceLaptop,
-  IconCheck, IconPhone,
+  IconPhone,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { COLORS, ROUTES } from '../utils/constants';
@@ -105,7 +105,7 @@ const ANIMATIONS = `
 }
 `;
 
-const CATEGORY_ICONS: Record<string, JSX.Element> = {
+const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   car:           <IconCar size={24} />,
   sparkles:      <IconSparkles size={24} />,
   droplets:      <IconDroplets size={24} />,
@@ -154,22 +154,29 @@ export function Landing() {
           style={{ position:'sticky',top:0,zIndex:200,background:'rgba(255,255,255,0.88)',backdropFilter:'blur(14px)',WebkitBackdropFilter:'blur(14px)',borderBottom:'1px solid rgba(0,0,137,0.08)',boxShadow:'0 2px 16px rgba(0,0,137,0.05)' }}>
           <Group justify="space-between" maw={1140} mx="auto">
             {/* Logo */}
-            <Group gap="xs">
+            <Group gap="xs" style={{ cursor:'pointer' }} onClick={() => navigate(ROUTES.landing)}>
               <Box style={{ width:38,height:38,borderRadius:11,background:`linear-gradient(135deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 4px 12px rgba(0,0,137,0.25)' }}>
                 <IconShieldCheck size={20} color="white" stroke={2.5} />
               </Box>
               <Text fw={800} size="lg" style={{ color:COLORS.navyBlue,letterSpacing:'-0.3px' }}>ONE TOUCH</Text>
             </Group>
             {/* Centered nav links */}
-            <Group gap="lg">
-              {['Browse Services','How It Works','About'].map(l => (
-                <Text key={l} size="sm" fw={600} c={COLORS.navyBlue} className="nav-link">{l}</Text>
+            <Group gap="lg" align="center">
+              {[
+                { label:'Browse Services', path:ROUTES.services },
+                { label:'How It Works', path:ROUTES.howItWorks },
+                { label:'About', path:ROUTES.about }
+              ].map(link => (
+                <Text key={link.label} size="sm" fw={600} c={COLORS.navyBlue} className="nav-link"
+                  onClick={() => navigate(link.path)}>
+                  {link.label}
+                </Text>
               ))}
             </Group>
             {/* Right side: language, login, signup */}
-            <Group gap="lg">
+            <Group gap="lg" align="center">
               <Box style={{ minWidth: 60 }}>
-                <LanguageSwitcher shortCodes={['en','am']} />
+                <LanguageSwitcher />
               </Box>
               <Button variant="subtle" size="sm" style={{ color:COLORS.navyBlue,fontWeight:600 }} onClick={() => navigate(ROUTES.login)}>Login</Button>
               <Button className="btn-teal" size="sm" style={{ color:'white',fontWeight:700 }} onClick={() => navigate(ROUTES.signup)}>Sign Up</Button>
@@ -332,7 +339,7 @@ export function Landing() {
             {MOCK_CATEGORIES.map((cat,i) => (
               <Box key={cat.id} className="cat-card" p="xl" ta="center"
                 style={{ background:'white',border:'1.5px solid #E9ECEF',borderRadius:20,boxShadow:'0 2px 12px rgba(0,0,137,0.05)',animation:`fadeUp 0.6s ${0.06*i}s ease both` }}
-                onClick={() => navigate(ROUTES.signup)}>
+                onClick={() => navigate(ROUTES.services)}>
                 <ThemeIcon size={56} radius="xl" mb="md" mx="auto"
                   style={{ background:`${cat.color}14`,color:cat.color,transition:'transform 0.2s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform='scale(1.12)'}
@@ -349,7 +356,7 @@ export function Landing() {
             <Button variant="outline" size="md" rightSection={<IconArrowRight size={16} />}
               className="btn-outline-navy"
               style={{ fontWeight:700 }}
-              onClick={() => navigate(ROUTES.signup)}>
+              onClick={() => navigate(ROUTES.services)}>
               View All Services
             </Button>
           </Group>

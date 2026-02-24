@@ -66,6 +66,9 @@ export const SUPPORTED_LANGUAGES = [
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 export const ROUTES = {
   landing: '/',
+  services: '/services',
+  howItWorks: '/how-it-works',
+  about: '/about',
   login: '/login',
   signup: '/signup',
   roleSelect: '/role-select',
