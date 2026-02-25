@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import {
   IconShieldCheck, IconUser, IconBuilding, IconUpload,
-  IconCamera, IconScan, IconPhoneCall, IconMail, IconCheck,
+  IconCamera, IconScan, IconPhoneCall, IconCheck,
   IconMapPin, IconBriefcase,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
@@ -97,7 +97,6 @@ export function IndividualClientRegister() {
   const [ocrDone, setOcrDone] = useState(false);
   const [extractedData, setExtractedData] = useState({ fullName: '', idNumber: '' });
   const [phoneOtp, setPhoneOtp] = useState('');
-  const [emailOtp, setEmailOtp] = useState('');
   const [idFile, setIdFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
 
@@ -123,22 +122,11 @@ export function IndividualClientRegister() {
 
   const verifyPhone = () => {
     if (phoneOtp === MOCK_OTP) {
-      notifications.show({ title: 'Phone Verified!', message: 'Your phone number is confirmed.', color: 'teal' });
-      setActive(2);
-    } else {
-      notifications.show({ title: 'Invalid OTP', message: `Use ${MOCK_OTP} for demo`, color: 'red' });
-    }
-  };
-
-  const verifyEmail = () => {
-    if (emailOtp === MOCK_OTP) {
       const userId = `client-${Date.now()}`;
-      
-      // Save user to users list
       const users = storage.get<User[]>(STORAGE_KEYS.users, []);
       const newUser: User = {
         id: userId,
-        email: `user-${Date.now()}@onetouch.et`,
+        email: `user_${Date.now()}@onetouch.local`,
         phone: '',
         role: 'client',
         createdAt: new Date().toISOString(),
@@ -146,8 +134,6 @@ export function IndividualClientRegister() {
       };
       users.push(newUser);
       storage.set(STORAGE_KEYS.users, users);
-
-      // Save client profile
       const profiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
       profiles.push({
         userId: userId,
@@ -159,11 +145,8 @@ export function IndividualClientRegister() {
         totalBookings: 0,
       });
       storage.set(STORAGE_KEYS.clientProfiles, profiles);
-      
-      // Authenticate user by setting currentUser in authStore
       const { login } = useAuthStore.getState();
       login(newUser.email, '');
-      
       notifications.show({ title: '🎉 Registration Complete!', message: 'Welcome to ONE TOUCH!', color: 'teal' });
       navigate(ROUTES.clientDashboard);
     } else {
@@ -176,7 +159,6 @@ export function IndividualClientRegister() {
       <Stepper active={active} color="teal" size="sm" mb="xl" onStepClick={setActive}>
         <Stepper.Step icon={<IconScan size={16} />} label="ID Upload" />
         <Stepper.Step icon={<IconPhoneCall size={16} />} label="Phone OTP" />
-        <Stepper.Step icon={<IconMail size={16} />} label="Email OTP" />
       </Stepper>
 
       {active === 0 && (
@@ -297,27 +279,6 @@ export function IndividualClientRegister() {
           </Button>
         </Stack>
       )}
-
-      {active === 2 && (
-        <Stack gap="lg">
-          <Alert color="navy" icon={<IconMail size={14} />}>
-            {t('register.otp_sent')} <strong>your email</strong>. {t('register.otp_enter')}.
-          </Alert>
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
-          <PinInput
-            length={6}
-            value={emailOtp}
-            onChange={setEmailOtp}
-            size="lg"
-            mx="auto"
-            type="number"
-          />
-          <Button fullWidth size="md" onClick={verifyEmail}
-            style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.tealBlue} 100%)` }}>
-            {t('register.complete')}
-          </Button>
-        </Stack>
-      )}
     </RegisterShell>
   );
 }
@@ -331,7 +292,6 @@ export function BusinessClientRegister() {
   const [ocrDone, setOcrDone] = useState(false);
   const [extracted, setExtracted] = useState({ businessName: '', taxId: '', address: '' });
   const [phoneOtp, setPhoneOtp] = useState('');
-  const [emailOtp, setEmailOtp] = useState('');
 
   const simulateOcr = (file: File | null) => {
     setDocFile(file);
@@ -351,14 +311,11 @@ export function BusinessClientRegister() {
   };
 
   const finish = () => {
-    if (emailOtp === MOCK_OTP) {
       const userId = `client-${Date.now()}`;
-      
-      // Save user to users list
       const users = storage.get<User[]>(STORAGE_KEYS.users, []);
       const newUser: User = {
         id: userId,
-        email: `business-${Date.now()}@onetouch.et`,
+        email: `business_${Date.now()}@onetouch.local`,
         phone: '',
         role: 'client',
         createdAt: new Date().toISOString(),
@@ -366,8 +323,6 @@ export function BusinessClientRegister() {
       };
       users.push(newUser);
       storage.set(STORAGE_KEYS.users, users);
-
-      // Save business client profile
       const profiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
       profiles.push({
         userId: userId,
@@ -379,16 +334,10 @@ export function BusinessClientRegister() {
         totalBookings: 0,
       });
       storage.set(STORAGE_KEYS.clientProfiles, profiles);
-      
-      // Authenticate user
       const { login } = useAuthStore.getState();
       login(newUser.email, '');
-      
       notifications.show({ title: '🎉 Business Account Ready!', message: 'Welcome to ONE TOUCH Business.', color: 'teal' });
       navigate(ROUTES.clientDashboard);
-    } else {
-      notifications.show({ title: 'Invalid OTP', message: 'Use 123456 for demo', color: 'red' });
-    }
   };
 
   return (
@@ -396,7 +345,6 @@ export function BusinessClientRegister() {
       <Stepper active={active} color="teal" size="sm" mb="xl">
         <Stepper.Step icon={<IconBuilding size={16} />} label="Documents" />
         <Stepper.Step icon={<IconPhoneCall size={16} />} label="Phone OTP" />
-        <Stepper.Step icon={<IconMail size={16} />} label="Email OTP" />
       </Stepper>
 
       {active === 0 && (
@@ -447,18 +395,8 @@ export function BusinessClientRegister() {
         <Stack gap="lg" align="center">
           <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
           <PinInput length={6} value={phoneOtp} onChange={setPhoneOtp} size="lg" type="number" />
-          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) setActive(2); else notifications.show({ title: 'Wrong OTP', message: 'Use 123456', color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
-            Verify Phone
-          </Button>
-        </Stack>
-      )}
-
-      {active === 2 && (
-        <Stack gap="lg" align="center">
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
-          <PinInput length={6} value={emailOtp} onChange={setEmailOtp} size="lg" type="number" />
-          <Button fullWidth size="md" onClick={finish} style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.tealBlue} 100%)` }}>
-            Complete Registration
+          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) finish(); else notifications.show({ title: 'Wrong OTP', message: 'Use 123456', color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
+            Verify Phone & Complete
           </Button>
         </Stack>
       )}
@@ -474,7 +412,6 @@ export function ProviderRegister() {
   const [ocrDone, setOcrDone] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [phoneOtp, setPhoneOtp] = useState('');
-  const [emailOtp, setEmailOtp] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [pricingModel, setPricingModel] = useState<string | null>(null);
   const [hourlyRate, setHourlyRate] = useState<number>(50);
@@ -499,14 +436,11 @@ export function ProviderRegister() {
   };
 
   const finish = () => {
-    if (emailOtp === MOCK_OTP) {
       const userId = `provider-${Date.now()}`;
-      
-      // Save user to users list
       const users = storage.get<User[]>(STORAGE_KEYS.users, []);
       const newUser: User = {
         id: userId,
-        email: `provider-${Date.now()}@onetouch.et`,
+        email: `provider_${Date.now()}@onetouch.local`,
         phone: '',
         role: 'provider',
         createdAt: new Date().toISOString(),
@@ -558,9 +492,6 @@ export function ProviderRegister() {
       
       notifications.show({ title: '🎉 Provider Profile Created!', message: 'You can now receive jobs on ONE TOUCH.', color: 'teal' });
       navigate(ROUTES.providerDashboard);
-    } else {
-      notifications.show({ title: 'Wrong OTP', message: 'Use 123456 for demo', color: 'red' });
-    }
   };
 
   return (
@@ -690,10 +621,8 @@ export function ProviderRegister() {
       {active === 4 && (
         <Stack gap="lg" align="center">
           <Alert color="teal" icon={<IconCheck size={14} />}>
-            Almost done! Verify your email to activate your provider account.
+            All verified! Click below to activate your provider account.
           </Alert>
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
-          <PinInput length={6} value={emailOtp} onChange={setEmailOtp} size="lg" type="number" />
           <Button fullWidth size="md" onClick={finish}
             style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.tealBlue} 100%)` }}>
             Complete Registration

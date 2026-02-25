@@ -8,9 +8,9 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Box, Button, FileButton, Group, MultiSelect, NumberInput,
-  Paper, PasswordInput, Progress, Select, Stack, Text, Textarea,
-  Avatar, Badge, Radio, Alert, SimpleGrid, useMantineColorScheme,
+  Box, Button, FileButton, Group, MultiSelect,
+  PasswordInput, Select, Stack, Text,
+  Avatar, Badge, Radio, Alert, SimpleGrid,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconArrowRight, IconCamera, IconLock,
@@ -30,13 +30,10 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProviderProfileData {
-  email: string;
   password: string;
   photoUrl: string | null;
   categoryId: string;
   subcategoryIds: string[];
-  bio: string;
-  yearsExp: number;
   pricingMethod: 'fixed' | 'platform_calculated';
 }
 
@@ -53,13 +50,10 @@ function StepProfileProvider({
   onDone: (data: ProviderProfileData) => void;
 }) {
   const [photoUrl, setPhotoUrl]           = useState<string | null>(faceUrl);
-  const [email, setEmail]                 = useState('');
   const [password, setPassword]           = useState('');
   const [confirm, setConfirm]             = useState('');
   const [categoryId, setCategoryId]       = useState('');
   const [subcategoryIds, setSubcategoryIds] = useState<string[]>([]);
-  const [bio, setBio]                     = useState('');
-  const [yearsExp, setYearsExp]           = useState<number | string>(0);
   const [pricingMethod, setPricingMethod] = useState<'fixed' | 'platform_calculated'>('fixed');
   const [errors, setErrors]               = useState<Record<string, string>>({});
 
@@ -76,21 +70,17 @@ function StepProfileProvider({
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!/^\S+@\S+\.\S+$/.test(email))    e.email = 'Please enter a valid email address';
     if (password.length < 6)              e.password = 'Password must be at least 6 characters';
     if (password !== confirm)             e.confirm = 'Passwords do not match';
     if (!categoryId)                      e.category = 'Please select a service category';
     if (subcategoryIds.length === 0)      e.subcategory = 'Please select at least one sub-service';
-    const exp = typeof yearsExp === 'string' ? parseInt(yearsExp, 10) : yearsExp;
-    if (isNaN(exp) || exp <= 0)           e.yearsExp = 'Please enter your years of experience (minimum 1)';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = () => {
     if (!validate()) return;
-    const exp = typeof yearsExp === 'string' ? parseInt(yearsExp, 10) : yearsExp;
-    onDone({ email, password, photoUrl, categoryId, subcategoryIds, bio, yearsExp: exp, pricingMethod });
+    onDone({ password, photoUrl, categoryId, subcategoryIds, pricingMethod });
   };
 
   const displayName = prefill.extracted.fullName ?? 'Provider';
@@ -171,29 +161,6 @@ function StepProfileProvider({
           </Group>
         </Box>
 
-        {/* Email */}
-        <div>
-          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>Email Address</Text>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: `1.5px solid ${errors.email ? '#E53E3E' : 'var(--ot-border-input)'}`,
-              fontSize: 14,
-              background: 'var(--ot-bg-card)',
-              color: 'var(--ot-text-body)',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {errors.email && <Text size="xs" c="red" mt={4}>{errors.email}</Text>}
-        </div>
-
         {/* Passwords */}
         <SimpleGrid cols={2} spacing={12}>
           <PasswordInput
@@ -265,32 +232,6 @@ function StepProfileProvider({
             />
           </Box>
         )}
-
-        {/* Years of experience */}
-        <NumberInput
-          label="Years of Skill / Experience *"
-          description="How many years have you been doing this professionally?"
-          placeholder="e.g. 5"
-          min={0}
-          max={60}
-          value={yearsExp}
-          onChange={setYearsExp}
-          error={errors.yearsExp}
-          size="sm"
-          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
-        />
-
-        {/* Bio (optional) */}
-        <Textarea
-          label="Professional Bio (optional)"
-          placeholder="Tell clients about your experience, skills, and what makes you stand out…"
-          value={bio}
-          onChange={e => setBio(e.target.value)}
-          size="sm"
-          minRows={3}
-          autosize
-          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
-        />
 
         {/* Pricing method */}
         <Box>
@@ -421,7 +362,8 @@ export function ProviderSignup() {
   const handleProfileDone = (data: ProviderProfileData) => {
     if (!idResult) return;
     const name = idResult.extracted.fullName ?? 'Provider';
-    const result = signup({ email: data.email, password: data.password, phone: idResult.selectedPhone, role: 'provider' });
+    const placeholderEmail = `provider_${Date.now()}@onetouch.local`;
+    const result = signup({ email: placeholderEmail, password: data.password, phone: idResult.selectedPhone, role: 'provider' });
     if (!result.success) {
       notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
       return;
