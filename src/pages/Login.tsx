@@ -1,303 +1,413 @@
 /**
- * Login.tsx — Refined authentication screen
- * Design language aligned with 3-step signup flow.
- * Dark mode, role-based routing, validation, demo quick-fill.
+ * Login.tsx — Phone + Password authentication with OTP-based forgot-password flow.
  */
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Box, Button, Center, Container, Group, Paper,
-  PasswordInput, Stack, Text, TextInput, Divider,
-  Alert, Badge, useMantineColorScheme,
+  Box, Button, Center, Container, Paper, Stack, Text, TextInput,
+  PasswordInput, PinInput, Progress, Alert, Anchor, Group, ThemeIcon,
 } from '@mantine/core';
 import {
-  IconShieldLock, IconArrowRight, IconMail, IconLock,
-  IconAlertCircle, IconUser, IconBriefcase,
+  IconPhone, IconLock, IconArrowRight, IconChevronLeft,
+  IconShieldCheck, IconAlertCircle, IconKey, IconDeviceMobile,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
-import { COLORS, ROUTES } from '../utils/constants';
+import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { AIHelpCenter } from '../components/AIHelpCenter';
-import { DarkModeToggle } from '../components/DarkModeToggle';
 
-// ─── Demo accounts ────────────────────────────────────────────────────────────
-const DEMO_ACCOUNTS = [
-  { role: 'Client',    email: 'abebe.girma@gmail.com',      icon: 'client',   color: 'teal' },
-  { role: 'Provider',  email: 'yohannes.teferi@gmail.com',  icon: 'provider', color: 'blue' },
-  { role: 'Admin',     email: 'admin@onetouch.et',           icon: 'admin',    color: 'grape' },
-] as const;
+// ─── Screens ──────────────────────────────────────────────────────────────────
+type Screen = 'login' | 'forgot-phone' | 'forgot-otp';
 
-export function Login() {
+// ─── Password strength ────────────────────────────────────────────────────────
+function getStrength(pw: string) {
+  if (pw.length === 0) return { value: 0, label: '', color: 'gray' };
+  if (pw.length < 6) return { value: 20, label: 'Too short', color: 'red' };
+  if (pw.length < 8) return { value: 50, label: 'Weak', color: 'orange' };
+  if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) return { value: 100, label: 'Strong', color: 'teal' };
+  return { value: 75, label: 'Fair', color: 'yellow' };
+}
+
+// ─── Resend countdown ─────────────────────────────────────────────────────────
+function useCountdown(start: number) {
+  const [seconds, setSeconds] = useState(0);
+  const ref = useRef<ReturnType<typeof setInterval> | null>(null);
+  const begin = () => {
+    setSeconds(start);
+    if (ref.current) clearInterval(ref.current);
+    ref.current = setInterval(() => setSeconds(s => { if (s <= 1) { clearInterval(ref.current!); return 0; } return s - 1; }), 1000);
+  };
+  useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
+  return { seconds, begin };
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
-  const { colorScheme } = useMantineColorScheme();
+  const { loginByPhone, resetPassword } = useAuthStore();
 
-  const [email, setEmail]       = useState('');
+  const [screen, setScreen] = useState<Screen>('login');
+
+  // Login form
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [emailError, setEmailError]   = useState('');
-  const [passError, setPassError]     = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  const validate = () => {
-    let ok = true;
-    if (!/^\S+@\S+/.test(email)) { setEmailError('Please enter a valid email address'); ok = false; }
-    else setEmailError('');
-    if (!password) { setPassError('Password is required'); ok = false; }
-    else setPassError('');
-    return ok;
-  };
+  // Forgot-phone screen
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotPhoneError, setForgotPhoneError] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!validate()) return;
-    setLoading(true);
+  // Forgot-otp screen
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const { seconds, begin: beginCountdown } = useCountdown(60);
+
+  const strength = getStrength(newPw);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const normPhone = (p: string) => p.replace(/[\s\-()]/g, '');
+
+  function goForgot() {
+    setForgotPhone(phone);
+    setForgotPhoneError('');
+    setScreen('forgot-phone');
+  }
+
+  // ── Screen 1: Sign in ─────────────────────────────────────────────────────
+  function handleLogin() {
+    setLoginError('');
+    if (!phone.trim()) { setLoginError('Please enter your phone number.'); return; }
+    if (!password) { setLoginError('Please enter your password.'); return; }
+    setLoginLoading(true);
     setTimeout(() => {
-      const result = login(email, password);
-      setLoading(false);
-      if (result.success) {
-        const user = useAuthStore.getState().currentUser;
-        notifications.show({
-          title: 'Welcome back!',
-          message: `Signed in as ${user?.email}`,
-          color: 'teal',
-          icon: <IconShieldLock size={16} />,
-        });
-        if (user?.role === 'client')   navigate(ROUTES.clientDashboard);
-        else if (user?.role === 'provider') navigate(ROUTES.providerDashboard);
-        else navigate(ROUTES.adminDashboard);
-      } else {
-        setError(result.error ?? 'Sign in failed. Please check your credentials.');
+      const result = loginByPhone(normPhone(phone), password);
+      setLoginLoading(false);
+      if (!result.success) {
+        setLoginError(result.error ?? 'Sign in failed.');
+        return;
       }
+      const { currentUser } = useAuthStore.getState();
+      notifications.show({ title: 'Welcome back!', message: 'Signed in successfully.', color: 'teal' });
+      if (currentUser?.role === 'client') navigate(ROUTES.clientDashboard, { replace: true });
+      else if (currentUser?.role === 'provider') navigate(ROUTES.providerDashboard, { replace: true });
+      else if (currentUser?.role === 'admin') navigate(ROUTES.adminDashboard, { replace: true });
+    }, 600);
+  }
+
+  // ── Screen 2: Send OTP ────────────────────────────────────────────────────
+  function handleSendCode() {
+    setForgotPhoneError('');
+    if (!forgotPhone.trim()) { setForgotPhoneError('Please enter your phone number.'); return; }
+    setSendingCode(true);
+    setTimeout(() => {
+      setSendingCode(false);
+      setOtp('');
+      setOtpError('');
+      setNewPw('');
+      setConfirmPw('');
+      setResetError('');
+      beginCountdown();
+      setScreen('forgot-otp');
+    }, 900);
+  }
+
+  // ── Screen 3: Verify OTP + reset password ─────────────────────────────────
+  function handleReset() {
+    setResetError('');
+    if (otp.length < 6) { setResetError('Please enter the 6-digit code.'); return; }
+    if (otp !== MOCK_OTP) { setOtpError('Incorrect code. Try ' + MOCK_OTP + ' for demo.'); return; }
+    if (newPw.length < 6) { setResetError('Password must be at least 6 characters.'); return; }
+    if (newPw !== confirmPw) { setResetError('Passwords do not match.'); return; }
+    setResetting(true);
+    setTimeout(() => {
+      const result = resetPassword(normPhone(forgotPhone), newPw);
+      setResetting(false);
+      if (!result.success) { setResetError(result.error ?? 'Reset failed.'); return; }
+      notifications.show({ title: 'Password reset!', message: 'You can now sign in with your new password.', color: 'teal' });
+      setPhone(forgotPhone);
+      setPassword('');
+      setScreen('login');
     }, 700);
-  };
+  }
 
-  const quickFill = (acc: typeof DEMO_ACCOUNTS[number]) => {
-    setEmail(acc.email);
-    setPassword('demo');
-    setEmailError('');
-    setPassError('');
-    setError('');
-  };
+  // ── Layout shell ──────────────────────────────────────────────────────────
+  const navy = COLORS.navyBlue;
+  const teal = COLORS.tealBlue;
 
-  return (
-    <Box
-      style={{
-        minHeight: '100vh',
-        background: 'var(--ot-bg-page)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* Navbar — identical structure to signup Shell */}
-      <Box style={{ background: 'var(--ot-nav-bg)', borderBottom: '1px solid var(--ot-nav-border)' }}>
-        <Container size={680}>
-          <Group justify="space-between" py={14}>
-            <Group gap={10} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.landing)}>
-              <Box
-                w={36}
-                h={36}
-                style={{
-                  borderRadius: 10,
-                  background: COLORS.navyBlue,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <IconLock size={16} color={COLORS.lemonYellow} strokeWidth={2.5} />
-              </Box>
-              <Text fw={900} size="sm" c={COLORS.navyBlue} style={{ letterSpacing: '-0.3px' }}>
-                ONE TOUCH
-              </Text>
-            </Group>
-            <Group gap={8}>
-              <DarkModeToggle />
-              <LanguageSwitcher />
-            </Group>
-          </Group>
-        </Container>
+  const headerSection = (
+    <Center mb="xl">
+      <Box style={{ textAlign: 'center' }}>
+        <Box
+          style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: `linear-gradient(135deg, ${navy}, ${teal})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 12px',
+          }}
+        >
+          <IconShieldCheck size={28} color="#fff" />
+        </Box>
+        <Text fw={800} size="xl" style={{ color: 'var(--ot-text-navy)' }}>OneTouch</Text>
+        <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>Your trusted services platform</Text>
       </Box>
+    </Center>
+  );
 
-      {/* Thin accent bar (matches signup) */}
-      <Box style={{ height: 3, background: `linear-gradient(90deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})` }} />
+  // ── SCREEN 1: Login ───────────────────────────────────────────────────────
+  if (screen === 'login') return (
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)' }}>
+      <Box style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
+        <LanguageSwitcher />
+      </Box>
+      <Container size="xs" py="xl">
+        <Center style={{ minHeight: '100vh' }}>
+          <Box style={{ width: '100%' }}>
+            {headerSection}
+            <Paper radius="lg" p="xl" shadow="md" style={{ background: 'var(--ot-bg-card)', border: '1px solid var(--ot-border)' }}>
+              <Text fw={700} size="lg" mb="xs" style={{ color: 'var(--ot-text-navy)' }}>Sign In</Text>
+              <Text size="sm" mb="xl" style={{ color: 'var(--ot-text-sub)' }}>Enter your phone number and password to continue.</Text>
 
-      <Center flex={1} py={48} px={16}>
-        <Container size={480} w="100%">
-          <Paper
-            radius={20}
-            p={{ base: 28, sm: 40 }}
-            style={{
-              border: '1px solid var(--ot-border)',
-              boxShadow: '0 4px 28px rgba(0,0,128,0.07)',
-              background: 'var(--ot-bg-card)',
-            }}
-          >
-            <Stack gap={28}>
-              {/* Header */}
-              <Stack gap={6} align="center">
-                <Box
-                  w={56}
-                  h={56}
-                  style={{
-                    borderRadius: 16,
-                    background: `${COLORS.navyBlue}12`,
-                    border: `1.5px solid ${COLORS.navyBlue}25`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <IconShieldLock size={28} color={COLORS.navyBlue} strokeWidth={1.8} />
-                </Box>
-                <Text fw={800} size="xl" c="var(--ot-text-navy)" mt={4}>
-                  Welcome Back
-                </Text>
-                <Text size="sm" c="var(--ot-text-sub)" ta="center">
-                  Sign in to your ONE TOUCH account
-                </Text>
-              </Stack>
-
-              {/* Error alert */}
-              {error && (
-                <Alert
-                  icon={<IconAlertCircle size={16} />}
-                  color="red"
-                  variant="light"
-                  radius="md"
-                  withCloseButton
-                  onClose={() => setError('')}
-                >
-                  {error}
+              {loginError && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">
+                  {loginError}
                 </Alert>
               )}
 
-              {/* Form */}
-              <form onSubmit={handleSubmit}>
-                <Stack gap={16}>
-                  <TextInput
-                    label="Email Address"
-                    placeholder="you@example.com"
-                    leftSection={<IconMail size={16} />}
-                    value={email}
-                    onChange={e => { setEmail(e.target.value); setEmailError(''); }}
-                    error={emailError}
-                    size="md"
-                    styles={{
-                      label: { fontWeight: 600, fontSize: 13, color: 'var(--ot-text-navy)', marginBottom: 6 },
-                    }}
-                  />
-                  <PasswordInput
-                    label="Password"
-                    placeholder="Your password"
-                    leftSection={<IconLock size={16} />}
-                    value={password}
-                    onChange={e => { setPassword(e.target.value); setPassError(''); }}
-                    error={passError}
-                    size="md"
-                    styles={{
-                      label: { fontWeight: 600, fontSize: 13, color: 'var(--ot-text-navy)', marginBottom: 6 },
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    fullWidth
-                    size="md"
-                    loading={loading}
-                    rightSection={!loading && <IconArrowRight size={16} />}
-                    mt={4}
-                    style={{
-                      background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)`,
-                      height: 48,
-                      fontWeight: 700,
-                      fontSize: 15,
-                    }}
-                  >
-                    Sign In
-                  </Button>
-                </Stack>
-              </form>
+              <Stack gap="md">
+                <TextInput
+                  label="Phone Number"
+                  placeholder="+251 9XX XXX XXX"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  leftSection={<IconPhone size={16} />}
+                  styles={{ input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' }, label: { color: 'var(--ot-text-body)' } }}
+                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                  size="md"
+                />
+                <PasswordInput
+                  label="Password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  leftSection={<IconLock size={16} />}
+                  styles={{ input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' }, label: { color: 'var(--ot-text-body)' } }}
+                  onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                  size="md"
+                />
 
-              {/* Divider */}
-              <Divider
-                label={<Text size="xs" c="var(--ot-text-muted)">Quick demo access</Text>}
-                labelPosition="center"
-              />
+                <Group justify="flex-end">
+                  <Anchor size="sm" onClick={goForgot} style={{ color: teal, cursor: 'pointer' }}>
+                    Forgot password?
+                  </Anchor>
+                </Group>
 
-              {/* Demo quick-fill */}
-              <Stack gap={8}>
-                {DEMO_ACCOUNTS.map(acc => (
-                  <Box
-                    key={acc.email}
-                    onClick={() => quickFill(acc)}
-                    style={{
-                      cursor: 'pointer',
-                      padding: '10px 14px',
-                      borderRadius: 12,
-                      border: '1.5px solid var(--ot-border)',
-                      background: 'var(--ot-bg-row)',
-                      transition: 'all 0.18s',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = COLORS.tealBlue;
-                      (e.currentTarget as HTMLElement).style.background = 'rgba(0,128,128,0.05)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = 'var(--ot-border)';
-                      (e.currentTarget as HTMLElement).style.background = 'var(--ot-bg-row)';
-                    }}
-                  >
-                    <Group gap={10} justify="space-between">
-                      <Group gap={10}>
-                        <Box
-                          w={32}
-                          h={32}
-                          style={{
-                            borderRadius: 8,
-                            background: acc.role === 'Client' ? `${COLORS.tealBlue}15` : acc.role === 'Provider' ? `${COLORS.navyBlue}12` : '#9B59B610',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}
-                        >
-                          {acc.role === 'Client'
-                            ? <IconUser size={16} color={COLORS.tealBlue} />
-                            : acc.role === 'Provider'
-                            ? <IconBriefcase size={16} color={COLORS.navyBlue} />
-                            : <IconShieldLock size={16} color="#9B59B6" />
-                          }
-                        </Box>
-                        <Stack gap={2}>
-                          <Text size="xs" fw={700} c="var(--ot-text-navy)">{acc.role}</Text>
-                          <Text size="10px" c="var(--ot-text-muted)">{acc.email}</Text>
-                        </Stack>
-                      </Group>
-                      <Badge size="xs" variant="light" color={acc.color}>Try</Badge>
-                    </Group>
-                  </Box>
-                ))}
+                <Button
+                  fullWidth
+                  size="md"
+                  loading={loginLoading}
+                  onClick={handleLogin}
+                  rightSection={<IconArrowRight size={16} />}
+                  style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
+                >
+                  Sign In
+                </Button>
               </Stack>
 
-              {/* Sign up link */}
-              <Text size="sm" ta="center" c="var(--ot-text-sub)">
+              <Text ta="center" size="sm" mt="xl" style={{ color: 'var(--ot-text-sub)' }}>
                 Don't have an account?{' '}
-                <Text
-                  component="span"
-                  c={COLORS.tealBlue}
-                  fw={700}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(ROUTES.signup)}
-                >
-                  Create one now
-                </Text>
+                <Anchor onClick={() => navigate(ROUTES.signup)} style={{ color: teal, cursor: 'pointer' }}>
+                  Create one
+                </Anchor>
               </Text>
-            </Stack>
-          </Paper>
-        </Container>
-      </Center>
+            </Paper>
 
-      <AIHelpCenter />
+            <Text ta="center" size="xs" mt="lg" style={{ color: 'var(--ot-text-muted)' }}>
+              Demo — Client: <strong>+1-555-0101</strong> · Provider: <strong>+1-555-0201</strong> · Admin: <strong>+1-555-0001</strong>
+              <br />Password for all: <strong>demo123</strong>
+            </Text>
+          </Box>
+        </Center>
+      </Container>
+    </Box>
+  );
+
+  // ── SCREEN 2: Forgot password — enter phone ───────────────────────────────
+  if (screen === 'forgot-phone') return (
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)' }}>
+      <Box style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
+        <LanguageSwitcher />
+      </Box>
+      <Container size="xs" py="xl">
+        <Center style={{ minHeight: '100vh' }}>
+          <Box style={{ width: '100%' }}>
+            {headerSection}
+            <Paper radius="lg" p="xl" shadow="md" style={{ background: 'var(--ot-bg-card)', border: '1px solid var(--ot-border)' }}>
+              <Group mb="lg">
+                <ThemeIcon variant="light" color="teal" size="lg" radius="xl">
+                  <IconDeviceMobile size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Reset Password</Text>
+                  <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>We'll send a verification code to your phone.</Text>
+                </Box>
+              </Group>
+
+              {forgotPhoneError && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">
+                  {forgotPhoneError}
+                </Alert>
+              )}
+
+              <Stack gap="md">
+                <TextInput
+                  label="Phone Number"
+                  placeholder="+251 9XX XXX XXX"
+                  value={forgotPhone}
+                  onChange={e => setForgotPhone(e.target.value)}
+                  leftSection={<IconPhone size={16} />}
+                  styles={{ input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' }, label: { color: 'var(--ot-text-body)' } }}
+                  onKeyDown={e => e.key === 'Enter' && handleSendCode()}
+                  size="md"
+                />
+
+                <Button
+                  fullWidth
+                  size="md"
+                  loading={sendingCode}
+                  onClick={handleSendCode}
+                  rightSection={<IconArrowRight size={16} />}
+                  style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
+                >
+                  Send Code
+                </Button>
+
+                <Anchor
+                  size="sm"
+                  onClick={() => setScreen('login')}
+                  style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  <IconChevronLeft size={14} /> Back to sign in
+                </Anchor>
+              </Stack>
+            </Paper>
+          </Box>
+        </Center>
+      </Container>
+    </Box>
+  );
+
+  // ── SCREEN 3: Forgot password — OTP + new password ────────────────────────
+  return (
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)' }}>
+      <Box style={{ position: 'absolute', top: 16, right: 16, zIndex: 10 }}>
+        <LanguageSwitcher />
+      </Box>
+      <Container size="xs" py="xl">
+        <Center style={{ minHeight: '100vh' }}>
+          <Box style={{ width: '100%' }}>
+            {headerSection}
+            <Paper radius="lg" p="xl" shadow="md" style={{ background: 'var(--ot-bg-card)', border: '1px solid var(--ot-border)' }}>
+              <Group mb="lg">
+                <ThemeIcon variant="light" color="teal" size="lg" radius="xl">
+                  <IconKey size={20} />
+                </ThemeIcon>
+                <Box>
+                  <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Verify & Reset</Text>
+                  <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
+                    Code sent to <strong>{forgotPhone}</strong>
+                  </Text>
+                </Box>
+              </Group>
+
+              {/* Demo hint */}
+              <Alert icon={<IconShieldCheck size={14} />} color="teal" mb="md" radius="md" variant="light">
+                Demo verification code: <strong>{MOCK_OTP}</strong>
+              </Alert>
+
+              {(otpError || resetError) && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">
+                  {otpError || resetError}
+                </Alert>
+              )}
+
+              <Stack gap="md">
+                <Box>
+                  <Text size="sm" fw={500} mb={6} style={{ color: 'var(--ot-text-body)' }}>Verification Code</Text>
+                  <Center>
+                    <PinInput
+                      length={6}
+                      type="number"
+                      value={otp}
+                      onChange={v => { setOtp(v); setOtpError(''); }}
+                      size="md"
+                    />
+                  </Center>
+                </Box>
+
+                <PasswordInput
+                  label="New Password"
+                  placeholder="At least 6 characters"
+                  value={newPw}
+                  onChange={e => { setNewPw(e.target.value); setResetError(''); }}
+                  leftSection={<IconLock size={16} />}
+                  styles={{ input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' }, label: { color: 'var(--ot-text-body)' } }}
+                  size="md"
+                />
+                {newPw.length > 0 && (
+                  <Box>
+                    <Progress value={strength.value} color={strength.color} size="xs" radius="xl" mb={4} />
+                    <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>{strength.label}</Text>
+                  </Box>
+                )}
+
+                <PasswordInput
+                  label="Confirm Password"
+                  placeholder="Repeat your new password"
+                  value={confirmPw}
+                  onChange={e => { setConfirmPw(e.target.value); setResetError(''); }}
+                  leftSection={<IconLock size={16} />}
+                  styles={{ input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' }, label: { color: 'var(--ot-text-body)' } }}
+                  size="md"
+                />
+
+                <Button
+                  fullWidth
+                  size="md"
+                  loading={resetting}
+                  onClick={handleReset}
+                  rightSection={<IconArrowRight size={16} />}
+                  style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
+                >
+                  Reset Password
+                </Button>
+
+                <Group justify="space-between">
+                  <Anchor
+                    size="sm"
+                    onClick={() => { if (seconds === 0) handleSendCode(); }}
+                    style={{ color: seconds > 0 ? 'var(--ot-text-muted)' : teal, cursor: seconds > 0 ? 'default' : 'pointer' }}
+                  >
+                    {seconds > 0 ? `Resend in ${seconds}s` : 'Resend code'}
+                  </Anchor>
+                  <Anchor
+                    size="sm"
+                    onClick={() => setScreen('forgot-phone')}
+                    style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <IconChevronLeft size={14} /> Change number
+                  </Anchor>
+                </Group>
+              </Stack>
+            </Paper>
+          </Box>
+        </Center>
+      </Container>
     </Box>
   );
 }

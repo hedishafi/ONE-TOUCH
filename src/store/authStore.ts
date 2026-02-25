@@ -20,6 +20,12 @@ const seedMockData = () => {
     storage.set(STORAGE_KEYS.commissionConfig, DEFAULT_COMMISSION_CONFIG);
     storage.set(STORAGE_KEYS.savedProviders, ['provider-002', 'provider-004']);
   }
+  // Seed default passwords for mock users (always ensure this exists)
+  if (!storage.get(STORAGE_KEYS.passwords, null)) {
+    const defaultPasswords: Record<string, string> = {};
+    MOCK_USERS.forEach(u => { defaultPasswords[u.id] = 'demo123'; });
+    storage.set(STORAGE_KEYS.passwords, defaultPasswords);
+  }
 };
 seedMockData();
 
@@ -31,6 +37,8 @@ interface AuthState {
   isAuthenticated: boolean;
   selectedRole: 'client' | 'provider' | null;
   login: (email: string, password: string) => { success: boolean; error?: string };
+  loginByPhone: (phone: string, password: string) => { success: boolean; error?: string };
+  resetPassword: (phone: string, newPassword: string) => { success: boolean; error?: string };
   logout: () => void;
   signup: (data: { email: string; password: string; phone: string; role: User['role'] }) => { success: boolean; userId?: string; error?: string };
   setUserRole: (role: 'client' | 'provider') => void;
@@ -69,6 +77,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clientProfile: user.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
       providerProfile: user.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
     });
+    return { success: true };
+  },
+
+  loginByPhone: (phone, password) => {
+    const norm = (p: string) => p.replace(/[\s\-()]/g, '');
+    const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+    const user = users.find(u => norm(u.phone ?? '') === norm(phone));
+    if (!user) return { success: false, error: 'No account found with this phone number.' };
+
+    const passwords = storage.get<Record<string, string>>(STORAGE_KEYS.passwords, {});
+    const storedPw = passwords[user.id] ?? 'demo123';
+    if (password !== storedPw) return { success: false, error: 'Incorrect password.' };
+
+    const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
+    const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
+
+    storage.set(STORAGE_KEYS.currentUser, user);
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      clientProfile: user.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
+      providerProfile: user.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
+    });
+    return { success: true };
+  },
+
+  resetPassword: (phone, newPassword) => {
+    const norm = (p: string) => p.replace(/[\s\-()]/g, '');
+    const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+    const user = users.find(u => norm(u.phone ?? '') === norm(phone));
+    if (!user) return { success: false, error: 'No account found with this phone number.' };
+
+    const passwords = storage.get<Record<string, string>>(STORAGE_KEYS.passwords, {});
+    passwords[user.id] = newPassword;
+    storage.set(STORAGE_KEYS.passwords, passwords);
     return { success: true };
   },
 

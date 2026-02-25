@@ -42,4 +42,5 @@ export const STORAGE_KEYS = {
   commissionConfig: 'ot_commission_config',
   fraudFlags: 'ot_fraud_flags',
   disputes: 'ot_disputes',
+  passwords: 'ot_passwords',
 };

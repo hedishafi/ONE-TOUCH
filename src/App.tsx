@@ -4,7 +4,7 @@ import { ScrollToTop } from './components/ScrollToTop';
 
 // Public pages
 import { Landing } from './pages/Landing';
-import { Login } from './pages/Login';
+import Login from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ClientSignup } from './pages/ClientSignup';
 import { ProviderSignup } from './pages/ProviderSignup';
