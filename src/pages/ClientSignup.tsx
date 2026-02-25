@@ -5,10 +5,10 @@
  * Per spec: clients do NOT fill profile forms — all info comes from scanned ID.
  * Only password creation and optional profile photo update at Step 3.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Box, Button, FileButton, Group, Paper, PasswordInput,
-  Progress, Stack, Text, Avatar, Badge, useMantineColorScheme,
+  Box, Button, FileButton, Group, PasswordInput,
+  Progress, Stack, Text, Avatar, Badge,
 } from '@mantine/core';
 import {
   IconCheck, IconCamera, IconArrowRight, IconLock,
@@ -34,14 +34,22 @@ function StepProfileClient({
   prefill: IdentityResult;
   faceUrl: string | null;
   onBack: () => void;
-  onDone: (email: string, password: string, photoUrl: string | null) => void;
+  onDone: (password: string, photoUrl: string | null) => void;
 }) {
-  const { colorScheme } = useMantineColorScheme();
   const [photoUrl, setPhotoUrl]         = useState<string | null>(faceUrl);
-  const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
   const [confirm, setConfirm]           = useState('');
   const [errors, setErrors]             = useState<Record<string, string>>({});
+
+  // Password strength
+  const strength =
+    password.length === 0 ? 0
+    : password.length < 6 ? 20
+    : password.length < 10 ? 50
+    : /[A-Z]/.test(password) && /[0-9!@#$%^&*]/.test(password) ? 100
+    : 75;
+  const strengthLabel = strength === 0 ? '' : strength <= 20 ? 'Too short' : strength <= 50 ? 'Weak' : strength <= 75 ? 'Fair' : 'Strong';
+  const strengthColor = strength <= 20 ? 'red' : strength <= 50 ? 'orange' : strength <= 75 ? 'yellow' : 'teal';
 
   const handlePhoto = (file: File | null) => {
     if (!file) return;
@@ -52,16 +60,15 @@ function StepProfileClient({
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!/^\S+@\S+\.\S+$/.test(email)) e.email = 'Please enter a valid email address';
-    if (password.length < 6)           e.password = 'Password must be at least 6 characters';
-    if (password !== confirm)          e.confirm = 'Passwords do not match';
+    if (password.length < 6)  e.password = 'Password must be at least 6 characters';
+    if (password !== confirm) e.confirm  = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onDone(email, password, photoUrl);
+    onDone(password, photoUrl);
   };
 
   const displayName = prefill.extracted.fullName ?? 'User';
@@ -140,29 +147,6 @@ function StepProfileClient({
           </Group>
         </Box>
 
-        {/* Email */}
-        <div>
-          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>Email Address</Text>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '10px 14px',
-              borderRadius: 10,
-              border: `1.5px solid ${errors.email ? '#E53E3E' : 'var(--ot-border-input)'}`,
-              fontSize: 14,
-              background: 'var(--ot-bg-card)',
-              color: 'var(--ot-text-body)',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {errors.email && <Text size="xs" c="red" mt={4}>{errors.email}</Text>}
-        </div>
-
         {/* Password fields */}
         <PasswordInput
           label="Password"
@@ -174,6 +158,15 @@ function StepProfileClient({
           size="sm"
           styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
         />
+
+        {/* Password strength indicator */}
+        {password.length > 0 && (
+          <Box mt={-8}>
+            <Progress value={strength} color={strengthColor} size="xs" radius="xl" />
+            <Text size="10px" c={strengthColor} mt={4} fw={600}>{strengthLabel}</Text>
+          </Box>
+        )}
+
         <PasswordInput
           label="Confirm Password"
           placeholder="Re-enter your password"
@@ -275,10 +268,11 @@ export function ClientSignup() {
     go(3);
   };
 
-  const handleProfileDone = (email: string, password: string, photoUrl: string | null) => {
+  const handleProfileDone = (password: string, photoUrl: string | null) => {
     if (!idResult) return;
     const name = idResult.extracted.fullName ?? 'User';
-    const result = signup({ email, password, phone: idResult.selectedPhone, role: 'client' });
+    const placeholderEmail = `user_${Date.now()}@onetouch.local`;
+    const result = signup({ email: placeholderEmail, password, phone: idResult.selectedPhone, role: 'client' });
     if (!result.success) {
       notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
       return;
