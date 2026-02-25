@@ -8,6 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 import { AIHelpCenter } from '../components/AIHelpCenter';
 
 const S = `
@@ -18,9 +19,9 @@ const S = `
 .su-c2    { animation: suCardIn 0.5s 0.22s ease both; }
 .su-card {
   cursor: pointer;
-  border: 1.5px solid #E4E9F2;
+  border: 1.5px solid var(--ot-border);
   border-radius: 20px;
-  background: #fff;
+  background: var(--ot-bg-card);
   transition: all 0.22s ease;
   box-shadow: 0 2px 16px rgba(0,0,128,0.05);
 }
@@ -103,11 +104,11 @@ export function Signup() {
   const navigate = useNavigate();
 
   return (
-    <Box style={{ minHeight: '100vh', background: '#F7F8FC', display: 'flex', flexDirection: 'column' }}>
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)', display: 'flex', flexDirection: 'column' }}>
       <style>{S}</style>
 
       {/* ── Navbar ── */}
-      <Box style={{ background: 'white', borderBottom: '1px solid #EEF0F7' }}>
+      <Box style={{ background: 'var(--ot-nav-bg)', borderBottom: '1px solid var(--ot-nav-border)' }}>
         <Container size={1000}>
           <Group justify="space-between" py={16}>
             <Group gap={10} onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>
@@ -119,7 +120,8 @@ export function Signup() {
               </Box>
               <Text fw={900} size="md" c={COLORS.navyBlue} style={{ letterSpacing: 0.3 }}>ONE TOUCH</Text>
             </Group>
-            <Group gap={12}>
+            <Group gap={8}>
+              <DarkModeToggle />
               <LanguageSwitcher />
               <Button variant="subtle" color="gray" size="sm" onClick={() => navigate(ROUTES.login)}>
                 Already have an account?

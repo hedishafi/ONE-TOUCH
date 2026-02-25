@@ -16,6 +16,7 @@ import { formatCurrency } from '../utils/formatting';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationCenter } from './NotificationCenter';
 import { useEffect } from 'react';
+import { DarkModeToggle } from './DarkModeToggle';
 
 export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?: () => void; mobileMenuOpened?: boolean }) {
   const { t } = useTranslation();
@@ -46,7 +47,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
   return (
     <Box
       style={{
-        background: '#FFFFFF',
+        background: 'var(--ot-header-bg)',
         padding: '0 24px',
         height: 64,
         display: 'flex',
@@ -56,7 +57,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
         top: 0,
         zIndex: 100,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
-        borderBottom: '1px solid #F1F3F5',
+        borderBottom: '1px solid var(--ot-header-border)',
       }}
     >
       {/* Left: Logo + Burger */}
@@ -126,6 +127,9 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
 
         {/* Language Switcher */}
         <LanguageSwitcher />
+
+        {/* Dark mode toggle */}
+        <DarkModeToggle />
 
         {/* Notifications */}
         <Indicator

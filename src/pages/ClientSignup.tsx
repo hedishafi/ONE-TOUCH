@@ -1,203 +1,314 @@
 /**
  * ClientSignup.tsx — 3-step client onboarding
- *   Step 1  Identity Verification  (ID upload → auto-extract → phone → agreement)
- *   Step 2  Phone & Biometric      (OTP → face scan)
- *   Step 3  Profile Setup
+ * Step 1: Identity  | Step 2: Phone & Biometric | Step 3: Password + Photo
+ *
+ * Per spec: clients do NOT fill profile forms — all info comes from scanned ID.
+ * Only password creation and optional profile photo update at Step 3.
  */
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
-  Box, Button, FileButton, Group, PasswordInput, Stack,
-  Text, TextInput, Badge, Center,
+  Box, Button, FileButton, Group, Paper, PasswordInput,
+  Progress, Stack, Text, Avatar, Badge, useMantineColorScheme,
 } from '@mantine/core';
 import {
-  IconArrowRight, IconMail, IconLock, IconUser,
-  IconCircleCheck, IconCamera, IconShieldCheck, IconPhone,
+  IconCheck, IconCamera, IconArrowRight, IconLock,
+  IconShieldCheck, IconUser,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
+import { COLORS, ROUTES } from '../utils/constants';
 import {
   Shell, Card, CardHeader,
   StepIdentity, StepVerify,
   type IdentityResult,
 } from './signup/shared';
 
-// ─── Step 3 – Client Profile Setup ───────────────────────────────────────────
-interface ProfileData { displayName: string; email: string; password: string; photoUrl: string | null; }
-
+// ─── Step 3 – Password + Photo (Client) ───────────────────────────────────────
 function StepProfileClient({
-  prefill, faceUrl, onComplete,
+  prefill,
+  faceUrl,
+  onBack,
+  onDone,
 }: {
   prefill: IdentityResult;
   faceUrl: string | null;
-  onComplete: (d: ProfileData) => void;
+  onBack: () => void;
+  onDone: (email: string, password: string, photoUrl: string | null) => void;
 }) {
-  const [displayName, setDisplayName] = useState(prefill.extracted.fullName ?? '');
-  const [email, setEmail]             = useState('');
-  const [password, setPassword]       = useState('');
-  const [confirm, setConfirm]         = useState('');
-  const [photoUrl, setPhotoUrl]       = useState<string | null>(faceUrl);
+  const { colorScheme } = useMantineColorScheme();
+  const [photoUrl, setPhotoUrl]         = useState<string | null>(faceUrl);
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
+  const [confirm, setConfirm]           = useState('');
+  const [errors, setErrors]             = useState<Record<string, string>>({});
 
-  const handlePhoto = (f: File | null) => {
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = e => setPhotoUrl(e.target?.result as string);
-    r.readAsDataURL(f);
+  const handlePhoto = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhotoUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!/^\S+@\S+\.\S+$/.test(email)) e.email = 'Please enter a valid email address';
+    if (password.length < 6)           e.password = 'Password must be at least 6 characters';
+    if (password !== confirm)          e.confirm = 'Passwords do not match';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = () => {
-    if (!displayName.trim()) { notifications.show({ title: 'Name required', color: 'yellow', message: 'Enter your display name.' }); return; }
-    if (!/\S+@\S+\.\S+/.test(email)) { notifications.show({ title: 'Valid email required', color: 'yellow', message: '' }); return; }
-    if (password.length < 6) { notifications.show({ title: 'Weak password', color: 'yellow', message: 'At least 6 characters.' }); return; }
-    if (password !== confirm) { notifications.show({ title: 'Passwords do not match', color: 'red', message: '' }); return; }
-    onComplete({ displayName, email, password, photoUrl });
+    if (!validate()) return;
+    onDone(email, password, photoUrl);
   };
 
+  const displayName = prefill.extracted.fullName ?? 'User';
+
   return (
     <Card>
-      <CardHeader icon={<IconUser size={20} color={COLORS.navyBlue} />} title="Profile Setup" sub="Confirm your details to complete registration" />
+      <CardHeader
+        icon={<IconUser size={22} color={COLORS.navyBlue} />}
+        title="Complete Your Account"
+        sub="Create a password to secure your account — your profile is already set up from your ID"
+      />
 
-      {/* Verified identity bar */}
-      {prefill.extracted.fullName && (
-        <Box p={12} mb={20} style={{ borderRadius: 12, background: '#E6F4F1', border: '1px solid #B2DFDB', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {photoUrl ? (
-            <Box w={40} h={40} style={{ borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-              <img src={photoUrl} alt="Face" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Box>
-          ) : (
-            <Box w={40} h={40} style={{ borderRadius: '50%', background: '#C8EBE4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <IconShieldCheck size={18} color={COLORS.tealBlue} />
-            </Box>
-          )}
-          <Stack gap={0} flex={1}>
-            <Text size="10px" fw={600} c="#718096">Identity Verified</Text>
-            <Text fw={700} size="sm" c={COLORS.navyBlue}>{prefill.extracted.fullName}</Text>
-          </Stack>
-          <Badge color="teal" variant="light" size="sm">Verified</Badge>
-        </Box>
-      )}
-
-      {/* Profile photo */}
-      <Stack gap={10} mb={22}>
-        <Text size="12px" fw={700} c={COLORS.navyBlue} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Profile Photo <Text span fw={400} c="#A0AEC0" size="11px">(optional)</Text>
-        </Text>
-        <Group gap={16} align="flex-start">
-          <Box w={72} h={72} style={{ borderRadius: '50%', overflow: 'hidden', border: `2px solid ${COLORS.tealBlue}30`, background: '#F0F2F9', flexShrink: 0 }}>
-            {photoUrl
-              ? <img src={photoUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <Center h="100%"><IconCamera size={24} color="#CBD5E0" /></Center>
-            }
-          </Box>
-          <Stack gap={4} justify="center">
-            <FileButton onChange={handlePhoto} accept="image/*">
-              {p => <Button {...p} variant="light" color="teal" size="sm" radius="xl">Update Photo</Button>}
-            </FileButton>
-            <Text size="11px" c="#A0AEC0">
-              {faceUrl ? 'Using your face scan — tap to update' : 'You can add this later in settings'}
-            </Text>
+      {/* Identity summary banner */}
+      <Box
+        p={16}
+        mb={24}
+        style={{
+          borderRadius: 12,
+          background: 'var(--ot-bg-row)',
+          border: '1px solid var(--ot-border)',
+        }}
+      >
+        <Group gap={12}>
+          <Avatar
+            src={photoUrl}
+            size={48}
+            radius="xl"
+            color="teal"
+            style={{ border: `2px solid ${COLORS.tealBlue}` }}
+          >
+            {displayName[0]}
+          </Avatar>
+          <Stack gap={3}>
+            <Text fw={700} size="sm" c="var(--ot-text-navy)">{displayName}</Text>
+            <Group gap={6}>
+              <Badge size="xs" color="teal" variant="dot">Identity Verified</Badge>
+              <Badge size="xs" color="blue" variant="dot">Phone Verified</Badge>
+              <Badge size="xs" color="green" variant="dot">Biometric Verified</Badge>
+            </Group>
           </Stack>
         </Group>
-      </Stack>
+      </Box>
 
-      <Box mb={20} style={{ height: 1, background: '#F0F2F7' }} />
+      <Stack gap={16}>
+        {/* Profile photo */}
+        <Box>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>Profile Photo</Text>
+          <Group gap={14} align="center">
+            <Avatar
+              src={photoUrl}
+              size={64}
+              radius="xl"
+              color="teal"
+              style={{ border: `2.5px solid ${COLORS.tealBlue}` }}
+            >
+              {displayName[0]}
+            </Avatar>
+            <Stack gap={4}>
+              <FileButton onChange={handlePhoto} accept="image/*">
+                {(p) => (
+                  <Button
+                    {...p}
+                    variant="light"
+                    color="teal"
+                    size="xs"
+                    leftSection={<IconCamera size={13} />}
+                  >
+                    {photoUrl ? 'Change Photo' : 'Upload Photo'}
+                  </Button>
+                )}
+              </FileButton>
+              {faceUrl && photoUrl === faceUrl && (
+                <Text size="10px" c="var(--ot-text-muted)">Auto-filled from face scan · tap to change</Text>
+              )}
+            </Stack>
+          </Group>
+        </Box>
 
-      {/* Account fields */}
-      <Stack gap={14} mb={24}>
-        <TextInput
-          label="Display Name" placeholder="How should we call you?"
-          leftSection={<IconUser size={14} color="#A0AEC0" />}
-          value={displayName} onChange={e => setDisplayName(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-        <TextInput
-          label="Email Address" placeholder="you@example.com" type="email"
-          leftSection={<IconMail size={14} color="#A0AEC0" />}
-          value={email} onChange={e => setEmail(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-        <TextInput
-          label="Phone Number" value={prefill.selectedPhone} readOnly
-          leftSection={<IconPhone size={14} color="#A0AEC0" />}
-          description="From your verified identity document"
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2', background: '#F7F8FC' } }}
+        {/* Email */}
+        <div>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>Email Address</Text>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: `1.5px solid ${errors.email ? '#E53E3E' : 'var(--ot-border-input)'}`,
+              fontSize: 14,
+              background: 'var(--ot-bg-card)',
+              color: 'var(--ot-text-body)',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          {errors.email && <Text size="xs" c="red" mt={4}>{errors.email}</Text>}
+        </div>
+
+        {/* Password fields */}
+        <PasswordInput
+          label="Password"
+          placeholder="Min. 6 characters"
+          leftSection={<IconLock size={15} />}
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          error={errors.password}
+          size="sm"
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
         />
         <PasswordInput
-          label="Create Password" placeholder="At least 6 characters"
-          leftSection={<IconLock size={14} color="#A0AEC0" />}
-          value={password} onChange={e => setPassword(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
+          label="Confirm Password"
+          placeholder="Re-enter your password"
+          leftSection={<IconLock size={15} />}
+          value={confirm}
+          onChange={e => setConfirm(e.target.value)}
+          error={errors.confirm}
+          size="sm"
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
         />
-        <PasswordInput
-          label="Confirm Password" placeholder="Repeat your password"
-          leftSection={<IconLock size={14} color="#A0AEC0" />}
-          value={confirm} onChange={e => setConfirm(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-      </Stack>
 
-      <Button
-        fullWidth size="md" radius="xl"
-        rightSection={<IconArrowRight size={16} />}
-        style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue}, ${COLORS.navyLight})`, fontWeight: 700 }}
-        onClick={handleSubmit}
-      >
-        Complete Registration
-      </Button>
+        {/* Verified phone (read-only) */}
+        <Box
+          p={12}
+          style={{
+            borderRadius: 10,
+            background: 'var(--ot-bg-row)',
+            border: '1px solid var(--ot-border)',
+          }}
+        >
+          <Text size="xs" c="var(--ot-text-muted)" mb={2}>Verified Phone Number</Text>
+          <Group gap={6}>
+            <Text size="sm" fw={600} c={COLORS.tealBlue}>{prefill.selectedPhone}</Text>
+            <Badge size="xs" color="teal" leftSection={<IconCheck size={9} />} variant="light">Verified</Badge>
+          </Group>
+        </Box>
+
+        <Button
+          fullWidth
+          size="md"
+          mt={4}
+          rightSection={<IconArrowRight size={16} />}
+          onClick={handleSubmit}
+          style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
+        >
+          Create Account
+        </Button>
+      </Stack>
     </Card>
   );
 }
 
-// ─── Done ─────────────────────────────────────────────────────────────────────
+// ─── Done Screen ──────────────────────────────────────────────────────────────
 function StepDone({ name }: { name: string }) {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setPct(p => { if (p >= 100) { clearInterval(iv); return 100; } return p + 5; }), 110);
+    return () => clearInterval(iv);
+  }, []);
   return (
     <Card>
-      <Stack align="center" gap={24} ta="center" py={16}>
-        <Box w={88} h={88} style={{ borderRadius: '50%', background: '#E6F4F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <IconCircleCheck size={50} color={COLORS.tealBlue} strokeWidth={1.4} />
+      <Stack align="center" gap={24} py={12}>
+        <Box
+          w={80} h={80}
+          style={{
+            borderRadius: '50%',
+            background: `${COLORS.tealBlue}14`,
+            border: `2.5px solid ${COLORS.tealBlue}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <IconShieldCheck size={40} color={COLORS.tealBlue} />
         </Box>
-        <Stack gap={6}>
+        <Stack gap={6} align="center">
           <Text fw={900} size="xl" c={COLORS.navyBlue}>Welcome, {name.split(' ')[0]}!</Text>
-          <Text size="sm" c="#718096" maw={300}>Your account is verified and ready. Taking you to your dashboard…</Text>
+          <Text size="sm" c="var(--ot-text-sub)" ta="center">
+            Your account has been created successfully. Taking you to your dashboard…
+          </Text>
         </Stack>
-        <Box w="100%" style={{ height: 4, borderRadius: 2, background: '#E4E9F2', overflow: 'hidden' }}>
-          <Box style={{ height: '100%', width: '100%', background: `linear-gradient(90deg, ${COLORS.tealBlue}, ${COLORS.tealDark})` }} />
+        <Box w="100%">
+          <Progress value={pct} color="teal" radius="xl" size="sm" animated />
         </Box>
       </Stack>
     </Card>
   );
 }
 
-// ─── Orchestrator ─────────────────────────────────────────────────────────────
+// ─── ClientSignup Orchestrator ────────────────────────────────────────────────
 export function ClientSignup() {
-  const navigate   = useNavigate();
+  const navigate  = useNavigate();
   const { signup } = useAuthStore();
-  const [step, setStep]         = useState(1);
+  const [step, setStep]       = useState(1);
   const [idResult, setIdResult] = useState<IdentityResult | null>(null);
   const [faceUrl, setFaceUrl]   = useState<string | null>(null);
   const [profileName, setProfileName] = useState('');
   const [done, setDone]         = useState(false);
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  const onIdentity = (r: IdentityResult)    => { setIdResult(r); go(2); };
-  const onVerified = (face: string | null)  => { setFaceUrl(face); go(3); };
+  const go = (n: number) => { setStep(n); scrollTop(); };
 
-  const onProfile = (d: ProfileData) => {
+  const handleIdentityDone = (r: IdentityResult) => {
+    setIdResult(r);
+    go(2);
+  };
+
+  const handleBioDone = (url: string | null) => {
+    setFaceUrl(url);
+    go(3);
+  };
+
+  const handleProfileDone = (email: string, password: string, photoUrl: string | null) => {
     if (!idResult) return;
-    setProfileName(d.displayName);
-    signup({ email: d.email, password: d.password, phone: idResult.selectedPhone, role: 'client' });
+    const name = idResult.extracted.fullName ?? 'User';
+    const result = signup({ email, password, phone: idResult.selectedPhone, role: 'client' });
+    if (!result.success) {
+      notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
+      return;
+    }
+    setProfileName(name);
     setDone(true);
+    scrollTop();
     setTimeout(() => navigate(ROUTES.clientDashboard), 2400);
   };
 
   return (
-    <Shell step={step}>
-      {step === 1 && <StepIdentity onNext={onIdentity} />}
-      {step === 2 && idResult && <StepVerify phone={idResult.selectedPhone} onDone={onVerified} onBack={() => go(1)} />}
-      {step === 3 && !done && idResult && <StepProfileClient prefill={idResult} faceUrl={faceUrl} onComplete={onProfile} />}
-      {step === 3 && done && <StepDone name={profileName} />}
+    <Shell step={done ? 3 : step}>
+      {done && profileName ? (
+        <StepDone name={profileName} />
+      ) : step === 1 ? (
+        <StepIdentity onNext={handleIdentityDone} />
+      ) : step === 2 && idResult ? (
+        <StepVerify
+          phone={idResult.selectedPhone}
+          onBack={() => go(1)}
+          onDone={handleBioDone}
+        />
+      ) : step === 3 && idResult ? (
+        <StepProfileClient
+          prefill={idResult}
+          faceUrl={faceUrl}
+          onBack={() => go(2)}
+          onDone={handleProfileDone}
+        />
+      ) : null}
     </Shell>
   );
 }

@@ -1,24 +1,26 @@
 /**
  * ProviderSignup.tsx — 3-step provider onboarding
- *   Step 1  Identity Verification  (ID upload → auto-extract → phone → agreement)
- *   Step 2  Phone & Biometric      (OTP → face scan with capture)
- *   Step 3  Profile Setup          (auto face pic, category, sub-services, bio? exp, pricing)
+ * Step 1: Identity  | Step 2: Phone & Biometric | Step 3: Provider Profile
+ *
+ * Step 3 includes: email/password, service category, sub-services,
+ * optional bio, required years of experience, fixed/platform pricing.
+ * Biometric face photo auto-fills profile picture.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Box, Button, FileButton, Group, PasswordInput, Stack, Textarea,
-  Text, TextInput, Badge, Center, Select, MultiSelect, SimpleGrid,
-  NumberInput, Alert,
+  Box, Button, FileButton, Group, MultiSelect, NumberInput,
+  Paper, PasswordInput, Progress, Select, Stack, Text, Textarea,
+  Avatar, Badge, Radio, Alert, SimpleGrid, useMantineColorScheme,
 } from '@mantine/core';
 import {
-  IconArrowRight, IconMail, IconLock, IconUser,
-  IconCircleCheck, IconCamera, IconShieldCheck, IconBriefcase,
-  IconStar, IconInfoCircle, IconCheck,
+  IconShieldCheck, IconArrowRight, IconCamera, IconLock,
+  IconBriefcase, IconCircleCheck, IconInfoCircle, IconUser,
+  IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
+import { COLORS, ROUTES } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import {
   Shell, Card, CardHeader,
@@ -27,8 +29,6 @@ import {
 } from './signup/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type PricingMethod = 'fixed' | 'platform_calculated';
-
 interface ProviderProfileData {
   email: string;
   password: string;
@@ -37,240 +37,367 @@ interface ProviderProfileData {
   subcategoryIds: string[];
   bio: string;
   yearsExp: number;
-  pricingMethod: PricingMethod;
+  pricingMethod: 'fixed' | 'platform_calculated';
 }
 
 // ─── Step 3 – Provider Profile Setup ─────────────────────────────────────────
 function StepProfileProvider({
-  prefill, faceUrl, onComplete,
+  prefill,
+  faceUrl,
+  onBack,
+  onDone,
 }: {
   prefill: IdentityResult;
   faceUrl: string | null;
-  onComplete: (d: ProviderProfileData) => void;
+  onBack: () => void;
+  onDone: (data: ProviderProfileData) => void;
 }) {
-  const [email, setEmail]           = useState('');
-  const [password, setPassword]     = useState('');
-  const [confirm, setConfirm]       = useState('');
-  const [photoUrl, setPhotoUrl]     = useState<string | null>(faceUrl);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [subIds, setSubIds]         = useState<string[]>([]);
-  const [bio, setBio]               = useState('');
-  const [yearsExp, setYearsExp]     = useState<number | string>(1);
-  const [pricing, setPricing]       = useState<PricingMethod>('fixed');
+  const [photoUrl, setPhotoUrl]           = useState<string | null>(faceUrl);
+  const [email, setEmail]                 = useState('');
+  const [password, setPassword]           = useState('');
+  const [confirm, setConfirm]             = useState('');
+  const [categoryId, setCategoryId]       = useState('');
+  const [subcategoryIds, setSubcategoryIds] = useState<string[]>([]);
+  const [bio, setBio]                     = useState('');
+  const [yearsExp, setYearsExp]           = useState<number | string>(0);
+  const [pricingMethod, setPricingMethod] = useState<'fixed' | 'platform_calculated'>('fixed');
+  const [errors, setErrors]               = useState<Record<string, string>>({});
 
-  const handlePhoto = (f: File | null) => {
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = e => setPhotoUrl(e.target?.result as string);
-    r.readAsDataURL(f);
+  const handlePhoto = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhotoUrl(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
-  const catOptions  = MOCK_CATEGORIES.map(c => ({ value: c.id, label: c.name }));
-  const selectedCat = MOCK_CATEGORIES.find(c => c.id === categoryId);
-  const subOptions  = (selectedCat?.subcategories ?? []).map(s => ({ value: s.id, label: s.name }));
+  // Category → sub-service options
+  const selectedCategory = MOCK_CATEGORIES.find(c => c.id === categoryId);
+  const subOptions = selectedCategory?.subcategories?.map(s => ({ value: s.id, label: s.name })) ?? [];
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!/^\S+@\S+\.\S+$/.test(email))    e.email = 'Please enter a valid email address';
+    if (password.length < 6)              e.password = 'Password must be at least 6 characters';
+    if (password !== confirm)             e.confirm = 'Passwords do not match';
+    if (!categoryId)                      e.category = 'Please select a service category';
+    if (subcategoryIds.length === 0)      e.subcategory = 'Please select at least one sub-service';
+    const exp = typeof yearsExp === 'string' ? parseInt(yearsExp, 10) : yearsExp;
+    if (isNaN(exp) || exp <= 0)           e.yearsExp = 'Please enter your years of experience (minimum 1)';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
   const handleSubmit = () => {
-    if (!/\S+@\S+\.\S+/.test(email)) { notifications.show({ title: 'Valid email required', color: 'yellow', message: '' }); return; }
-    if (password.length < 6) { notifications.show({ title: 'Weak password', color: 'yellow', message: 'At least 6 characters.' }); return; }
-    if (password !== confirm) { notifications.show({ title: 'Passwords do not match', color: 'red', message: '' }); return; }
-    if (!categoryId) { notifications.show({ title: 'Category required', color: 'yellow', message: 'Select your service category.' }); return; }
-    if (!subIds.length) { notifications.show({ title: 'Sub-service required', color: 'yellow', message: 'Select at least one sub-service.' }); return; }
+    if (!validate()) return;
     const exp = typeof yearsExp === 'string' ? parseInt(yearsExp, 10) : yearsExp;
-    if (!exp || exp < 0) { notifications.show({ title: 'Experience required', color: 'yellow', message: 'Enter your years of experience.' }); return; }
-    onComplete({ email, password, photoUrl, categoryId, subcategoryIds: subIds, bio, yearsExp: exp, pricingMethod: pricing });
+    onDone({ email, password, photoUrl, categoryId, subcategoryIds, bio, yearsExp: exp, pricingMethod });
   };
 
-  const pricingOpts: { value: PricingMethod; label: string; desc: string }[] = [
-    { value: 'fixed',               label: 'Fixed Price',         desc: 'You set a clear price per job' },
-    { value: 'platform_calculated', label: 'Platform Calculated', desc: 'Price auto-calculated by ONE TOUCH' },
-  ];
+  const displayName = prefill.extracted.fullName ?? 'Provider';
 
   return (
     <Card>
-      <CardHeader icon={<IconBriefcase size={20} color={COLORS.navyBlue} />} title="Provider Profile" sub="Set up your profile to start receiving jobs" />
+      <CardHeader
+        icon={<IconBriefcase size={22} color={COLORS.navyBlue} />}
+        title="Provider Profile Setup"
+        sub="Set up your service profile to start receiving job requests"
+      />
 
-      {/* Verified identity bar */}
-      {prefill.extracted.fullName && (
-        <Box p={12} mb={20} style={{ borderRadius: 12, background: '#E6F4F1', border: '1px solid #B2DFDB', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {photoUrl ? (
-            <Box w={40} h={40} style={{ borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-              <img src={photoUrl} alt="Face" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Box>
-          ) : (
-            <Box w={40} h={40} style={{ borderRadius: '50%', background: '#C8EBE4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <IconShieldCheck size={18} color={COLORS.tealBlue} />
-            </Box>
-          )}
-          <Stack gap={0} flex={1}>
-            <Text size="10px" fw={600} c="#718096">Verified Identity</Text>
-            <Text fw={700} size="sm" c={COLORS.navyBlue}>{prefill.extracted.fullName}</Text>
-          </Stack>
-          <Badge color="teal" variant="light" size="sm">Verified</Badge>
-        </Box>
-      )}
-
-      {/* Profile photo — auto from face scan */}
-      <Stack gap={10} mb={22}>
-        <Text size="12px" fw={700} c={COLORS.navyBlue} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Profile Photo
-        </Text>
-        <Group gap={16} align="flex-start">
-          <Box w={72} h={72} style={{ borderRadius: '50%', overflow: 'hidden', border: `2px solid ${COLORS.tealBlue}40`, background: '#F0F2F9', flexShrink: 0 }}>
-            {photoUrl
-              ? <img src={photoUrl} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <Center h="100%"><IconCamera size={24} color="#CBD5E0" /></Center>
-            }
-          </Box>
-          <Stack gap={4} justify="center">
-            <FileButton onChange={handlePhoto} accept="image/*">
-              {p => <Button {...p} variant="light" color="teal" size="sm" radius="xl">Update Photo</Button>}
-            </FileButton>
-            <Text size="11px" c="#A0AEC0">
-              {faceUrl ? 'Auto-filled from face scan · tap to change' : 'Optional — you can add this later'}
-            </Text>
+      {/* Identity verification summary */}
+      <Box
+        p={16}
+        mb={24}
+        style={{
+          borderRadius: 12,
+          background: 'var(--ot-bg-row)',
+          border: '1px solid var(--ot-border)',
+        }}
+      >
+        <Group gap={12}>
+          <Avatar
+            src={photoUrl}
+            size={48}
+            radius="xl"
+            color="teal"
+            style={{ border: `2px solid ${COLORS.tealBlue}` }}
+          >
+            {displayName[0]}
+          </Avatar>
+          <Stack gap={3}>
+            <Text fw={700} size="sm" c="var(--ot-text-navy)">{displayName}</Text>
+            <Group gap={6}>
+              <Badge size="xs" color="teal" variant="dot">Identity Verified</Badge>
+              <Badge size="xs" color="blue" variant="dot">Phone Verified</Badge>
+              <Badge size="xs" color="green" variant="dot">Biometric Verified</Badge>
+            </Group>
           </Stack>
         </Group>
-      </Stack>
+      </Box>
 
-      <Box mb={20} style={{ height: 1, background: '#F0F2F7' }} />
+      <Stack gap={18}>
+        {/* Profile photo */}
+        <Box>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>Profile Photo</Text>
+          <Group gap={14} align="center">
+            <Avatar
+              src={photoUrl}
+              size={64}
+              radius="xl"
+              color="teal"
+              style={{ border: `2.5px solid ${COLORS.tealBlue}` }}
+            >
+              {displayName[0]}
+            </Avatar>
+            <Stack gap={4}>
+              <FileButton onChange={handlePhoto} accept="image/*">
+                {(p) => (
+                  <Button
+                    {...p}
+                    variant="light"
+                    color="teal"
+                    size="xs"
+                    leftSection={<IconCamera size={13} />}
+                  >
+                    {photoUrl ? 'Change Photo' : 'Upload Photo'}
+                  </Button>
+                )}
+              </FileButton>
+              {faceUrl && photoUrl === faceUrl ? (
+                <Text size="10px" c="var(--ot-text-muted)">Auto-filled from face scan · tap to change</Text>
+              ) : (
+                <Text size="10px" c="var(--ot-text-muted)">Upload a clear professional photo</Text>
+              )}
+            </Stack>
+          </Group>
+        </Box>
 
-      {/* Account credentials */}
-      <Text size="12px" fw={700} c={COLORS.navyBlue} mb={12} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Account Credentials</Text>
-      <Stack gap={12} mb={22}>
-        <TextInput
-          label="Email Address" placeholder="you@example.com" type="email"
-          leftSection={<IconMail size={14} color="#A0AEC0" />}
-          value={email} onChange={e => setEmail(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-        <TextInput
-          label="Phone Number" value={prefill.selectedPhone} readOnly
-          description="Verified phone from your identity document"
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2', background: '#F7F8FC' } }}
-        />
-        <PasswordInput
-          label="Create Password" placeholder="At least 6 characters"
-          leftSection={<IconLock size={14} color="#A0AEC0" />}
-          value={password} onChange={e => setPassword(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-        <PasswordInput
-          label="Confirm Password" placeholder="Repeat your password"
-          leftSection={<IconLock size={14} color="#A0AEC0" />}
-          value={confirm} onChange={e => setConfirm(e.currentTarget.value)}
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-      </Stack>
-
-      <Box mb={20} style={{ height: 1, background: '#F0F2F7' }} />
-
-      {/* Service category */}
-      <Text size="12px" fw={700} c={COLORS.navyBlue} mb={12} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Services</Text>
-      <Stack gap={12} mb={22}>
-        <Select
-          label="Service Category" placeholder="Select your primary category"
-          data={catOptions} value={categoryId}
-          onChange={v => { setCategoryId(v); setSubIds([]); }}
-          leftSection={<IconBriefcase size={14} color="#A0AEC0" />}
-          searchable
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
-        {categoryId && (
-          <MultiSelect
-            label="Sub-services you offer"
-            placeholder="Select one or more"
-            data={subOptions} value={subIds} onChange={setSubIds}
-            searchable
-            styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
+        {/* Email */}
+        <div>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>Email Address</Text>
+          <input
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: `1.5px solid ${errors.email ? '#E53E3E' : 'var(--ot-border-input)'}`,
+              fontSize: 14,
+              background: 'var(--ot-bg-card)',
+              color: 'var(--ot-text-body)',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
           />
+          {errors.email && <Text size="xs" c="red" mt={4}>{errors.email}</Text>}
+        </div>
+
+        {/* Passwords */}
+        <SimpleGrid cols={2} spacing={12}>
+          <PasswordInput
+            label="Password"
+            placeholder="Min. 6 characters"
+            leftSection={<IconLock size={15} />}
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            error={errors.password}
+            size="sm"
+            styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+          />
+          <PasswordInput
+            label="Confirm Password"
+            placeholder="Re-enter password"
+            leftSection={<IconLock size={15} />}
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            error={errors.confirm}
+            size="sm"
+            styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+          />
+        </SimpleGrid>
+
+        {/* Verified phone */}
+        <Box
+          p={12}
+          style={{
+            borderRadius: 10,
+            background: 'var(--ot-bg-row)',
+            border: '1px solid var(--ot-border)',
+          }}
+        >
+          <Text size="xs" c="var(--ot-text-muted)" mb={2}>Verified Phone Number</Text>
+          <Group gap={6}>
+            <Text size="sm" fw={600} c={COLORS.tealBlue}>{prefill.selectedPhone}</Text>
+            <Badge size="xs" color="teal" leftSection={<IconCheck size={9} />} variant="light">Verified</Badge>
+          </Group>
+        </Box>
+
+        {/* Service Category */}
+        <Box>
+          <Select
+            label="Service Category"
+            placeholder="Select your main service area"
+            data={MOCK_CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+            value={categoryId}
+            onChange={v => { setCategoryId(v ?? ''); setSubcategoryIds([]); }}
+            error={errors.category}
+            size="sm"
+            searchable
+            styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+          />
+        </Box>
+
+        {/* Sub-services */}
+        {categoryId && (
+          <Box>
+            <MultiSelect
+              label="Sub-Services"
+              placeholder="Select all that apply"
+              data={subOptions}
+              value={subcategoryIds}
+              onChange={setSubcategoryIds}
+              error={errors.subcategory}
+              size="sm"
+              searchable
+              styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+            />
+          </Box>
         )}
-        <Textarea
-          label={<Text size="12px" fw={600} c={COLORS.navyBlue}>Bio <Text span fw={400} c="#A0AEC0">(optional)</Text></Text>}
-          placeholder="Briefly describe your experience and what makes you the best choice for clients…"
-          minRows={3} value={bio}
-          onChange={e => setBio(e.currentTarget.value)}
-          styles={{ input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-        />
+
+        {/* Years of experience */}
         <NumberInput
-          label="Years of Experience"
+          label="Years of Skill / Experience *"
+          description="How many years have you been doing this professionally?"
           placeholder="e.g. 5"
-          leftSection={<IconStar size={14} color="#A0AEC0" />}
-          min={0} max={60}
+          min={0}
+          max={60}
           value={yearsExp}
           onChange={setYearsExp}
-          required
-          styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 4 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
+          error={errors.yearsExp}
+          size="sm"
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
         />
-      </Stack>
 
-      <Box mb={20} style={{ height: 1, background: '#F0F2F7' }} />
+        {/* Bio (optional) */}
+        <Textarea
+          label="Professional Bio (optional)"
+          placeholder="Tell clients about your experience, skills, and what makes you stand out…"
+          value={bio}
+          onChange={e => setBio(e.target.value)}
+          size="sm"
+          minRows={3}
+          autosize
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+        />
 
-      {/* Pricing */}
-      <Text size="12px" fw={700} c={COLORS.navyBlue} mb={10} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Payment Structure</Text>
-      <Alert color="blue" icon={<IconInfoCircle size={13} />} radius={10} p={10} mb={14}>
-        <Text size="xs">Per-hour pricing is not available to ensure full transparency and trust for clients.</Text>
-      </Alert>
-      <SimpleGrid cols={2} spacing={10} mb={24}>
-        {pricingOpts.map(opt => (
-          <Box
-            key={opt.value}
-            onClick={() => setPricing(opt.value)}
-            style={{ cursor: 'pointer', borderRadius: 14, border: `1.5px solid ${pricing === opt.value ? COLORS.tealBlue : '#E4E9F2'}`, background: pricing === opt.value ? '#00808008' : 'white', padding: 14, transition: 'all 0.18s' }}
-          >
-            <Stack gap={6} align="center" ta="center">
-              <Box w={30} h={30} style={{ borderRadius: 8, background: pricing === opt.value ? `${COLORS.tealBlue}18` : '#F7F8FC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconCheck size={15} color={pricing === opt.value ? COLORS.tealBlue : '#CBD5E0'} strokeWidth={pricing === opt.value ? 3 : 2} />
+        {/* Pricing method */}
+        <Box>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={12}>Payment Structure</Text>
+          <SimpleGrid cols={2} spacing={10}>
+            {([
+              { value: 'fixed',               label: 'Fixed Price',       desc: 'You set a fixed rate per job' },
+              { value: 'platform_calculated', label: 'Platform Calculated', desc: 'Platform determines fair pricing' },
+            ] as const).map(opt => (
+              <Box
+                key={opt.value}
+                className={`sf-id-opt${pricingMethod === opt.value ? ' sel' : ''}`}
+                p={14}
+                onClick={() => setPricingMethod(opt.value)}
+              >
+                <Group gap={10} wrap="nowrap">
+                  <Radio
+                    checked={pricingMethod === opt.value}
+                    onChange={() => setPricingMethod(opt.value)}
+                    color="blue"
+                    size="sm"
+                  />
+                  <Stack gap={2}>
+                    <Text size="sm" fw={700} c="var(--ot-text-navy)">{opt.label}</Text>
+                    <Text size="10px" c="var(--ot-text-muted)">{opt.desc}</Text>
+                  </Stack>
+                </Group>
               </Box>
-              <Text size="12px" fw={700} c={pricing === opt.value ? COLORS.tealBlue : COLORS.navyBlue}>{opt.label}</Text>
-              <Text size="10px" c="#718096">{opt.desc}</Text>
-            </Stack>
-          </Box>
-        ))}
-      </SimpleGrid>
+            ))}
+          </SimpleGrid>
+          <Alert icon={<IconInfoCircle size={14} />} color="blue" variant="light" radius="md" mt={10}>
+            <Text size="xs">
+              Per-hour pricing is not supported on ONE TOUCH to ensure fair, transparent job-based compensation.
+            </Text>
+          </Alert>
+        </Box>
 
-      <Button
-        fullWidth size="md" radius="xl"
-        rightSection={<IconArrowRight size={16} />}
-        style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue}, ${COLORS.navyLight})`, fontWeight: 700 }}
-        onClick={handleSubmit}
-      >
-        Complete Registration
-      </Button>
+        <Button
+          fullWidth
+          size="md"
+          mt={4}
+          rightSection={<IconArrowRight size={16} />}
+          onClick={handleSubmit}
+          style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
+        >
+          Complete Registration
+        </Button>
+      </Stack>
     </Card>
   );
 }
 
-// ─── Done ─────────────────────────────────────────────────────────────────────
+// ─── Done Screen ──────────────────────────────────────────────────────────────
 function StepDone({ name }: { name: string }) {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setPct(p => { if (p >= 100) { clearInterval(iv); return 100; } return p + 4; }), 110);
+    return () => clearInterval(iv);
+  }, []);
   return (
     <Card>
-      <Stack align="center" gap={24} ta="center" py={16}>
-        <Box w={88} h={88} style={{ borderRadius: '50%', background: '#E6F4F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <IconCircleCheck size={50} color={COLORS.tealBlue} strokeWidth={1.4} />
+      <Stack align="center" gap={24} py={12}>
+        <Box
+          w={80} h={80}
+          style={{
+            borderRadius: '50%',
+            background: `${COLORS.tealBlue}14`,
+            border: `2.5px solid ${COLORS.tealBlue}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <IconShieldCheck size={40} color={COLORS.tealBlue} />
         </Box>
-        <Stack gap={6}>
+        <Stack gap={6} align="center">
           <Text fw={900} size="xl" c={COLORS.navyBlue}>Welcome, {name.split(' ')[0]}!</Text>
-          <Text size="sm" c="#718096" maw={320}>Your provider account is verified. Redirecting to your dashboard…</Text>
+          <Text size="sm" c="var(--ot-text-sub)" ta="center">
+            Your provider profile has been created. Taking you to your dashboard…
+          </Text>
         </Stack>
-        <SimpleGrid cols={3} spacing={10} w="100%">
-          {['Identity Verified', 'Phone Verified', 'Face Matched'].map(label => (
-            <Stack key={label} align="center" gap={6} p={10} style={{ borderRadius: 10, background: '#E6F4F1', border: '1px solid #C8EBE4' }}>
-              <IconCircleCheck size={16} color={COLORS.tealBlue} />
-              <Text size="10px" fw={600} c="#718096">{label}</Text>
-            </Stack>
+        <Stack gap={8} w="100%">
+          {['Identity Verification', 'Phone Verification', 'Face Scan'].map(label => (
+            <Group key={label} gap={8}>
+              <Box
+                w={22} h={22}
+                style={{
+                  borderRadius: '50%',
+                  background: `${COLORS.tealBlue}15`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <IconCircleCheck size={14} color={COLORS.tealBlue} />
+              </Box>
+              <Text size="sm" c="var(--ot-text-sub)">{label}</Text>
+            </Group>
           ))}
-        </SimpleGrid>
-        <Box w="100%" style={{ height: 4, borderRadius: 2, background: '#E4E9F2', overflow: 'hidden' }}>
-          <Box style={{ height: '100%', width: '100%', background: `linear-gradient(90deg, ${COLORS.tealBlue}, ${COLORS.navyBlue})` }} />
+        </Stack>
+        <Box w="100%">
+          <Progress value={pct} color="teal" radius="xl" size="sm" animated />
         </Box>
       </Stack>
     </Card>
   );
 }
 
-// ─── Orchestrator ─────────────────────────────────────────────────────────────
+// ─── ProviderSignup Orchestrator ──────────────────────────────────────────────
 export function ProviderSignup() {
-  const navigate   = useNavigate();
+  const navigate  = useNavigate();
   const { signup } = useAuthStore();
   const [step, setStep]         = useState(1);
   const [idResult, setIdResult] = useState<IdentityResult | null>(null);
@@ -278,26 +405,53 @@ export function ProviderSignup() {
   const [profileName, setProfileName] = useState('');
   const [done, setDone]         = useState(false);
 
-  const go = (n: number) => { setStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const go = (n: number) => { setStep(n); scrollTop(); };
 
-  const onIdentity = (r: IdentityResult)   => { setIdResult(r); go(2); };
-  const onVerified = (face: string | null) => { setFaceUrl(face); go(3); };
+  const handleIdentityDone = (r: IdentityResult) => {
+    setIdResult(r);
+    go(2);
+  };
 
-  const onProfile = (d: ProviderProfileData) => {
+  const handleBioDone = (url: string | null) => {
+    setFaceUrl(url);
+    go(3);
+  };
+
+  const handleProfileDone = (data: ProviderProfileData) => {
     if (!idResult) return;
-    setProfileName(idResult.extracted.fullName ?? 'Provider');
-    signup({ email: d.email, password: d.password, phone: idResult.selectedPhone, role: 'provider' });
-    notifications.show({ title: 'Registration Complete!', message: 'Welcome to ONE TOUCH.', color: 'teal', icon: <IconCircleCheck size={15} /> });
+    const name = idResult.extracted.fullName ?? 'Provider';
+    const result = signup({ email: data.email, password: data.password, phone: idResult.selectedPhone, role: 'provider' });
+    if (!result.success) {
+      notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
+      return;
+    }
+    setProfileName(name);
     setDone(true);
+    scrollTop();
     setTimeout(() => navigate(ROUTES.providerDashboard), 2600);
   };
 
   return (
-    <Shell step={step}>
-      {step === 1 && <StepIdentity onNext={onIdentity} />}
-      {step === 2 && idResult && <StepVerify phone={idResult.selectedPhone} onDone={onVerified} onBack={() => go(1)} />}
-      {step === 3 && !done && idResult && <StepProfileProvider prefill={idResult} faceUrl={faceUrl} onComplete={onProfile} />}
-      {step === 3 && done && <StepDone name={profileName} />}
+    <Shell step={done ? 3 : step}>
+      {done && profileName ? (
+        <StepDone name={profileName} />
+      ) : step === 1 ? (
+        <StepIdentity onNext={handleIdentityDone} />
+      ) : step === 2 && idResult ? (
+        <StepVerify
+          phone={idResult.selectedPhone}
+          onBack={() => go(1)}
+          onDone={handleBioDone}
+        />
+      ) : step === 3 && idResult ? (
+        <StepProfileProvider
+          prefill={idResult}
+          faceUrl={faceUrl}
+          onBack={() => go(2)}
+          onDone={handleProfileDone}
+        />
+      ) : null}
     </Shell>
   );
 }

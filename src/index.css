@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* ── Design tokens (light) ─────────────────────────────────────────────────── */
 :root {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   line-height: 1.5;
@@ -8,6 +9,72 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Page & card surfaces */
+  --ot-bg-page:        #F7F8FC;
+  --ot-bg-card:        #ffffff;
+  --ot-bg-card-inner:  #FAFBFF;
+  --ot-bg-row:         #F8F9FC;
+
+  /* Borders */
+  --ot-border:         #EEF0F7;
+  --ot-border-inner:   #F0F2F7;
+  --ot-border-input:   #D1D9E6;
+
+  /* Text */
+  --ot-text-navy:      #000080;
+  --ot-text-sub:       #718096;
+  --ot-text-muted:     #A0AEC0;
+  --ot-text-body:      #2D3748;
+
+  /* Identity option cards */
+  --ot-id-opt-bg:      #ffffff;
+  --ot-id-opt-border:  #E4E9F2;
+  --ot-id-opt-hover:   #00808008;
+  --ot-id-opt-sel-bg:  #00008006;
+
+  /* Upload zone */
+  --ot-upload-bg:      #FAFBFF;
+  --ot-upload-icon-bg: #EEF0F7;
+
+  /* Nav */
+  --ot-nav-bg:         #ffffff;
+  --ot-nav-border:     #EEF0F7;
+
+  /* Header */
+  --ot-header-bg:      #ffffff;
+  --ot-header-border:  #F1F3F5;
+}
+
+/* ── Design tokens (dark) ──────────────────────────────────────────────────── */
+[data-mantine-color-scheme="dark"] {
+  --ot-bg-page:        #111318;
+  --ot-bg-card:        #1C1F2E;
+  --ot-bg-card-inner:  #171A28;
+  --ot-bg-row:         #1F2235;
+
+  --ot-border:         #2A2E42;
+  --ot-border-inner:   #252840;
+  --ot-border-input:   #333750;
+
+  --ot-text-navy:      #7B9FFF;
+  --ot-text-sub:       #A0AABB;
+  --ot-text-muted:     #6B7280;
+  --ot-text-body:      #D1D5DB;
+
+  --ot-id-opt-bg:      #1C1F2E;
+  --ot-id-opt-border:  #2A2E42;
+  --ot-id-opt-hover:   rgba(0,128,128,0.08);
+  --ot-id-opt-sel-bg:  rgba(100,130,255,0.07);
+
+  --ot-upload-bg:      #171A28;
+  --ot-upload-icon-bg: #252840;
+
+  --ot-nav-bg:         #161924;
+  --ot-nav-border:     #2A2E42;
+
+  --ot-header-bg:      #161924;
+  --ot-header-border:  #2A2E42;
 }
 
 *,
@@ -19,7 +86,9 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #F5F6FA;
+  background-color: var(--ot-bg-page);
+  color: var(--ot-text-body);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 #root {
@@ -35,17 +104,10 @@ body {
 }
 
 /* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-::-webkit-scrollbar-thumb {
-  background: #C5D1E8;
-  border-radius: 999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #1B2A4A;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: var(--ot-bg-page); }
+::-webkit-scrollbar-thumb  { background: var(--ot-border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #1B2A4A; }
+
+/* Smooth colour scheme transitions */
+*, *::before, *::after { transition: background-color 0.2s ease, border-color 0.2s ease; }

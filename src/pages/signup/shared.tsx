@@ -1,49 +1,69 @@
 /**
- * signup/shared.tsx
- * Shared components for the 3-step signup flow (Client + Provider):
- *   Step 1 – Identity Verification  (auto-extract, phone, agreement)
- *   Step 2 – Phone & Biometric      (OTP then face scan, sequential)
+ * signup/shared.tsx — Refined 3-step signup shared components
+ * Step 1: Identity Verification (auto-extract, phone, agreement)
+ * Step 2: Phone & Biometric Verification (OTP → face scan, sequential)
+ * Consuming pages supply their own Step 3 (Role-Based Profile Setup).
  *
- * Each consuming page adds its own Step 3 (Profile Setup).
+ * Dark mode: uses CSS variables from index.css (--ot-* tokens)
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box, Button, Center, Container, Group, Paper,
   PinInput, Stack, Text, TextInput, ActionIcon,
   Alert, FileButton, Badge, SimpleGrid, RingProgress,
-  Loader, Checkbox,
+  Loader, Checkbox, useMantineColorScheme,
 } from '@mantine/core';
 import {
   IconShieldLock, IconArrowRight, IconArrowLeft,
   IconPhone, IconUser, IconMessageCircle,
   IconCircleCheck, IconAlertCircle, IconUpload, IconCamera,
   IconScan, IconFileText, IconIdBadge, IconCheck, IconX, IconRotate,
-  IconLock, IconInfoCircle,
+  IconLock, IconInfoCircle, IconEPassport, IconCar, IconIdBadge2,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { COLORS, MOCK_OTP, ROUTES } from '../../utils/constants';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { AIHelpCenter } from '../../components/AIHelpCenter';
+import { DarkModeToggle } from '../../components/DarkModeToggle';
 
-// ─── Global CSS ───────────────────────────────────────────────────────────────
+// ─── Global CSS (animations; id-opt uses CSS vars) ────────────────────────────
 export const SHARED_CSS = `
-@keyframes sfIn     { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes sfIn     { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
 @keyframes scanLine { 0%{top:0%} 100%{top:100%} }
-@keyframes pulseRing{ 0%,100%{box-shadow:0 0 0 0 rgba(0,128,128,0.3)} 60%{box-shadow:0 0 0 16px rgba(0,128,128,0)} }
-.sf-in       { animation: sfIn 0.38s ease both; }
+@keyframes pulseRing{ 0%,100%{box-shadow:0 0 0 0 rgba(0,128,128,0.35)} 60%{box-shadow:0 0 0 18px rgba(0,128,128,0)} }
+@keyframes fadeUp   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.sf-in       { animation: sfIn 0.36s cubic-bezier(0.22,1,0.36,1) both; }
 .sf-ring     { animation: pulseRing 2s ease-in-out infinite; }
 .sf-scanline { position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#008080,transparent);animation:scanLine 1.8s linear infinite; }
-.sf-id-opt   { cursor:pointer;border:1.5px solid #E4E9F2;border-radius:14px;background:#fff;transition:all 0.18s; }
-.sf-id-opt:hover { border-color:#008080;background:#00808008; }
-.sf-id-opt.sel   { border-color:#000080;background:#00008006;box-shadow:0 2px 10px #00008018; }
+.sf-fade-up  { animation: fadeUp 0.3s ease both; }
+
+.sf-id-opt {
+  cursor: pointer;
+  border: 1.5px solid var(--ot-id-opt-border);
+  border-radius: 14px;
+  background: var(--ot-id-opt-bg);
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.sf-id-opt:hover {
+  border-color: #008080;
+  background: var(--ot-id-opt-hover);
+}
+.sf-id-opt.sel {
+  border-color: #000080;
+  background: var(--ot-id-opt-sel-bg);
+  box-shadow: 0 2px 12px rgba(0,0,128,0.14);
+}
+[data-mantine-color-scheme="dark"] .sf-id-opt.sel {
+  border-color: #7B9FFF;
+  box-shadow: 0 2px 12px rgba(123,159,255,0.18);
+}
 `;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type IdType = 'passport' | 'driving_license' | 'national_id' | 'kebele_id';
-
 export interface IdField { key: string; label: string; placeholder: string; }
-
 export interface IdentityResult {
   idType: IdType;
   extracted: Record<string, string>;
@@ -52,7 +72,6 @@ export interface IdentityResult {
   selectedPhone: string;
   agreed: boolean;
 }
-
 export interface VerifyResult {
   capturedFaceUrl: string | null;
 }
@@ -81,15 +100,15 @@ export const ID_FIELDS: Record<IdType, IdField[]> = {
     { key: 'issuingAuthority', label: 'Issuing Authority',      placeholder: 'e.g. Addis Ababa Transport Bureau' },
   ],
   national_id: [
-    { key: 'fullName',    label: 'Full Name',        placeholder: 'As on ID' },
-    { key: 'idNumber',    label: 'ID Number',        placeholder: 'e.g. ETH-NIDA-XXXXXXXX' },
-    { key: 'dateOfBirth', label: 'Date of Birth',    placeholder: 'DD/MM/YYYY' },
-    { key: 'gender',      label: 'Gender',           placeholder: 'Male / Female' },
-    { key: 'nationality', label: 'Nationality',      placeholder: 'Ethiopian' },
-    { key: 'region',      label: 'Region / Sub-City',placeholder: 'e.g. Addis Ababa' },
-    { key: 'woreda',      label: 'Woreda',           placeholder: 'e.g. Bole' },
-    { key: 'issueDate',   label: 'Issue Date',       placeholder: 'DD/MM/YYYY' },
-    { key: 'expiryDate',  label: 'Expiry Date',      placeholder: 'DD/MM/YYYY' },
+    { key: 'fullName',    label: 'Full Name',         placeholder: 'As on ID' },
+    { key: 'idNumber',    label: 'ID Number',         placeholder: 'e.g. ETH-NIDA-XXXXXXXX' },
+    { key: 'dateOfBirth', label: 'Date of Birth',     placeholder: 'DD/MM/YYYY' },
+    { key: 'gender',      label: 'Gender',            placeholder: 'Male / Female' },
+    { key: 'nationality', label: 'Nationality',       placeholder: 'Ethiopian' },
+    { key: 'region',      label: 'Region / Sub-City', placeholder: 'e.g. Addis Ababa' },
+    { key: 'woreda',      label: 'Woreda',            placeholder: 'e.g. Bole' },
+    { key: 'issueDate',   label: 'Issue Date',        placeholder: 'DD/MM/YYYY' },
+    { key: 'expiryDate',  label: 'Expiry Date',       placeholder: 'DD/MM/YYYY' },
   ],
   kebele_id: [
     { key: 'fullName',       label: 'Full Name',         placeholder: 'As on Kebele ID' },
@@ -131,34 +150,73 @@ export const MOCK_EXTRACTED: Record<IdType, Record<string, string>> = {
   },
 };
 
-// ─── Step labels & dot component ─────────────────────────────────────────────
+// ─── Step labels & dot progress ───────────────────────────────────────────────
 export const STEP_LABELS = ['Identity', 'Phone & Biometric', 'Profile'];
 
 export function StepDots({ current }: { current: number }) {
   return (
-    <Group justify="center" gap={0} mb={30} wrap="nowrap">
+    <Group justify="center" gap={0} mb={32} wrap="nowrap">
       {STEP_LABELS.map((label, i) => {
         const done = i + 1 < current;
         const active = i + 1 === current;
+        const dotBg = done
+          ? COLORS.tealBlue
+          : active
+          ? COLORS.navyBlue
+          : 'var(--ot-border)';
+        const dotText = done ? 'white' : active ? 'white' : 'var(--ot-text-muted)';
+        const labelColor = active
+          ? COLORS.navyBlue
+          : done
+          ? COLORS.tealBlue
+          : 'var(--ot-text-muted)';
         return (
           <Group key={label} gap={0} align="center" wrap="nowrap">
-            <Stack gap={4} align="center">
-              <Box w={30} h={30} style={{
-                borderRadius: '50%', flexShrink: 0,
-                background: done ? COLORS.tealBlue : active ? COLORS.navyBlue : '#E4E9F2',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: active ? `0 2px 10px ${COLORS.navyBlue}45` : 'none',
-                transition: 'all 0.3s',
-              }}>
-                {done
-                  ? <svg width="13" height="13" viewBox="0 0 13 13"><path d="M2 6.5l3 3 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-                  : <Text size="11px" fw={700} c={active ? 'white' : '#A0AEC0'}>{i + 1}</Text>
-                }
+            <Stack gap={5} align="center">
+              <Box
+                w={32}
+                h={32}
+                style={{
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  background: dotBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: active ? `0 0 0 4px ${COLORS.navyBlue}25` : 'none',
+                  transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)',
+                }}
+              >
+                {done ? (
+                  <svg width="13" height="13" viewBox="0 0 13 13">
+                    <path d="M2 6.5l3 3 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                ) : (
+                  <Text size="11px" fw={700} c={dotText} style={{ lineHeight: 1 }}>{i + 1}</Text>
+                )}
               </Box>
-              <Text size="10px" fw={600} c={active ? COLORS.navyBlue : done ? COLORS.tealBlue : '#A0AEC0'} style={{ whiteSpace: 'nowrap' }}>{label}</Text>
+              <Text
+                size="10px"
+                fw={600}
+                c={labelColor}
+                style={{ whiteSpace: 'nowrap', transition: 'color 0.25s' }}
+              >
+                {label}
+              </Text>
             </Stack>
             {i < STEP_LABELS.length - 1 && (
-              <Box w={44} h={2} mx={6} mb={18} style={{ background: done ? COLORS.tealBlue : '#E4E9F2', transition: 'background 0.3s', borderRadius: 2 }} />
+              <Box
+                w={48}
+                h={2}
+                mx={8}
+                mb={20}
+                style={{
+                  background: done ? COLORS.tealBlue : 'var(--ot-border)',
+                  transition: 'background 0.35s',
+                  borderRadius: 2,
+                  flexShrink: 0,
+                }}
+              />
             )}
           </Group>
         );
@@ -167,43 +225,61 @@ export function StepDots({ current }: { current: number }) {
   );
 }
 
-// ─── Shared shell ─────────────────────────────────────────────────────────────
+// ─── Shell (page wrapper with nav + progress bar) ─────────────────────────────
 export function Shell({ children, step }: { children: React.ReactNode; step: number }) {
   const navigate = useNavigate();
   return (
-    <Box style={{ minHeight: '100vh', background: '#F7F8FC', display: 'flex', flexDirection: 'column' }}>
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)', display: 'flex', flexDirection: 'column' }}>
       <style>{SHARED_CSS}</style>
 
       {/* Navbar */}
-      <Box style={{ background: 'white', borderBottom: '1px solid #EEF0F7' }}>
+      <Box style={{ background: 'var(--ot-nav-bg)', borderBottom: '1px solid var(--ot-nav-border)' }}>
         <Container size={680}>
           <Group justify="space-between" py={14}>
             <Group gap={10} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.landing)}>
-              <Box w={34} h={34} style={{ borderRadius: 9, background: COLORS.navyBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconLock size={15} color={COLORS.lemonYellow} strokeWidth={2.5} />
+              <Box
+                w={36}
+                h={36}
+                style={{
+                  borderRadius: 10,
+                  background: COLORS.navyBlue,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <IconLock size={16} color={COLORS.lemonYellow} strokeWidth={2.5} />
               </Box>
-              <Text fw={900} size="sm" c={COLORS.navyBlue}>ONE TOUCH</Text>
+              <Text fw={900} size="sm" c={COLORS.navyBlue} style={{ letterSpacing: '-0.3px' }}>
+                ONE TOUCH
+              </Text>
             </Group>
-            <Group gap={10}>
+            <Group gap={8}>
+              <DarkModeToggle />
               <LanguageSwitcher />
-              <Button variant="subtle" size="xs" color="gray" onClick={() => navigate(ROUTES.login)}>Sign In</Button>
+              <Button variant="subtle" size="xs" color="gray" onClick={() => navigate(ROUTES.login)}>
+                Sign In
+              </Button>
             </Group>
           </Group>
         </Container>
       </Box>
 
       {/* Progress bar */}
-      <Box style={{ height: 3, background: '#EEF0F7' }}>
-        <Box style={{
-          height: '100%',
-          width: `${(step / 3) * 100}%`,
-          background: `linear-gradient(90deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})`,
-          transition: 'width 0.45s ease',
-          borderRadius: '0 2px 2px 0',
-        }} />
+      <Box style={{ height: 3, background: 'var(--ot-border)' }}>
+        <Box
+          style={{
+            height: '100%',
+            width: `${(step / 3) * 100}%`,
+            background: `linear-gradient(90deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})`,
+            transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)',
+            borderRadius: '0 2px 2px 0',
+          }}
+        />
       </Box>
 
-      <Center flex={1} py={36} px={16}>
+      <Center flex={1} py={40} px={16}>
         <Container size={600} w="100%">
           <StepDots current={step} />
           {children}
@@ -217,70 +293,136 @@ export function Shell({ children, step }: { children: React.ReactNode; step: num
 // ─── Card wrapper ─────────────────────────────────────────────────────────────
 export function Card({ children }: { children: React.ReactNode }) {
   return (
-    <Paper radius={20} p={{ base: 24, sm: 36 }}
-      style={{ border: '1px solid #EEF0F7', boxShadow: '0 4px 24px rgba(0,0,128,0.07)', background: 'white' }}
+    <Paper
+      radius={20}
+      p={{ base: 24, sm: 36 }}
       className="sf-in"
+      style={{
+        border: '1px solid var(--ot-border)',
+        boxShadow: '0 4px 28px rgba(0,0,128,0.07)',
+        background: 'var(--ot-bg-card)',
+      }}
     >
       {children}
     </Paper>
   );
 }
 
+// ─── Card Header ──────────────────────────────────────────────────────────────
 export function CardHeader({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
     <>
-      <Group gap={12} mb={20}>
-        <Box w={42} h={42} style={{ borderRadius: 12, background: '#F0F2F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Group gap={14} mb={22}>
+        <Box
+          w={44}
+          h={44}
+          style={{
+            borderRadius: 13,
+            background: 'var(--ot-bg-row)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            border: '1px solid var(--ot-border)',
+          }}
+        >
           {icon}
         </Box>
-        <Stack gap={1}>
-          <Text fw={800} size="lg" c={COLORS.navyBlue}>{title}</Text>
-          {sub && <Text size="xs" c="#718096">{sub}</Text>}
+        <Stack gap={2}>
+          <Text fw={800} size="lg" c="var(--ot-text-navy)">{title}</Text>
+          {sub && <Text size="xs" c="var(--ot-text-sub)">{sub}</Text>}
         </Stack>
       </Group>
-      <Box mb={22} style={{ height: 1, background: '#F0F2F7' }} />
+      <Box mb={24} style={{ height: 1, background: 'var(--ot-border-inner)' }} />
     </>
   );
 }
 
 // ─── Upload zone ──────────────────────────────────────────────────────────────
 export function UploadZone({ label, preview, onFile, scanning }: {
-  label: string; preview: string | null; onFile: (f: File | null) => void; scanning: boolean;
+  label: string;
+  preview: string | null;
+  onFile: (f: File | null) => void;
+  scanning: boolean;
 }) {
   return (
-    <Box style={{
-      borderRadius: 14, border: `2px dashed ${preview ? COLORS.tealBlue : '#D1D9E6'}`,
-      background: preview ? '#00808005' : '#FAFBFF', padding: preview ? 12 : 20,
-      textAlign: 'center', transition: 'all 0.2s',
-    }}>
+    <Box
+      style={{
+        borderRadius: 14,
+        border: `2px dashed ${preview ? COLORS.tealBlue : 'var(--ot-border-input)'}`,
+        background: preview ? 'rgba(0,128,128,0.04)' : 'var(--ot-upload-bg)',
+        padding: preview ? 12 : 22,
+        textAlign: 'center',
+        transition: 'all 0.22s',
+      }}
+    >
       {preview ? (
-        <Stack align="center" gap={8}>
+        <Stack align="center" gap={10}>
           <Box style={{ position: 'relative', display: 'inline-block', borderRadius: 10, overflow: 'hidden' }}>
-            <img src={preview} alt={label} style={{ maxHeight: 130, maxWidth: '100%', borderRadius: 10, display: 'block' }} />
+            <img
+              src={preview}
+              alt={label}
+              style={{ maxHeight: 140, maxWidth: '100%', borderRadius: 10, display: 'block' }}
+            />
             {scanning && (
-              <Box style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,128,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <Box
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(0,0,128,0.45)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 10,
+                }}
+              >
                 <Box className="sf-scanline" />
-                <Loader color="white" size="xs" mt={8} />
-                <Text size="10px" c="white" fw={600} mt={4}>Extracting…</Text>
+                <Loader color="white" size="xs" mt={10} />
+                <Text size="10px" c="white" fw={700} mt={6} style={{ letterSpacing: 1 }}>
+                  EXTRACTING...
+                </Text>
               </Box>
             )}
           </Box>
-          {!scanning && <Badge color="teal" leftSection={<IconCheck size={10} />} variant="light" size="sm">Uploaded</Badge>}
+          {!scanning && (
+            <Badge color="teal" leftSection={<IconCheck size={10} />} variant="light" size="sm">
+              Uploaded
+            </Badge>
+          )}
           <FileButton onChange={onFile} accept="image/*">
-            {p => <Button {...p} variant="subtle" color="gray" size="xs" leftSection={<IconRotate size={12} />}>Replace</Button>}
+            {(p) => (
+              <Button {...p} variant="subtle" color="gray" size="xs" leftSection={<IconRotate size={12} />}>
+                Replace
+              </Button>
+            )}
           </FileButton>
         </Stack>
       ) : (
-        <Stack align="center" gap={8}>
-          <Box w={40} h={40} style={{ borderRadius: 10, background: '#EEF0F7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconUpload size={18} color="#A0AEC0" />
+        <Stack align="center" gap={10}>
+          <Box
+            w={44}
+            h={44}
+            style={{
+              borderRadius: 12,
+              background: 'var(--ot-upload-icon-bg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconUpload size={20} color="var(--ot-text-muted)" />
           </Box>
-          <Stack gap={2}>
-            <Text fw={600} size="sm" c={COLORS.navyBlue}>{label}</Text>
-            <Text size="11px" c="#A0AEC0">JPG, PNG · max 10 MB</Text>
+          <Stack gap={3}>
+            <Text fw={600} size="sm" c="var(--ot-text-navy)">{label}</Text>
+            <Text size="11px" c="var(--ot-text-muted)">JPG, PNG · max 10 MB</Text>
           </Stack>
           <FileButton onChange={onFile} accept="image/*">
-            {p => <Button {...p} variant="light" color="blue" size="sm" radius="xl" leftSection={<IconUpload size={13} />}>Choose File</Button>}
+            {(p) => (
+              <Button {...p} variant="light" color="blue" size="sm" radius="xl" leftSection={<IconUpload size={13} />}>
+                Choose File
+              </Button>
+            )}
           </FileButton>
         </Stack>
       )}
@@ -288,504 +430,749 @@ export function UploadZone({ label, preview, onFile, scanning }: {
   );
 }
 
-// ─── STEP 1 – Identity Verification ──────────────────────────────────────────
+// ─── STEP 1 — Identity Verification ──────────────────────────────────────────
 export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }) {
   const navigate = useNavigate();
-  const [idType, setIdType]           = useState<IdType | null>(null);
-  const [frontUrl, setFrontUrl]       = useState<string | null>(null);
-  const [backUrl, setBackUrl]         = useState<string | null>(null);
-  const [scanning, setScanning]       = useState(false);
-  const [extracted, setExtracted]     = useState<Record<string, string>>({});
-  const [fields, setFields]           = useState<Record<string, string>>({});
-  const [done, setDone]               = useState(false);
-  const [manualPhone, setManualPhone] = useState('');
-  const [selectedPhone, setSelectedPhone] = useState('');
-  const [agreed, setAgreed]           = useState(false);
+  const { colorScheme } = useMantineColorScheme();
 
-  const isPassport   = idType === 'passport';
-  const needsBack    = !isPassport;
-  const docPhone     = extracted.phone?.trim() ?? '';
-  const hasDocPhone  = !isPassport && docPhone.length >= 7;
+  const [idType, setIdType]       = useState<IdType | null>(null);
+  const [frontUrl, setFrontUrl]   = useState<string | null>(null);
+  const [backUrl, setBackUrl]     = useState<string | null>(null);
+  const [scanning, setScanning]   = useState(false);
+  const [extracted, setExtracted] = useState<Record<string, string>>({});
+  const [fields, setFields]       = useState<Record<string, string>>({});
+  const [done, setDone]           = useState(false);
+
+  // Phone sub-state
+  const [phoneMode, setPhoneMode]   = useState<'extracted' | 'manual' | null>(null);
+  const [manualPhone, setManualPhone] = useState('');
+  const [agreed, setAgreed]         = useState(false);
+
+  const frontRef = useRef<string | null>(null);
+  const backRef  = useRef<string | null>(null);
+
+  const ID_OPTIONS: { type: IdType; label: string; icon: React.ReactNode; sub: string }[] = [
+    { type: 'passport',        label: 'Passport',        icon: <IconEPassport size={24} color={COLORS.navyBlue} />,  sub: 'Single page scan' },
+    { type: 'driving_license', label: 'Driving License', icon: <IconCar      size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
+    { type: 'national_id',     label: 'National ID',     icon: <IconIdBadge2 size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
+    { type: 'kebele_id',       label: 'Kebele ID',       icon: <IconIdBadge  size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
+  ];
+
+  function toDataURL(file: File): Promise<string> {
+    return new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result as string);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+  }
 
   const runExtract = useCallback((type: IdType) => {
     setScanning(true);
+    setDone(false);
+    setExtracted({});
+    setFields({});
     setTimeout(() => {
-      const data = MOCK_EXTRACTED[type];
-      setExtracted(data);
-      setFields(Object.fromEntries(ID_FIELDS[type].map(f => [f.key, data[f.key] ?? ''])));
+      const mock = MOCK_EXTRACTED[type];
+      setExtracted(mock);
+      const initial: Record<string, string> = {};
+      ID_FIELDS[type].forEach(f => { initial[f.key] = mock[f.key] ?? ''; });
+      setFields(initial);
       setScanning(false);
       setDone(true);
-      if (!isPassport && data.phone?.trim()) setSelectedPhone(data.phone.trim());
-      notifications.show({ title: 'Information Extracted', message: 'Fields auto-filled — review before continuing.', color: 'teal', icon: <IconScan size={15} /> });
-    }, 1800);
-  }, [isPassport]);
+      if (type !== 'passport' && !phoneMode && mock.phone) setPhoneMode('extracted');
+      notifications.show({
+        title: 'Extraction Complete',
+        message: 'All available information has been extracted from your document.',
+        color: 'teal',
+        icon: <IconCircleCheck size={16} />,
+      });
+    }, 1900);
+  }, [phoneMode]);
 
-  const handleFront = (file: File | null) => {
-    if (!file || !idType) return;
-    const r = new FileReader();
-    r.onload = e => {
-      setFrontUrl(e.target?.result as string);
-      if (isPassport) runExtract(idType);         // passport: single upload → auto-extract
-      else if (backUrl) runExtract(idType);       // others: if back already uploaded → extract
-    };
-    r.readAsDataURL(file);
-  };
+  const handleFront = useCallback(async (file: File | null, type: IdType) => {
+    if (!file) return;
+    const url = await toDataURL(file);
+    setFrontUrl(url);
+    frontRef.current = url;
+    if (type === 'passport') {
+      runExtract(type);
+    } else if (backRef.current) {
+      runExtract(type);
+    }
+  }, [runExtract]);
 
-  const handleBack = (file: File | null) => {
-    if (!file || !idType) return;
-    const r = new FileReader();
-    r.onload = e => {
-      setBackUrl(e.target?.result as string);
-      if (frontUrl) runExtract(idType);           // others: if front already uploaded → extract
-    };
-    r.readAsDataURL(file);
-  };
+  const handleBack = useCallback(async (file: File | null, type: IdType) => {
+    if (!file) return;
+    const url = await toDataURL(file);
+    setBackUrl(url);
+    backRef.current = url;
+    if (frontRef.current) {
+      runExtract(type);
+    }
+  }, [runExtract]);
 
-  const changeType = (type: IdType) => {
-    setIdType(type); setFrontUrl(null); setBackUrl(null);
-    setExtracted({}); setFields({}); setDone(false);
-    setScanning(false); setSelectedPhone(''); setManualPhone('');
-  };
+  const docPhone = extracted?.phone ?? '';
+  const isPassport = idType === 'passport';
+  const showPhoneChoice = !isPassport && done && docPhone !== '';
+  const showManualEntry = done && (isPassport || !docPhone || phoneMode === 'manual');
 
-  const resolvedPhone = hasDocPhone && selectedPhone !== '__manual__'
-    ? selectedPhone : manualPhone.trim();
+  const resolvedPhone = phoneMode === 'extracted' ? docPhone : manualPhone;
+  const phoneValid = resolvedPhone.trim().length >= 9;
+
+  const canProceed = done && !scanning && agreed && phoneValid;
 
   const handleContinue = () => {
-    if (!done) { notifications.show({ title: 'Upload required', message: 'Upload your ID document first.', color: 'yellow' }); return; }
-    if (!resolvedPhone || resolvedPhone.length < 7) { notifications.show({ title: 'Phone required', message: 'Provide a valid phone number.', color: 'yellow' }); return; }
-    if (!agreed) { notifications.show({ title: 'Agreement required', message: 'You must agree to the Terms and Privacy Policy.', color: 'yellow' }); return; }
-    onNext({ idType: idType!, extracted, frontDataUrl: frontUrl, backDataUrl: backUrl, selectedPhone: resolvedPhone, agreed });
+    if (!idType || !canProceed) return;
+    onNext({
+      idType,
+      extracted,
+      frontDataUrl: frontUrl,
+      backDataUrl: backUrl,
+      selectedPhone: resolvedPhone.trim(),
+      agreed,
+    });
   };
-
-  const idOptions: { type: IdType; label: string; desc: string; icon: React.ReactNode }[] = [
-    { type: 'passport',        label: 'Passport',        desc: 'Main page only', icon: <IconFileText size={20} color={COLORS.navyBlue} /> },
-    { type: 'driving_license', label: 'Driving License', desc: 'Front & back',   icon: <IconIdBadge size={20} color={COLORS.navyBlue} /> },
-    { type: 'national_id',     label: 'National ID',     desc: 'Front & back',   icon: <IconShieldLock size={20} color={COLORS.navyBlue} /> },
-    { type: 'kebele_id',       label: 'Kebele ID',       desc: 'Front & back',   icon: <IconUser size={20} color={COLORS.navyBlue} /> },
-  ];
 
   return (
     <Card>
-      <CardHeader icon={<IconShieldLock size={20} color={COLORS.navyBlue} />} title="Identity Verification" sub="Upload your ID — we'll extract your information automatically" />
+      <CardHeader
+        icon={<IconFileText size={22} color={COLORS.navyBlue} />}
+        title="Identity Verification"
+        sub="Select your document type and upload — we'll extract your information automatically"
+      />
 
-      {/* Document type selection */}
-      <Text size="12px" fw={700} c={COLORS.navyBlue} mb={10} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Choose Document Type</Text>
-      <SimpleGrid cols={{ base: 2, sm: 4 }} spacing={10} mb={24}>
-        {idOptions.map(opt => (
-          <Box key={opt.type} className={`sf-id-opt${idType === opt.type ? ' sel' : ''}`} p={12} onClick={() => changeType(opt.type)}>
-            <Stack gap={6} align="center" ta="center">
-              <Box w={34} h={34} style={{ borderRadius: 10, background: idType === opt.type ? `${COLORS.navyBlue}10` : '#F7F8FC', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {/* ID Type Selection */}
+      <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={12}>
+        Document Type
+      </Text>
+      <SimpleGrid cols={2} spacing={10} mb={24}>
+        {ID_OPTIONS.map(opt => (
+          <Box
+            key={opt.type}
+            className={`sf-id-opt${idType === opt.type ? ' sel' : ''}`}
+            p={14}
+            onClick={() => {
+              if (idType !== opt.type) {
+                setIdType(opt.type);
+                setFrontUrl(null);
+                setBackUrl(null);
+                frontRef.current = null;
+                backRef.current  = null;
+                setExtracted({});
+                setFields({});
+                setDone(false);
+                setPhoneMode(null);
+                setManualPhone('');
+              }
+            }}
+          >
+            <Group gap={10} wrap="nowrap">
+              <Box
+                w={38}
+                h={38}
+                style={{
+                  borderRadius: 10,
+                  background: idType === opt.type ? `${COLORS.navyBlue}12` : 'var(--ot-bg-row)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}
+              >
                 {opt.icon}
               </Box>
-              <Text size="11px" fw={700} c={idType === opt.type ? COLORS.navyBlue : '#4A5568'}>{opt.label}</Text>
-              <Text size="10px" c="#A0AEC0">{opt.desc}</Text>
-            </Stack>
+              <Stack gap={2}>
+                <Text size="sm" fw={700} c="var(--ot-text-navy)" style={{ lineHeight: 1.2 }}>
+                  {opt.label}
+                </Text>
+                <Text size="10px" c="var(--ot-text-muted)">{opt.sub}</Text>
+              </Stack>
+            </Group>
           </Box>
         ))}
       </SimpleGrid>
 
-      {/* Upload zones */}
+      {/* Upload Section */}
       {idType && (
-        <Stack gap={14} mb={22}>
+        <Box className="sf-fade-up">
           {isPassport ? (
-            <UploadZone label="Main Passport Page (photo page)" preview={frontUrl} onFile={handleFront} scanning={scanning} />
+            <>
+              <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>
+                Passport Photo Page
+              </Text>
+              <UploadZone
+                label="Upload photo page"
+                preview={frontUrl}
+                onFile={(f) => handleFront(f, idType)}
+                scanning={scanning}
+              />
+            </>
           ) : (
-            <SimpleGrid cols={2} spacing={12}>
-              <UploadZone label="Front of Document" preview={frontUrl} onFile={handleFront} scanning={scanning && !backUrl} />
-              <UploadZone label="Back of Document"  preview={backUrl}  onFile={handleBack}  scanning={scanning && !!frontUrl} />
+            <SimpleGrid cols={2} spacing={12} mb={4}>
+              <Stack gap={6}>
+                <Text size="xs" fw={600} c="var(--ot-text-navy)">Front Side</Text>
+                <UploadZone
+                  label="Front of document"
+                  preview={frontUrl}
+                  onFile={(f) => handleFront(f, idType)}
+                  scanning={scanning && !!backUrl}
+                />
+              </Stack>
+              <Stack gap={6}>
+                <Text size="xs" fw={600} c="var(--ot-text-navy)">Back Side</Text>
+                <UploadZone
+                  label="Back of document"
+                  preview={backUrl}
+                  onFile={(f) => handleBack(f, idType)}
+                  scanning={scanning && !!frontUrl}
+                />
+              </Stack>
             </SimpleGrid>
           )}
 
+          {/* Scanning indicator */}
           {scanning && (
-            <Group gap={10} p={12} style={{ borderRadius: 10, background: '#EEF5FF', border: '1px solid #C3D9FF' }}>
-              <Loader size="xs" color="blue" />
-              <Text size="xs" fw={600} c={COLORS.navyBlue}>Scanning and extracting information…</Text>
-            </Group>
+            <Alert icon={<Loader size="xs" />} color="blue" variant="light" radius="md" mt={16}>
+              <Text size="sm">Extracting information from your document…</Text>
+            </Alert>
           )}
 
-          {done && (
-            <Group gap={8} p={10} style={{ borderRadius: 10, background: '#E6F4F1', border: '1px solid #B2DFDB' }}>
-              <IconCircleCheck size={16} color={COLORS.tealBlue} />
-              <Text size="xs" fw={600} c={COLORS.tealBlue}>Extraction complete — review fields below</Text>
-            </Group>
+          {/* Extracted fields */}
+          {done && Object.keys(fields).length > 0 && !scanning && (
+            <Box mt={22} className="sf-fade-up">
+              <Group gap={8} mb={14}>
+                <IconCircleCheck size={17} color={COLORS.tealBlue} />
+                <Text size="sm" fw={700} c={COLORS.tealBlue}>Extraction Complete</Text>
+                <Badge size="xs" color="teal" variant="dot">Review & edit if needed</Badge>
+              </Group>
+              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={10}>
+                {ID_FIELDS[idType]
+                  .filter(f => f.key !== 'phone')
+                  .map(f => (
+                    <TextInput
+                      key={f.key}
+                      label={f.label}
+                      placeholder={f.placeholder}
+                      value={fields[f.key] ?? ''}
+                      onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      size="sm"
+                      styles={{
+                        label: { fontSize: 11, fontWeight: 600, color: 'var(--ot-text-sub)', marginBottom: 4 },
+                      }}
+                    />
+                  ))}
+              </SimpleGrid>
+            </Box>
           )}
-        </Stack>
-      )}
-
-      {/* Editable extracted fields */}
-      {done && idType && (
-        <>
-          <Text size="12px" fw={700} c={COLORS.navyBlue} mb={10} style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Review Extracted Information</Text>
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={12} mb={22}>
-            {ID_FIELDS[idType].filter(f => f.key !== 'phone').map(f => (
-              <TextInput
-                key={f.key}
-                label={f.label}
-                placeholder={f.placeholder}
-                value={fields[f.key] ?? ''}
-                onChange={e => setFields(p => ({ ...p, [f.key]: e.currentTarget.value }))}
-                styles={{ label: { fontWeight: 600, fontSize: 12, color: COLORS.navyBlue, marginBottom: 3 }, input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-              />
-            ))}
-          </SimpleGrid>
 
           {/* Phone selection */}
-          <Box mb={20} style={{ padding: 16, borderRadius: 14, background: '#F7F8FC', border: '1px solid #E4E9F2' }}>
-            <Group gap={8} mb={12}>
-              <IconPhone size={15} color={COLORS.navyBlue} />
-              <Text fw={700} size="sm" c={COLORS.navyBlue}>Phone for Verification Code</Text>
-            </Group>
+          {done && !scanning && (
+            <Box mt={24} className="sf-fade-up">
+              <Group gap={8} mb={12}>
+                <IconPhone size={16} color={COLORS.navyBlue} />
+                <Text size="sm" fw={700} c="var(--ot-text-navy)">Phone Number for OTP</Text>
+              </Group>
 
-            {isPassport ? (
-              <Stack gap={6}>
-                <Text size="11px" c="#718096">Passports don't contain phone numbers — enter yours manually.</Text>
+              {/* Show extracted phone choice for non-passport with phone */}
+              {showPhoneChoice && (
+                <Box mb={14}>
+                  <Text size="xs" c="var(--ot-text-sub)" mb={10}>
+                    A phone number was detected on your document. Select which to use for verification:
+                  </Text>
+                  <SimpleGrid cols={2} spacing={8}>
+                    {[
+                      { mode: 'extracted' as const, label: 'Use from document', value: docPhone },
+                      { mode: 'manual'   as const, label: 'Enter a different number', value: null },
+                    ].map(opt => (
+                      <Box
+                        key={opt.mode}
+                        className={`sf-id-opt${phoneMode === opt.mode ? ' sel' : ''}`}
+                        p={12}
+                        onClick={() => setPhoneMode(opt.mode)}
+                      >
+                        <Stack gap={3}>
+                          <Text size="xs" fw={700} c="var(--ot-text-navy)">{opt.label}</Text>
+                          {opt.value && <Text size="11px" c={COLORS.tealBlue} fw={600}>{opt.value}</Text>}
+                        </Stack>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              )}
+
+              {showManualEntry && (
                 <TextInput
                   placeholder="+251 9XX XXX XXX"
-                  leftSection={<IconPhone size={14} color="#A0AEC0" />}
+                  leftSection={<IconPhone size={15} />}
                   value={manualPhone}
-                  onChange={e => setManualPhone(e.currentTarget.value)}
-                  styles={{ input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
+                  onChange={e => setManualPhone(e.target.value)}
+                  size="sm"
+                  description={isPassport ? 'Passport does not contain a phone number — please enter manually' : undefined}
                 />
-              </Stack>
-            ) : hasDocPhone ? (
-              <Stack gap={10}>
-                <Text size="11px" c="#718096">We found a number on your document. Choose where to send the code:</Text>
-                {/* Extracted phone option */}
-                <Box
-                  p={12} style={{ borderRadius: 10, border: `1.5px solid ${selectedPhone === docPhone ? COLORS.tealBlue : '#E4E9F2'}`, background: selectedPhone === docPhone ? '#00808008' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}
-                  onClick={() => setSelectedPhone(docPhone)}
-                >
-                  <Group justify="space-between" wrap="nowrap">
-                    <Stack gap={0}>
-                      <Text size="10px" fw={600} c="#A0AEC0">From your document</Text>
-                      <Text fw={700} size="sm" c={COLORS.navyBlue}>{docPhone}</Text>
-                    </Stack>
-                    {selectedPhone === docPhone && (
-                      <Box w={18} h={18} style={{ borderRadius: '50%', background: COLORS.tealBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconCheck size={10} color="white" strokeWidth={3} />
-                      </Box>
-                    )}
-                  </Group>
-                </Box>
-                {/* Manual entry option */}
-                <Box
-                  p={12} style={{ borderRadius: 10, border: `1.5px solid ${selectedPhone === '__manual__' ? COLORS.navyBlue : '#E4E9F2'}`, background: selectedPhone === '__manual__' ? '#00008006' : 'white', cursor: 'pointer', transition: 'all 0.15s' }}
-                  onClick={() => setSelectedPhone('__manual__')}
-                >
-                  <Group justify="space-between">
-                    <Text fw={600} size="sm" c={COLORS.navyBlue}>Use a different number</Text>
-                    {selectedPhone === '__manual__' && (
-                      <Box w={18} h={18} style={{ borderRadius: '50%', background: COLORS.navyBlue, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <IconCheck size={10} color="white" strokeWidth={3} />
-                      </Box>
-                    )}
-                  </Group>
-                  {selectedPhone === '__manual__' && (
-                    <TextInput
-                      mt={10} placeholder="+251 9XX XXX XXX"
-                      leftSection={<IconPhone size={14} color="#A0AEC0" />}
-                      value={manualPhone}
-                      onChange={e => { e.stopPropagation(); setManualPhone(e.currentTarget.value); }}
-                      onClick={e => e.stopPropagation()}
-                      styles={{ input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-                    />
-                  )}
-                </Box>
-              </Stack>
-            ) : (
-              <Stack gap={6}>
-                <Text size="11px" c="#718096">No phone found on document — enter manually.</Text>
-                <TextInput
-                  placeholder="+251 9XX XXX XXX"
-                  leftSection={<IconPhone size={14} color="#A0AEC0" />}
-                  value={manualPhone}
-                  onChange={e => setManualPhone(e.currentTarget.value)}
-                  styles={{ input: { borderRadius: 9, borderColor: '#E4E9F2' } }}
-                />
-              </Stack>
-            )}
-          </Box>
+              )}
+            </Box>
+          )}
 
-          {/* Agreement checkbox */}
-          <Box
-            p={14} mb={20}
-            style={{ borderRadius: 13, border: `1.5px solid ${agreed ? COLORS.tealBlue : '#E4E9F2'}`, background: agreed ? '#00808006' : '#FAFBFF', transition: 'all 0.2s' }}
-          >
-            <Group gap={12} align="flex-start" wrap="nowrap">
+          {/* Agreement */}
+          {done && !scanning && (
+            <Box
+              mt={24}
+              p={16}
+              className="sf-fade-up"
+              style={{
+                borderRadius: 12,
+                background: 'var(--ot-bg-row)',
+                border: '1px solid var(--ot-border)',
+              }}
+            >
               <Checkbox
-                size="sm" checked={agreed}
+                checked={agreed}
                 onChange={e => setAgreed(e.currentTarget.checked)}
-                color="teal"
-                styles={{ input: { borderRadius: 4, cursor: 'pointer' } }}
+                label={
+                  <Text size="sm" c="var(--ot-text-body)">
+                    I agree to the{' '}
+                    <Text
+                      component="span"
+                      c={COLORS.tealBlue}
+                      fw={600}
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={e => { e.preventDefault(); navigate(ROUTES.termsOfService); }}
+                    >
+                      Terms of Service
+                    </Text>
+                    {' '}and{' '}
+                    <Text
+                      component="span"
+                      c={COLORS.tealBlue}
+                      fw={600}
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={e => { e.preventDefault(); navigate(ROUTES.privacyPolicy); }}
+                    >
+                      Privacy Policy
+                    </Text>
+                  </Text>
+                }
               />
-              <Text size="sm" c="#4A5568" lh={1.55}>
-                I have read and agree to ONE TOUCH's{' '}
-                <Text span fw={700} c={COLORS.tealBlue} style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate(ROUTES.termsOfService)}>Terms of Service</Text>
-                {' '}and{' '}
-                <Text span fw={700} c={COLORS.tealBlue} style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate(ROUTES.privacyPolicy)}>Privacy Policy</Text>.
-                I confirm this information belongs to me.
-              </Text>
-            </Group>
-          </Box>
+            </Box>
+          )}
 
+          {/* Continue */}
           <Button
-            fullWidth size="md" radius="xl"
-            disabled={!agreed}
+            fullWidth
+            mt={24}
+            size="md"
+            disabled={!canProceed}
             rightSection={<IconArrowRight size={16} />}
-            style={{ background: agreed ? `linear-gradient(135deg, ${COLORS.navyBlue}, ${COLORS.navyLight})` : undefined, fontWeight: 700 }}
             onClick={handleContinue}
+            style={{
+              background: canProceed
+                ? `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)`
+                : undefined,
+              transition: 'all 0.2s',
+            }}
           >
-            Continue to Verification
+            Continue to Phone & Biometric
           </Button>
-        </>
-      )}
-
-      {!idType && (
-        <Alert color="blue" icon={<IconInfoCircle size={14} />} radius={10} p={10}>
-          <Text size="xs">Select a document type above to begin — information will be extracted automatically.</Text>
-        </Alert>
+        </Box>
       )}
     </Card>
   );
 }
 
-// ─── STEP 2 – Phone OTP + Biometric (sequential sub-steps) ───────────────────
-type Phase2 = 'otp_send' | 'otp_verify' | 'bio_idle' | 'bio_camera' | 'bio_scanning' | 'bio_matching' | 'bio_success' | 'bio_failed';
+// ─── STEP 2 — Phone & Biometric Verification ──────────────────────────────────
+type Phase2 =
+  | 'otp_send'
+  | 'otp_verify'
+  | 'bio_idle'
+  | 'bio_camera'
+  | 'bio_scanning'
+  | 'bio_matching'
+  | 'bio_success'
+  | 'bio_failed';
 
-export function StepVerify({ phone, onDone, onBack }: {
+export function StepVerify({
+  phone,
+  onBack,
+  onDone,
+}: {
   phone: string;
-  onDone: (capturedFaceUrl: string | null) => void;
   onBack: () => void;
+  onDone: (faceUrl: string | null) => void;
 }) {
-  const [phase, setPhase]       = useState<Phase2>('otp_send');
-  const [otp, setOtp]           = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [scanPct, setScanPct]   = useState(0);
-  const [faceUrl, setFaceUrl]   = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [phase, setPhase]           = useState<Phase2>('otp_send');
+  const [pin, setPin]               = useState('');
+  const [otpError, setOtpError]     = useState('');
+  const [sending, setSending]       = useState(false);
+  const [scanPct, setScanPct]       = useState(0);
+  const [capturedFaceUrl, setCapturedFaceUrl] = useState<string | null>(null);
+
+  const videoRef  = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const isOtpPhase = phase.startsWith('otp');
-  const isBioPhase = phase.startsWith('bio');
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
 
   const sendOtp = () => {
-    setLoading(true);
+    setSending(true);
     setTimeout(() => {
-      setLoading(false); setPhase('otp_verify');
-      notifications.show({ title: 'Code Sent', message: `Sent to ${phone}. Demo code: ${MOCK_OTP}`, color: 'teal', icon: <IconMessageCircle size={15} /> });
+      setSending(false);
+      setPhase('otp_verify');
     }, 1000);
   };
 
   const verifyOtp = () => {
-    if (otp.length < 6) { setOtpError('Enter all 6 digits.'); return; }
-    setLoading(true); setOtpError('');
-    setTimeout(() => {
-      setLoading(false);
-      if (otp === MOCK_OTP) { setPhase('bio_idle'); }
-      else { setOtpError('Incorrect code — try again.'); }
-    }, 900);
+    if (pin === MOCK_OTP) {
+      setOtpError('');
+      setPhase('bio_idle');
+    } else {
+      setOtpError('Incorrect verification code. Please try again.');
+    }
   };
 
-  const startCamera = useCallback(async () => {
+  const startCamera = async () => {
     setPhase('bio_camera');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       streamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-    } catch { simulateBio(); }
-  }, []);
-
-  const captureFace = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    // Capture frame to canvas
-    if (videoRef.current && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      canvasRef.current.width  = videoRef.current.videoWidth  || 320;
-      canvasRef.current.height = videoRef.current.videoHeight || 240;
-      ctx?.drawImage(videoRef.current, 0, 0);
-      setFaceUrl(canvasRef.current.toDataURL('image/jpeg', 0.8));
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch {
+      simulateBio();
     }
+  };
+
+  const captureFrame = () => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (video && canvas) {
+      canvas.width  = video.videoWidth  || 320;
+      canvas.height = video.videoHeight || 240;
+      canvas.getContext('2d')?.drawImage(video, 0, 0);
+      const url = canvas.toDataURL('image/jpeg', 0.92);
+      setCapturedFaceUrl(url);
+    }
+    streamRef.current?.getTracks().forEach(t => t.stop());
     simulateBio();
   };
 
   const simulateBio = () => {
     setPhase('bio_scanning');
-    let p = 0;
+    setScanPct(0);
+    let pct = 0;
     const iv = setInterval(() => {
-      p += 4; setScanPct(p);
-      if (p >= 100) { clearInterval(iv); setPhase('bio_matching'); setTimeout(() => setPhase('bio_success'), 1600); }
+      pct += 4;
+      setScanPct(Math.min(pct, 100));
+      if (pct >= 100) {
+        clearInterval(iv);
+        setPhase('bio_matching');
+        setTimeout(() => setPhase('bio_success'), 1200);
+      }
     }, 60);
   };
 
-  useEffect(() => () => { streamRef.current?.getTracks().forEach(t => t.stop()); }, []);
+  // ── Render phases ──────────────────────────────────────────────────────────
 
-  const subLabel = isOtpPhase ? 'Phone Verification' : 'Biometric Face Verification';
-  const subDesc  = isOtpPhase ? 'Confirm your phone number with a one-time code' : 'Match your live face with your identity document';
+  const renderOtpSend = () => (
+    <Stack gap={20} className="sf-fade-up">
+      <Box
+        p={18}
+        style={{
+          borderRadius: 14,
+          border: '1.5px solid var(--ot-border)',
+          background: 'var(--ot-bg-row)',
+        }}
+      >
+        <Group gap={12}>
+          <Box
+            w={40}
+            h={40}
+            style={{
+              borderRadius: 10,
+              background: `${COLORS.navyBlue}12`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          >
+            <IconPhone size={20} color={COLORS.navyBlue} />
+          </Box>
+          <Stack gap={2}>
+            <Text size="xs" c="var(--ot-text-sub)" fw={500}>OTP will be sent to</Text>
+            <Text size="sm" fw={700} c="var(--ot-text-navy)">{phone}</Text>
+          </Stack>
+        </Group>
+      </Box>
+      <Alert icon={<IconInfoCircle size={15} />} color="blue" variant="light" radius="md">
+        <Text size="sm">A 6-digit verification code will be sent to your phone number via SMS.</Text>
+      </Alert>
+      <Button
+        fullWidth
+        size="md"
+        loading={sending}
+        rightSection={!sending && <IconMessageCircle size={16} />}
+        onClick={sendOtp}
+        style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
+      >
+        Send Verification Code
+      </Button>
+      <Button variant="subtle" color="gray" size="sm" leftSection={<IconArrowLeft size={14} />} onClick={onBack}>
+        Back to Identity
+      </Button>
+    </Stack>
+  );
+
+  const renderOtpVerify = () => (
+    <Stack gap={20} align="center" className="sf-fade-up">
+      <Text size="sm" c="var(--ot-text-sub)" ta="center">
+        Enter the 6-digit code sent to <Text component="span" fw={700} c="var(--ot-text-navy)">{phone}</Text>
+      </Text>
+      <PinInput
+        length={6}
+        value={pin}
+        onChange={setPin}
+        onComplete={verifyOtp}
+        type="number"
+        placeholder="○"
+        size="lg"
+        styles={{ input: { fontWeight: 700, fontSize: 20, letterSpacing: 4 } }}
+      />
+      {otpError && (
+        <Alert icon={<IconAlertCircle size={15} />} color="red" variant="light" radius="md" w="100%">
+          {otpError}
+        </Alert>
+      )}
+      <Button
+        fullWidth
+        size="md"
+        onClick={verifyOtp}
+        disabled={pin.length < 6}
+        style={{
+          background: pin.length >= 6
+            ? `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)`
+            : undefined,
+        }}
+        rightSection={<IconArrowRight size={16} />}
+      >
+        Verify Code
+      </Button>
+      <Text size="xs" c="var(--ot-text-muted)">
+        Didn't receive it?{' '}
+        <Text
+          component="span"
+          c={COLORS.tealBlue}
+          fw={600}
+          style={{ cursor: 'pointer' }}
+          onClick={sendOtp}
+        >
+          Resend code
+        </Text>
+      </Text>
+      <Text size="10px" c="var(--ot-text-muted)">(Demo: use <strong>123456</strong>)</Text>
+    </Stack>
+  );
+
+  const renderBioIdle = () => (
+    <Stack align="center" gap={28} className="sf-fade-up">
+      <Box
+        w={110}
+        h={110}
+        className="sf-ring"
+        style={{
+          borderRadius: '50%',
+          background: `${COLORS.tealBlue}12`,
+          border: `2.5px solid ${COLORS.tealBlue}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <IconCamera size={46} color={COLORS.tealBlue} strokeWidth={1.5} />
+      </Box>
+      <Stack gap={6} align="center">
+        <Text fw={800} size="lg" c="var(--ot-text-navy)">Biometric Verification</Text>
+        <Text size="sm" c="var(--ot-text-sub)" ta="center" maw={340}>
+          We'll take a live selfie and match it against your identity document to confirm your identity.
+        </Text>
+      </Stack>
+      <Alert icon={<IconInfoCircle size={15} />} color="teal" variant="light" radius="md" w="100%">
+        <Text size="sm">All biometric data is processed locally on your device and never stored permanently.</Text>
+      </Alert>
+      <Button
+        fullWidth
+        size="md"
+        rightSection={<IconCamera size={16} />}
+        onClick={startCamera}
+        style={{ background: `linear-gradient(135deg, ${COLORS.tealDark} 0%, ${COLORS.tealBlue} 100%)` }}
+      >
+        Start Face Scan
+      </Button>
+    </Stack>
+  );
+
+  const renderBioCamera = () => (
+    <Stack align="center" gap={20} className="sf-fade-up">
+      <Text fw={700} size="md" c="var(--ot-text-navy)">Position your face within the oval</Text>
+      <Box style={{ position: 'relative', width: 280, height: 210 }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 18 }}
+        />
+        <Box
+          style={{
+            position: 'absolute', inset: 0,
+            border: `3px solid ${COLORS.lemonYellow}`,
+            borderRadius: '50% / 40%',
+            pointerEvents: 'none',
+            boxShadow: `0 0 0 2000px rgba(0,0,0,0.55)`,
+            margin: '10px 30px',
+          }}
+        />
+      </Box>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <Button
+        fullWidth
+        size="md"
+        leftSection={<IconCamera size={16} />}
+        onClick={captureFrame}
+        style={{ background: `linear-gradient(135deg, ${COLORS.tealDark} 0%, ${COLORS.tealBlue} 100%)` }}
+      >
+        Capture
+      </Button>
+    </Stack>
+  );
+
+  const renderBioScanning = () => (
+    <Stack align="center" gap={24} className="sf-fade-up">
+      <RingProgress
+        size={130}
+        thickness={10}
+        roundCaps
+        sections={[{ value: scanPct, color: COLORS.tealBlue }]}
+        label={
+          <Text ta="center" fw={800} size="lg" c={COLORS.navyBlue}>{scanPct}%</Text>
+        }
+      />
+      <Stack gap={4} align="center">
+        <Text fw={700} size="md" c="var(--ot-text-navy)">Analyzing biometric data…</Text>
+        <Text size="sm" c="var(--ot-text-sub)">Please wait while we verify your identity</Text>
+      </Stack>
+    </Stack>
+  );
+
+  const renderBioMatching = () => (
+    <Stack align="center" gap={24} className="sf-fade-up">
+      <Loader size="lg" color="teal" type="bars" />
+      <Stack gap={4} align="center">
+        <Text fw={700} size="md" c="var(--ot-text-navy)">Matching with document…</Text>
+        <Text size="sm" c="var(--ot-text-sub)">Comparing your face scan with uploaded ID</Text>
+      </Stack>
+    </Stack>
+  );
+
+  const renderBioSuccess = () => (
+    <Stack align="center" gap={24} className="sf-fade-up">
+      {capturedFaceUrl && (
+        <Box
+          style={{
+            width: 90, height: 90, borderRadius: '50%', overflow: 'hidden',
+            border: `3px solid ${COLORS.tealBlue}`,
+            boxShadow: `0 0 0 4px ${COLORS.tealBlue}25`,
+          }}
+        >
+          <img src={capturedFaceUrl} alt="Captured face" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </Box>
+      )}
+      <Box
+        w={72}
+        h={72}
+        style={{
+          borderRadius: '50%',
+          background: `${COLORS.tealBlue}15`,
+          border: `2px solid ${COLORS.tealBlue}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <IconCircleCheck size={38} color={COLORS.tealBlue} />
+      </Box>
+      <Stack gap={6} align="center">
+        <Text fw={800} size="xl" c={COLORS.navyBlue}>Identity Confirmed!</Text>
+        <Text size="sm" c="var(--ot-text-sub)" ta="center">
+          Your face has been successfully verified. Proceeding to profile setup.
+        </Text>
+      </Stack>
+      <Button
+        fullWidth
+        size="md"
+        rightSection={<IconArrowRight size={16} />}
+        onClick={() => onDone(capturedFaceUrl)}
+        style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
+      >
+        Continue to Profile Setup
+      </Button>
+    </Stack>
+  );
+
+  const renderBioFailed = () => (
+    <Stack align="center" gap={24} className="sf-fade-up">
+      <Box
+        w={72}
+        h={72}
+        style={{
+          borderRadius: '50%',
+          background: '#FFF0F0',
+          border: '2px solid #E53E3E',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <IconX size={36} color="#E53E3E" />
+      </Box>
+      <Stack gap={6} align="center">
+        <Text fw={800} size="xl" c="#C53030">Verification Failed</Text>
+        <Text size="sm" c="var(--ot-text-sub)" ta="center">
+          We could not match your face with the uploaded document. Please try again in good lighting.
+        </Text>
+      </Stack>
+      <Button
+        fullWidth
+        size="md"
+        variant="outline"
+        color="red"
+        leftSection={<IconRotate size={16} />}
+        onClick={() => { setPhase('bio_idle'); setScanPct(0); setCapturedFaceUrl(null); }}
+      >
+        Try Again
+      </Button>
+    </Stack>
+  );
 
   return (
     <Card>
-      <Group gap={10} mb={20}>
-        {isOtpPhase && <ActionIcon variant="subtle" radius={10} onClick={onBack}><IconArrowLeft size={16} /></ActionIcon>}
-        <Stack gap={0}>
-          <Text fw={800} size="lg" c={COLORS.navyBlue}>{subLabel}</Text>
-          <Text size="xs" c="#718096">{subDesc}</Text>
-        </Stack>
-        {isBioPhase && (
-          <Box ml="auto">
-            <Badge color="teal" variant="light" size="sm" leftSection={<IconCheck size={10} />}>Phone Verified</Badge>
-          </Box>
-        )}
-      </Group>
-      <Box mb={22} style={{ height: 1, background: '#F0F2F7' }} />
-
-      {/* OTP – send */}
-      {phase === 'otp_send' && (
-        <Stack gap={20}>
-          <Box p={14} style={{ borderRadius: 12, background: '#F7F8FC', border: '1px solid #E4E9F2', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Box w={34} h={34} style={{ borderRadius: 9, background: `${COLORS.tealBlue}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <IconPhone size={15} color={COLORS.tealBlue} />
-            </Box>
-            <Stack gap={0}>
-              <Text size="10px" fw={600} c="#A0AEC0" style={{ textTransform: 'uppercase', letterSpacing: 0.8 }}>Sending code to</Text>
-              <Text fw={700} size="sm" c={COLORS.navyBlue}>{phone}</Text>
-            </Stack>
-          </Box>
-          <Button
-            fullWidth size="md" radius="xl" loading={loading}
-            leftSection={<IconMessageCircle size={16} />}
-            style={{ background: `linear-gradient(135deg, ${COLORS.tealBlue}, ${COLORS.tealDark})`, fontWeight: 700 }}
-            onClick={sendOtp}
-          >
-            Send Verification Code
-          </Button>
-        </Stack>
-      )}
-
-      {/* OTP – verify */}
-      {phase === 'otp_verify' && (
-        <Stack gap={20}>
-          <Stack align="center" gap={12}>
-            <Text size="sm" fw={600} c={COLORS.navyBlue}>Enter the 6-digit code sent to {phone}</Text>
-            <PinInput length={6} type="number" size="lg" value={otp} onChange={setOtp} oneTimeCode />
-            {otpError && (
-              <Alert color="red" icon={<IconAlertCircle size={14} />} radius={10} p={10} w="100%">
-                <Text size="xs">{otpError}</Text>
-              </Alert>
-            )}
-          </Stack>
-          <Button
-            fullWidth size="md" radius="xl" loading={loading}
-            rightSection={<IconArrowRight size={16} />}
-            style={{ background: `linear-gradient(135deg, ${COLORS.tealBlue}, ${COLORS.tealDark})`, fontWeight: 700 }}
-            onClick={verifyOtp}
-          >
-            Verify Code
-          </Button>
-          <Text size="xs" ta="center" c="#A0AEC0">
-            Didn't receive it?{' '}
-            <Text span fw={700} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => { setPhase('otp_send'); setOtp(''); setOtpError(''); }}>Resend</Text>
-          </Text>
-        </Stack>
-      )}
-
-      {/* Biometric – idle */}
-      {phase === 'bio_idle' && (
-        <Stack align="center" gap={20} ta="center">
-          <Box w={110} h={110} className="sf-ring" style={{ borderRadius: '50%', background: `${COLORS.tealBlue}10`, border: `2px solid ${COLORS.tealBlue}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconCamera size={48} color={COLORS.tealBlue} strokeWidth={1.5} />
-          </Box>
-          <Stack gap={6} maw={320}>
-            <Text fw={700} size="md" c={COLORS.navyBlue}>Ready for face scan</Text>
-            <Text size="sm" c="#718096" lh={1.6}>Good lighting, no glasses or obstructions. Your face will be matched to your ID photo.</Text>
-          </Stack>
-          <Alert color="blue" icon={<IconInfoCircle size={13} />} radius={10} p={10} w="100%">
-            <Text size="xs">Biometric data is processed locally — never stored on our servers.</Text>
-          </Alert>
-          <Button
-            fullWidth size="md" radius="xl"
-            leftSection={<IconCamera size={16} />}
-            style={{ background: `linear-gradient(135deg, ${COLORS.tealBlue}, ${COLORS.tealDark})`, fontWeight: 700 }}
-            onClick={startCamera}
-          >
-            Start Face Scan
-          </Button>
-        </Stack>
-      )}
-
-      {/* Biometric – camera */}
-      {phase === 'bio_camera' && (
-        <Stack align="center" gap={16}>
-          <Box style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: `2px solid ${COLORS.tealBlue}`, width: 280, height: 210 }}>
-            <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted playsInline />
-            <Box style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <Box style={{ width: 120, height: 155, borderRadius: '50%', border: `2px solid ${COLORS.lemonYellow}`, boxShadow: '0 0 0 2000px rgba(0,0,0,0.28)' }} />
-            </Box>
-          </Box>
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <Text size="xs" c="#718096" ta="center">Centre your face inside the oval, then tap Capture</Text>
-          <Button
-            fullWidth size="md" radius="xl"
-            leftSection={<IconScan size={16} />}
-            style={{ background: `linear-gradient(135deg, ${COLORS.tealBlue}, ${COLORS.tealDark})`, fontWeight: 700 }}
-            onClick={captureFace}
-          >
-            Capture &amp; Analyse
-          </Button>
-        </Stack>
-      )}
-
-      {/* Biometric – scanning */}
-      {phase === 'bio_scanning' && (
-        <Stack align="center" gap={20} ta="center" py={12}>
-          <RingProgress size={130} thickness={9} sections={[{ value: scanPct, color: 'teal' }]} label={<Text fw={700} size="lg" c={COLORS.tealBlue} ta="center">{scanPct}%</Text>} />
-          <Stack gap={4}><Text fw={700} c={COLORS.navyBlue}>Analysing features…</Text><Text size="sm" c="#718096">Please stay still</Text></Stack>
-        </Stack>
-      )}
-
-      {/* Biometric – matching */}
-      {phase === 'bio_matching' && (
-        <Stack align="center" gap={20} ta="center" py={12}>
-          <Loader size={64} color="teal" />
-          <Stack gap={4}><Text fw={700} c={COLORS.navyBlue}>Matching with ID photo…</Text><Text size="sm" c="#718096">Comparing live face to your document</Text></Stack>
-        </Stack>
-      )}
-
-      {/* Biometric – success */}
-      {phase === 'bio_success' && (
-        <Stack align="center" gap={20} ta="center">
-          {faceUrl ? (
-            <Box style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', border: `3px solid ${COLORS.tealBlue}`, flexShrink: 0 }}>
-              <img src={faceUrl} alt="Captured face" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </Box>
-          ) : (
-            <Box w={88} h={88} style={{ borderRadius: '50%', background: '#E6F4F1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <IconCircleCheck size={48} color={COLORS.tealBlue} strokeWidth={1.5} />
-            </Box>
-          )}
-          <Stack gap={5}><Text fw={800} size="xl" c={COLORS.navyBlue}>Identity Confirmed!</Text><Text size="sm" c="#718096">Face matched successfully to your document.</Text></Stack>
-          <Button fullWidth size="md" radius="xl" rightSection={<IconArrowRight size={16} />} style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue}, ${COLORS.navyLight})`, fontWeight: 700 }} onClick={() => onDone(faceUrl)}>
-            Continue to Profile Setup
-          </Button>
-        </Stack>
-      )}
-
-      {/* Biometric – failed (hard block) */}
-      {phase === 'bio_failed' && (
-        <Stack align="center" gap={20} ta="center">
-          <Box w={88} h={88} style={{ borderRadius: '50%', background: '#FDE8E8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconX size={44} color="#E53E3E" strokeWidth={1.5} />
-          </Box>
-          <Stack gap={5}><Text fw={800} size="xl" c="#E53E3E">Verification Failed</Text><Text size="sm" c="#718096">Face did not match. Ensure good lighting and try again.</Text></Stack>
-          <Alert color="red" icon={<IconAlertCircle size={13} />} radius={10} p={10} w="100%">
-            <Text size="xs" fw={600}>You cannot proceed without successful face verification. This protects your account security.</Text>
-          </Alert>
-          <Button fullWidth variant="outline" color="red" size="md" radius="xl" leftSection={<IconRotate size={15} />} onClick={() => { setPhase('bio_idle'); setScanPct(0); }}>
-            Try Again
-          </Button>
-        </Stack>
-      )}
+      <CardHeader
+        icon={<IconScan size={22} color={COLORS.navyBlue} />}
+        title={phase.startsWith('otp') ? 'Phone Verification' : 'Biometric Verification'}
+        sub={
+          phase === 'otp_send'    ? 'Verify your phone number via SMS OTP'          :
+          phase === 'otp_verify'  ? 'Enter the 6-digit code sent to your phone'     :
+          phase === 'bio_idle'    ? 'Live face scan to confirm your identity'        :
+          phase === 'bio_camera'  ? 'Position your face and capture'                :
+          phase === 'bio_scanning'? 'Analyzing your biometric data'                 :
+          phase === 'bio_matching'? 'Matching face with identity document'           :
+          phase === 'bio_success' ? 'Identity confirmed successfully'               :
+                                    'Biometric match unsuccessful'
+        }
+      />
+      {phase === 'otp_send'    && renderOtpSend()}
+      {phase === 'otp_verify'  && renderOtpVerify()}
+      {phase === 'bio_idle'    && renderBioIdle()}
+      {phase === 'bio_camera'  && renderBioCamera()}
+      {phase === 'bio_scanning'&& renderBioScanning()}
+      {phase === 'bio_matching'&& renderBioMatching()}
+      {phase === 'bio_success' && renderBioSuccess()}
+      {phase === 'bio_failed'  && renderBioFailed()}
     </Card>
   );
 }

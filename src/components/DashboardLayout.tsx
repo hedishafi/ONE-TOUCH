@@ -26,12 +26,12 @@ export function DashboardLayout({ children, navItems, title }: DashboardLayoutPr
         collapsed: { mobile: !opened },
       }}
       padding="md"
-      style={{ backgroundColor: '#FFFFFF' }}
+      style={{ backgroundColor: 'var(--ot-bg-page)' }}
     >
       <AppShell.Header
         style={{
-          backgroundColor: '#FFFFFF',
-          borderBottom: '1px solid #F1F3F5',
+          backgroundColor: 'var(--ot-header-bg)',
+          borderBottom: '1px solid var(--ot-header-border)',
         }}
       >
         <AppHeader onBurgerClick={toggle} mobileMenuOpened={opened} />
@@ -39,8 +39,8 @@ export function DashboardLayout({ children, navItems, title }: DashboardLayoutPr
 
       <AppShell.Navbar
         style={{
-          background: '#FFFFFF',
-          borderRight: '1px solid #F1F3F5',
+          background: 'var(--ot-bg-card)',
+          borderRight: '1px solid var(--ot-border)',
         }}
       >
         <AppShell.Section p="md">
