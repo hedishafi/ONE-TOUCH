@@ -107,17 +107,30 @@ export default function Login() {
     setTimeout(() => {
       const role = lookupPhoneRole(normPhone(phone));
       setPhoneLoading(false);
-      if (!role) { setPhoneError('No account found with this phone number. Check the number or create an account.'); return; }
+      if (!role) { setPhoneError('No account found with this phone number. Try +1-555-0101 (client) or +1-555-0201 (provider).'); return; }
       setDetectedRole(role);
       if (role === 'client') {
         setClientOtp('');
         setClientOtpError('');
         setClientAttempts(0);
         beginOtp();
+        // Simulate SMS being sent — show demo OTP clearly
+        notifications.show({
+          title: '📱 Verification Code Sent',
+          message: `A 6-digit code was sent to ${phone}.\n\n🔑 Demo code: ${MOCK_OTP}`,
+          color: 'teal',
+          autoClose: 12000,
+        });
         setScreen('client-otp');
       } else {
         setPassword('');
         setPasswordError('');
+        notifications.show({
+          title: '🔒 Enter your password',
+          message: `Welcome back! Demo password: demo123`,
+          color: 'blue',
+          autoClose: 8000,
+        });
         setScreen('password');
       }
     }, 500);
@@ -162,6 +175,12 @@ export default function Login() {
     setClientOtpError('');
     setClientAttempts(0);
     beginOtp();
+    notifications.show({
+      title: '📱 New Code Sent',
+      message: `A new 6-digit code was sent to ${phone}.\n\n🔑 Demo code: ${MOCK_OTP}`,
+      color: 'teal',
+      autoClose: 12000,
+    });
   }
 
   // ── Screen: password ──────────────────────────────────────────────────────
