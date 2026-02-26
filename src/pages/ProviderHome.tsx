@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, Switch,
-  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea,
+  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconBriefcase, IconTrendingUp, IconUser, IconWallet,
@@ -124,6 +124,12 @@ export function ProviderHome() {
   const [profile,   setProfile]   = useState<ProviderProfile|null>(authProf);
   const [online,    setOnline]    = useState(authProf?.isOnline ?? false);
   const [sidebar,   setSidebar]   = useState(false);
+
+  const colorScheme = useComputedColorScheme('light');
+  const isDark = colorScheme === 'dark';
+  const mapTile = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const [trials,    setTrials]    = useState(FREE_TRIAL_TOTAL);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [chapaOpen, setChapaOpen] = useState(false);
@@ -354,7 +360,7 @@ export function ProviderHome() {
           {/* Map */}
           <Paper radius="xl" style={{overflow:'hidden',border:'1px solid var(--ot-border)',position:'relative'}}>
             <MapContainer center={mapCtr} zoom={14} style={{width:'100%',height:420}}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              <TileLayer url={mapTile}
                 attribution="&copy; OpenStreetMap contributors"/>
               <Marker position={mapCtr} icon={dot(N)}>
                 <Popup><Text size="sm" fw={600}>{profile?.fullName??'You'} — {online?'Online':'Offline'}</Text></Popup>

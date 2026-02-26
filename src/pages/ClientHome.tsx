@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
@@ -14,7 +14,8 @@ import {
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
 } from '@tabler/icons-react';
-import { MapContainer, TileLayer, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
@@ -26,6 +27,26 @@ import { MOCK_CATEGORIES } from '../mock/mockServices';
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
 const MAP_CTR: [number, number] = [9.032, 38.747];
+
+// Fixed nearby provider dots for the live map preview
+const PROV_DOTS: {pos:[number,number]; color:string; name:string; rating:number}[] = [
+  {pos:[9.036,38.751],color:T,              name:'Abebe T.',rating:4.9},
+  {pos:[9.029,38.743],color:COLORS.success, name:'Sara M.',  rating:4.8},
+  {pos:[9.034,38.755],color:N,              name:'Dawit K.', rating:4.7},
+  {pos:[9.027,38.748],color:T,              name:'Tigist A.',rating:4.9},
+  {pos:[9.039,38.744],color:COLORS.success, name:'Yared T.', rating:4.6},
+  {pos:[9.031,38.757],color:COLORS.warning, name:'Hana B.',  rating:4.8},
+];
+const provDot=(color:string)=>L.divIcon({
+  className:'',
+  html:`<div class="ot-prov-dot" style="--dc:${color}"></div>`,
+  iconAnchor:[9,9],iconSize:[18,18],
+});
+const userDot=L.divIcon({
+  className:'',
+  html:`<div class="ot-user-dot"></div>`,
+  iconAnchor:[12,12],iconSize:[24,24],
+});
 
 // Map icon string names to emojis for display
 const CAT_ICONS: Record<string, string> = {
@@ -108,6 +129,16 @@ export function ClientHome() {
   const [cPrice,setCPrice]=useState({min:80,max:200});
   const cTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
+  // Service-choice picker
+  const [pickOpen,setPickOpen]=useState(false);
+  const [pickCat, setPickCat] =useState('');
+
+  const colorScheme=useComputedColorScheme('light');
+  const isDark=colorScheme==='dark';
+  const TILE_LIGHT='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const TILE_DARK ='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const mapTile=isDark?TILE_DARK:TILE_LIGHT;
+
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}
     fetchNotifications(currentUser.id);
@@ -175,6 +206,9 @@ export function ClientHome() {
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
   function closeCall(){if(cTimer.current)clearTimeout(cTimer.current);setCOpen(false);setTimeout(()=>setCStage('idle'),300);}
+
+  function openPick(catName:string){setPickCat(catName);setPickOpen(true);}
+  function pickAI(){setPickOpen(false);if(pickCat)startCall(pickCat);else startAssist();}
 
   /* ── RENDER ─────────────────────────────────────────────────────────────── */
   return (
@@ -244,12 +278,25 @@ export function ClientHome() {
               </Group>
             </Group>
             <Group gap={10}>
-              <Box px={12} py={5} style={{borderRadius:20,background:`${T}15`,border:`1px solid ${T}40`}}>
+              <Box px={12} py={5} visibleFrom="sm"
+                style={{borderRadius:20,background:`${T}15`,border:`1px solid ${T}40`}}>
                 <Text size="xs" fw={600} c={T}>
                   Hi, {clientProfile?.fullName?.split(' ')[0]??'there'} 👋
                 </Text>
               </Box>
-              <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}>
+              {/* Call Center button */}
+              <Box
+                component="a" href="tel:8182" aria-label="Call center 8182"
+                style={{display:'flex',alignItems:'center',gap:6,
+                  padding:'7px 13px',borderRadius:20,flexShrink:0,
+                  background:`linear-gradient(135deg,${N},${T})`,
+                  color:'white',textDecoration:'none',fontWeight:700,fontSize:13,
+                  boxShadow:`0 2px 10px ${N}55`,minHeight:44}}>
+                <IconPhone size={15} color="white"/>
+                <Text size="xs" fw={800} c="white" visibleFrom="xs">8182</Text>
+              </Box>
+              <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}
+                aria-label="Notifications">
                 {unreadCount>0?<IconBellFilled size={22} color={T}/>:<IconBell size={22}/>}
                 {unreadCount>0&&<Box style={{position:'absolute',top:2,right:2,width:14,height:14,
                   borderRadius:'50%',background:COLORS.error,display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -288,56 +335,76 @@ export function ClientHome() {
           </Paper>
         )}
 
-        {/* Hero CTAs */}
-        <SimpleGrid cols={2} spacing={14} mb={28}>
-          {/* Only Call in App */}
-          <Paper p="xl" radius="xl" onClick={startAssist}
-            style={{background:`linear-gradient(145deg,${N},${T})`,cursor:'pointer',
-              position:'relative',overflow:'hidden',minHeight:180}}>
-            <Box style={{position:'absolute',top:-24,right:-24,width:130,height:130,
-              borderRadius:'50%',background:'rgba(255,255,255,.07)'}}/>
-            <Stack gap={10} style={{position:'relative',zIndex:1}}>
-              <Box w={52} h={52} style={{borderRadius:16,background:'rgba(255,255,255,.2)',
-                display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <IconPhoneCall size={28} color="white"/>
-              </Box>
-              <Box>
-                <Text fw={900} size="lg" c="white" lh={1.1}>Only Call</Text>
-                <Text fw={900} size="lg" c="rgba(255,255,255,.9)" lh={1.1}>in App</Text>
-              </Box>
-              <Text size="xs" c="rgba(255,255,255,.72)">AI assistant finds the right pro for you</Text>
-              <Group gap={6}>
-                <Badge size="xs" style={{background:'rgba(255,255,255,.2)',color:'white',border:'none'}}>Smart match</Badge>
-                <Badge size="xs" style={{background:'rgba(255,255,255,.2)',color:'white',border:'none'}}>Fast</Badge>
+        {/* Hero — Live Provider Map */}
+        <Box mb={28}>
+          <Paper radius="xl"
+            style={{overflow:'hidden',border:'1px solid var(--ot-border)',
+              boxShadow:'0 4px 24px rgba(0,0,0,.07)',position:'relative'}}>
+
+            <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:300}}
+              zoomControl={false} dragging={false} scrollWheelZoom={false}
+              doubleClickZoom={false} keyboard={false} attributionControl={false}>
+              <TileLayer url={mapTile}/>
+              <AnimRing ctr={MAP_CTR} color={T}/>
+              {PROV_DOTS.map((p,i)=>(
+                <Marker key={i} position={p.pos} icon={provDot(p.color)}/>
+              ))}
+              <Marker position={MAP_CTR} icon={userDot}/>
+            </MapContainer>
+
+            {/* Top pill — providers online */}
+            <Box style={{position:'absolute',top:12,left:12,zIndex:500}}>
+              <Group gap={6} px={10} py={6}
+                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
+                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
+                <Box w={7} h={7} style={{borderRadius:'50%',background:COLORS.success,
+                  boxShadow:`0 0 0 3px ${COLORS.success}44`,flexShrink:0}}/>
+                <Text size="xs" fw={700} c={N}>{PROV_DOTS.length} providers online</Text>
               </Group>
-            </Stack>
+            </Box>
+
+            {/* Top-right pill — location */}
+            <Box style={{position:'absolute',top:12,right:12,zIndex:500}}>
+              <Group gap={5} px={9} py={6}
+                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
+                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
+                <IconMapPin size={12} color={T}/>
+                <Text size="xs" fw={600} c={N}>Near you</Text>
+              </Group>
+            </Box>
           </Paper>
 
-          {/* Browse Services */}
-          <Paper p="xl" radius="xl"
-            style={{background:'var(--ot-bg-card)',border:`2px solid ${T}44`,
-              cursor:'pointer',position:'relative',overflow:'hidden',minHeight:180}}>
-            <Box style={{position:'absolute',top:-20,right:-20,width:110,height:110,
-              borderRadius:'50%',background:`${T}10`}}/>
-            <Stack gap={10} style={{position:'relative',zIndex:1}}>
-              <Box w={52} h={52} style={{borderRadius:16,background:`${T}18`,
-                display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <IconSearch size={28} color={T}/>
-              </Box>
-              <Box>
-                <Text fw={900} size="lg" c={N} lh={1.1}>Browse</Text>
-                <Text fw={900} size="lg" c={N} lh={1.1}>Services</Text>
-              </Box>
-              <Text size="xs" c="var(--ot-text-sub)">Pick from all categories below</Text>
-            </Stack>
+          {/* CTA bar below the map — no overlay, clean card */}
+          <Paper mt={10} p="md" radius="xl"
+            style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
+            <Group justify="space-between" align="center" wrap="nowrap">
+              <Group gap={12} wrap="nowrap">
+                <Box w={44} h={44} style={{borderRadius:14,flexShrink:0,
+                  background:`linear-gradient(135deg,${N},${T})`,
+                  display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <IconPhoneCall size={22} color="white"/>
+                </Box>
+                <Box>
+                  <Text fw={800} size="sm" c={N}>Only Call in App</Text>
+                  <Text size="xs" c="dimmed">AI finds &amp; connects you to the right pro</Text>
+                </Box>
+              </Group>
+              <Button size="sm" radius="xl" onClick={startAssist}
+                style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
+                leftSection={<IconPhoneCall size={14}/>}>
+                Call Now
+              </Button>
+            </Group>
           </Paper>
-        </SimpleGrid>
+        </Box>
 
         {/* Category grid */}
         <Text fw={800} size="sm" c={N} mb={14}>All Services</Text>
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
           {MOCK_CATEGORIES.map(cat=>(
-            <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>startCall(cat.name)}
+            <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
+              role="button" aria-label={`Book ${cat.name}`} tabIndex={0}
+              onKeyDown={e=>e.key==='Enter'&&openPick(cat.name)}
               style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)',
                 cursor:'pointer',textAlign:'center',transition:'transform .18s,box-shadow .18s'}}
               onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.transform='translateY(-3px)';
@@ -525,7 +592,7 @@ export function ClientHome() {
             <Box style={{height:220,borderRadius:16,overflow:'hidden',border:'1px solid var(--ot-border)'}}>
               <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:'100%'}}
                 zoomControl={false} dragging={false} scrollWheelZoom={false}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                <TileLayer url={mapTile}/>
                 <AnimRing ctr={MAP_CTR} color={T}/>
               </MapContainer>
             </Box>
@@ -684,8 +751,101 @@ export function ClientHome() {
         </Stack>
       </Modal>
 
+      {/* ══ SERVICE CHOICE MODAL ══════════════════════════════════════════════ */}
+      <Modal opened={pickOpen} onClose={()=>setPickOpen(false)} centered radius="xl" size="sm"
+        withCloseButton={false}
+        styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'},
+          body:{padding:0}}}>
+        <Box p="xl">
+          <Group justify="space-between" mb="lg">
+            <Box>
+              <Text fw={900} size="lg" c={N} lh={1}>{pickCat||'Services'}</Text>
+              <Text size="xs" c="dimmed" mt={2}>How would you like to get help?</Text>
+            </Box>
+            <ActionIcon variant="subtle" onClick={()=>setPickOpen(false)}
+              aria-label="Close" size="lg"><IconX size={18}/></ActionIcon>
+          </Group>
+
+          <Stack gap={12}>
+            {/* Option 1 — Call Center */}
+            <Paper
+              component="a" href="tel:8182"
+              aria-label="Call call center 8182"
+              p="lg" radius="xl"
+              onClick={()=>setPickOpen(false)}
+              style={{display:'block',textDecoration:'none',
+                background:`linear-gradient(135deg,${N},${T})`,
+                cursor:'pointer',border:'none',minHeight:44}}>
+              <Group gap={14} wrap="nowrap">
+                <Box w={52} h={52} style={{borderRadius:16,background:'rgba(255,255,255,.2)',
+                  flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <IconPhone size={26} color="white"/>
+                </Box>
+                <Box>
+                  <Text fw={800} size="md" c="white">Call Call Center</Text>
+                  <Text size="xs" c="rgba(255,255,255,.8)" mt={2}>
+                    Speaks to a real agent · <Text span fw={800} c="white">📞 8182</Text>
+                  </Text>
+                  <Badge mt={6} size="xs" style={{background:'rgba(255,255,255,.2)',color:'white',border:'none'}}>
+                    Human assistance
+                  </Badge>
+                </Box>
+              </Group>
+            </Paper>
+
+            {/* Option 2 — AI Assistant */}
+            <Paper
+              p="lg" radius="xl" onClick={pickAI}
+              aria-label="Use in-app AI assistant"
+              role="button" tabIndex={0}
+              onKeyDown={e=>e.key==='Enter'&&pickAI()}
+              style={{cursor:'pointer',border:`2px solid ${T}55`,
+                background:'var(--ot-bg-card)',minHeight:44}}>
+              <Group gap={14} wrap="nowrap">
+                <Box w={52} h={52} style={{borderRadius:16,background:`${T}18`,
+                  flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <IconMicrophone size={26} color={T}/>
+                </Box>
+                <Box>
+                  <Text fw={800} size="md" c={N}>Call In-App AI</Text>
+                  <Text size="xs" c="dimmed" mt={2}>AI asks your problem &amp; finds the best pro</Text>
+                  <Group gap={6} mt={6}>
+                    <Badge size="xs" variant="light" color="teal">Smart match</Badge>
+                    <Badge size="xs" variant="light" color="blue">Auto-locate</Badge>
+                  </Group>
+                </Box>
+              </Group>
+            </Paper>
+          </Stack>
+
+          <Text size="xs" c="dimmed" ta="center" mt={14}>
+            Both options are free to use · tap outside to dismiss
+          </Text>
+        </Box>
+      </Modal>
+
       <style>{`
         @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:.55}}
+        .ot-prov-dot{
+          width:18px;height:18px;border-radius:50%;
+          background:var(--dc);border:3px solid white;
+          box-shadow:0 2px 8px rgba(0,0,0,.3);
+          animation:prov-blink 2.2s ease-in-out infinite;
+        }
+        .ot-prov-dot::after{
+          content:'';position:absolute;inset:-5px;border-radius:50%;
+          border:2px solid var(--dc);opacity:0;
+          animation:prov-ring 2.2s ease-out infinite;
+        }
+        @keyframes prov-blink{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+        @keyframes prov-ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+        .ot-user-dot{
+          width:24px;height:24px;border-radius:50%;
+          background:${N};border:4px solid white;
+          box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4);
+          animation:user-pulse 1.8s ease-in-out infinite;
+        }
+        @keyframes user-pulse{0%,100%{box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4)}50%{box-shadow:0 0 0 8px ${T}33,0 3px 12px rgba(0,0,0,.4)}}
       `}</style>
     </Box>
   );
