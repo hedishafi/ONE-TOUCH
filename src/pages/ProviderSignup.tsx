@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Button, FileButton, Group, MultiSelect,
-  PasswordInput, Select, Stack, Text,
+  PasswordInput, Progress, Select, Stack, Text,
   Avatar, Badge, Radio, Alert, SimpleGrid,
 } from '@mantine/core';
 import {
@@ -339,7 +339,7 @@ function StepDone({ name }: { name: string }) {
 // ─── ProviderSignup Orchestrator ──────────────────────────────────────────────
 export function ProviderSignup() {
   const navigate  = useNavigate();
-  const { signup } = useAuthStore();
+  const { signup, loginByUserId } = useAuthStore();
   const [step, setStep]         = useState(1);
   const [idResult, setIdResult] = useState<IdentityResult | null>(null);
   const [faceUrl, setFaceUrl]   = useState<string | null>(null);
@@ -367,6 +367,10 @@ export function ProviderSignup() {
     if (!result.success) {
       notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
       return;
+    }
+    // Authenticate the newly created user so ProtectedRoute lets them through
+    if (result.userId) {
+      loginByUserId(result.userId);
     }
     setProfileName(name);
     setDone(true);
