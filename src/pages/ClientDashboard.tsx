@@ -28,7 +28,8 @@ import { formatCurrency, formatTimeAgo, calcDistance } from '../utils/formatting
 import { COLORS, ROUTES, CLIENT_TIER_COLORS } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import type { ProviderProfile, Job, WalletTransaction, NavItem } from '../types';
+import type { ProviderProfile, Job, WalletTransaction } from '../types';
+import type { NavItem } from '../types/nav';
 
 // Fix Leaflet default icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -255,7 +256,7 @@ export function BookingHistory() {
             </Stack>
           </Center>
         ) : (
-          displayed.map(job => <JobCard key={job.id} job={job} role="client" />)
+          displayed.map(job => <JobCard key={job.id} job={job} viewAs="client" />)
         )}
       </Stack>
     </DashboardLayout>
@@ -357,7 +358,7 @@ export function ClientWallet() {
         >
           <Stack gap="xs">
             <Text size="sm" c="rgba(255,255,255,0.7)" fw={500}>{t('wallet.balance')}</Text>
-            <Text size={42} fw={800} c="white">{formatCurrency(balance)}</Text>
+            <Text style={{ fontSize: 42 }} fw={800} c="white">{formatCurrency(balance)}</Text>
             <Group gap="xs">
               <Badge color="yellow" variant="filled" size="sm">🔒 Escrow Protected</Badge>
               <Badge color="teal" variant="light" size="sm">✅ Instant Top-Up</Badge>
@@ -416,7 +417,7 @@ export function ClientWallet() {
                     <Table.Th>Type</Table.Th>
                     <Table.Th>Amount</Table.Th>
                     <Table.Th>Date</Table.Th>
-                    <Table.Th>Status</Table.Th>
+
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -434,7 +435,6 @@ export function ClientWallet() {
                         </Text>
                       </Table.Td>
                       <Table.Td><Text size="xs" c="dimmed">{formatTimeAgo(tx.createdAt)}</Text></Table.Td>
-                      <Table.Td><Badge size="xs" color={tx.status === 'completed' ? 'teal' : 'yellow'}>{tx.status}</Badge></Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
@@ -456,13 +456,13 @@ export function ClientLoyalty() {
   const tier = myProfile?.loyaltyTier ?? 'bronze';
   const totalBookings = myProfile?.totalBookings ?? 3;
   const tiers = LOYALTY_CONFIG.clientTiers;
-  const currentTierConfig = tiers.find(t => t.tier === tier) ?? tiers[0];
-  const nextTierConfig = tiers.find(t => t.minBookings > (currentTierConfig?.minBookings ?? 0));
+  const currentTierConfig = tiers.find(ct => ct.tier === tier) ?? tiers[0];
+  const nextTierConfig = tiers.find(ct => ct.minBookings > (currentTierConfig?.minBookings ?? 0));
   const progress = nextTierConfig
     ? Math.min(100, (totalBookings / nextTierConfig.minBookings) * 100)
     : 100;
 
-  const tierColor = CLIENT_TIER_COLORS[tier as keyof typeof CLIENT_TIER_COLORS] ?? '#CD7F32';
+  const tierColor = (CLIENT_TIER_COLORS as Record<string, string>)[tier] ?? '#CD7F32';
   const tierLabel = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' }[tier] ?? tier;
 
   return (
@@ -506,22 +506,22 @@ export function ClientLoyalty() {
 
         {/* Benefits */}
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-          {tiers.map(t => {
-            const tc = CLIENT_TIER_COLORS[t.tier as keyof typeof CLIENT_TIER_COLORS] ?? '#CD7F32';
-            const isActive = t.tier === tier;
+          {tiers.map(ct => {
+            const tc = (CLIENT_TIER_COLORS as Record<string, string>)[ct.tier] ?? '#CD7F32';
+            const isActive = ct.tier === tier;
             return (
-              <Card key={t.tier} radius="lg" withBorder p="lg"
+              <Card key={ct.tier} radius="lg" withBorder p="lg"
                 style={{ border: isActive ? `2px solid ${tc}` : undefined, opacity: isActive ? 1 : 0.65 }}>
                 <Stack gap="xs">
                   <Group justify="space-between">
-                    <Badge style={{ background: tc, color: 'white' }} size="sm">{t.tier.toUpperCase()}</Badge>
+                    <Badge style={{ background: tc, color: 'white' }} size="sm">{ct.tier.toUpperCase()}</Badge>
                     {isActive && <Badge color="teal" size="xs">Current</Badge>}
                   </Group>
-                  <Text size="lg" fw={800} c={tc}>{t.cashbackRate}% {t('loyalty.cashback')}</Text>
-                  <Text size="xs" c="dimmed">From {t.minBookings} bookings</Text>
+                  <Text size="lg" fw={800} c={tc}>{ct.cashbackRate}% {t('loyalty.cashback')}</Text>
+                  <Text size="xs" c="dimmed">From {ct.minBookings} bookings</Text>
                   <Divider />
                   <Stack gap={4}>
-                    {t.perks.map(perk => (
+                    {ct.benefits.map((perk: string) => (
                       <Group key={perk} gap="xs">
                         <IconGift size={12} color={tc} />
                         <Text size="xs">{perk}</Text>

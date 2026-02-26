@@ -57,7 +57,7 @@ function StepPhoneOTP({
   const [attempts, setAttempts] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const { seconds, begin }      = useCountdown(60);
-  const { loginByPhoneOTP }     = useAuthStore();
+  const { loginByUserId }       = useAuthStore();
 
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;
@@ -94,7 +94,7 @@ function StepPhoneOTP({
     });
     storage.set(STORAGE_KEYS.clientProfiles, profiles);
 
-    return phone;
+    return userId;
   };
 
   const handleOtpChange = (val: string) => {
@@ -117,8 +117,8 @@ function StepPhoneOTP({
 
     setVerifying(true);
     setTimeout(() => {
-      const accountPhone = createClientAccount();
-      const result = loginByPhoneOTP(accountPhone);
+      const userId = createClientAccount();
+      const result = loginByUserId(userId);
       setVerifying(false);
       if (!result.success) {
         setError(result.error ?? 'Sign in failed after verification.');

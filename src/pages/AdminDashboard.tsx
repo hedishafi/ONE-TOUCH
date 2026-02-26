@@ -21,9 +21,10 @@ import { formatCurrency, formatTimeAgo } from '../utils/formatting';
 import { COLORS, ROUTES } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import type {
-  NavItem, User, ProviderProfile, Job, WalletTransaction,
+  User, ProviderProfile, Job, WalletTransaction,
   FraudFlag, Dispute, CommissionConfig,
 } from '../types';
+import type { NavItem } from '../types/nav';
 
 const ADMIN_NAV: NavItem[] = [
   { path: ROUTES.adminDashboard, label: 'Analytics', icon: <IconChartBar size={18} /> },
@@ -98,10 +99,10 @@ export function AdminAnalytics() {
 export function UserVerification() {
   const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>(storage.get<User[]>(STORAGE_KEYS.users, []));
-  const pending = users.filter(u => u.role === 'provider' && !u.isVerified);
+  const pending = users.filter(u => u.role === 'provider' && u.verificationStatus === 'pending');
 
   const approve = (id: string) => {
-    const updated = users.map(u => u.id === id ? { ...u, isVerified: true } : u);
+    const updated = users.map(u => u.id === id ? { ...u, verificationStatus: 'verified' as const } : u);
     storage.set(STORAGE_KEYS.users, updated);
     setUsers(updated);
     notifications.show({ title: 'Provider Approved ✅', message: 'Provider is now verified and visible on the platform.', color: 'teal' });
@@ -150,8 +151,8 @@ export function UserVerification() {
                 <Table.Tr key={u.id}>
                   <Table.Td>
                     <Group gap="xs">
-                      <Avatar size={32} radius="xl" color="teal">{u.name.charAt(0)}</Avatar>
-                      <Text size="sm" fw={500}>{u.name}</Text>
+                      <Avatar size={32} radius="xl" color="teal">{u.email.charAt(0).toUpperCase()}</Avatar>
+                      <Text size="sm" fw={500}>{u.email}</Text>
                     </Group>
                   </Table.Td>
                   <Table.Td><Text size="sm">{u.email}</Text></Table.Td>
@@ -178,12 +179,12 @@ export function UserVerification() {
 
 // ─── COMMISSION SETTINGS ──────────────────────────────────────────────────────
 export function CommissionSettings() {
-  const saved = storage.get<CommissionConfig>(STORAGE_KEYS.commissionConfig, { baseRate: 10, tierDiscounts: { rising_pro: 0, trusted_pro: 2, elite_pro: 4 } });
+  const saved = storage.get<CommissionConfig>(STORAGE_KEYS.commissionConfig, { baseRate: 10, loyaltyDiscounts: { rising_pro: 0, trusted_pro: 2, elite_pro: 4 }, repeatBookingCashback: 5 });
   const [baseRate, setBaseRate] = useState(saved.baseRate);
-  const [tierDiscounts, setTierDiscounts] = useState(saved.tierDiscounts);
+  const [tierDiscounts, setTierDiscounts] = useState<Record<string, number>>(saved.loyaltyDiscounts);
 
   const save = () => {
-    storage.set(STORAGE_KEYS.commissionConfig, { baseRate, tierDiscounts });
+    storage.set(STORAGE_KEYS.commissionConfig, { baseRate, loyaltyDiscounts: tierDiscounts, repeatBookingCashback: 5 });
     notifications.show({ title: 'Settings Saved ✅', message: 'Commission rates updated.', color: 'teal' });
   };
 

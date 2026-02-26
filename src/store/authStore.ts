@@ -39,6 +39,7 @@ interface AuthState {
   login: (email: string, password: string) => { success: boolean; error?: string };
   loginByPhone: (phone: string, password: string) => { success: boolean; error?: string };
   loginByPhoneOTP: (phone: string) => { success: boolean; error?: string };
+  loginByUserId: (userId: string) => { success: boolean; error?: string };
   lookupPhoneRole: (phone: string) => 'client' | 'provider' | 'admin' | null;
   resetPassword: (phone: string, newPassword: string) => { success: boolean; error?: string };
   logout: () => void;
@@ -110,6 +111,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const users = storage.get<User[]>(STORAGE_KEYS.users, []);
     const user = users.find(u => norm(u.phone ?? '') === norm(phone));
     if (!user) return { success: false, error: 'No account found with this phone number.' };
+
+    const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
+    const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
+
+    storage.set(STORAGE_KEYS.currentUser, user);
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      clientProfile: user.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
+      providerProfile: user.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
+    });
+    return { success: true };
+  },
+
+  loginByUserId: (userId) => {
+    const users = storage.get<User[]>(STORAGE_KEYS.users, []);
+    const user = users.find(u => u.id === userId);
+    if (!user) return { success: false, error: 'User not found.' };
 
     const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
     const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
