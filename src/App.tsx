@@ -28,6 +28,7 @@ import {
 } from './pages/Registration';
 
 // Client pages
+import { ClientHome } from './pages/ClientHome';
 import {
   BrowseServices,
   BookingHistory,
@@ -37,6 +38,7 @@ import {
 } from './pages/ClientDashboard';
 
 // Provider pages
+import { ProviderHome } from './pages/ProviderHome';
 import {
   ActiveJobs,
   Earnings,
@@ -93,7 +95,7 @@ function App() {
           path="/client/*"
           element={<ProtectedRoute allowedRoles={['client']} />}
         >
-          <Route path="dashboard" element={<BrowseServices />} />
+          <Route path="dashboard" element={<ClientHome />} />
           <Route path="browse" element={<BrowseServices />} />
           <Route path="history" element={<BookingHistory />} />
           <Route path="saved" element={<SavedProviders />} />
@@ -107,7 +109,7 @@ function App() {
           path="/provider/*"
           element={<ProtectedRoute allowedRoles={['provider']} />}
         >
-          <Route path="dashboard" element={<ActiveJobs />} />
+          <Route path="dashboard" element={<ProviderHome />} />
           <Route path="jobs" element={<ActiveJobs />} />
           <Route path="earnings" element={<Earnings />} />
           <Route path="profile" element={<ProviderProfile />} />
