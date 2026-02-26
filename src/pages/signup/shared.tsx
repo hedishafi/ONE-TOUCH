@@ -153,10 +153,10 @@ export const MOCK_EXTRACTED: Record<IdType, Record<string, string>> = {
 // ─── Step labels & dot progress ───────────────────────────────────────────────
 export const STEP_LABELS = ['Identity', 'Phone & Biometric', 'Profile'];
 
-export function StepDots({ current }: { current: number }) {
+export function StepDots({ current, labels = STEP_LABELS }: { current: number; labels?: string[] }) {
   return (
     <Group justify="center" gap={0} mb={32} wrap="nowrap">
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const done = i + 1 < current;
         const active = i + 1 === current;
         const dotBg = done
@@ -204,7 +204,7 @@ export function StepDots({ current }: { current: number }) {
                 {label}
               </Text>
             </Stack>
-            {i < STEP_LABELS.length - 1 && (
+            {i < labels.length - 1 && (
               <Box
                 w={48}
                 h={2}
@@ -226,7 +226,7 @@ export function StepDots({ current }: { current: number }) {
 }
 
 // ─── Shell (page wrapper with nav + progress bar) ─────────────────────────────
-export function Shell({ children, step }: { children: React.ReactNode; step: number }) {
+export function Shell({ children, step, labels = STEP_LABELS }: { children: React.ReactNode; step: number; labels?: string[] }) {
   const navigate = useNavigate();
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)', display: 'flex', flexDirection: 'column' }}>
@@ -271,7 +271,7 @@ export function Shell({ children, step }: { children: React.ReactNode; step: num
         <Box
           style={{
             height: '100%',
-            width: `${(step / 3) * 100}%`,
+            width: `${(step / labels.length) * 100}%`,
             background: `linear-gradient(90deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})`,
             transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)',
             borderRadius: '0 2px 2px 0',
@@ -281,7 +281,7 @@ export function Shell({ children, step }: { children: React.ReactNode; step: num
 
       <Center flex={1} py={40} px={16}>
         <Container size={600} w="100%">
-          <StepDots current={step} />
+          <StepDots current={step} labels={labels} />
           {children}
         </Container>
       </Center>
