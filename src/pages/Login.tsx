@@ -99,15 +99,28 @@ export default function Login() {
     else navigate(ROUTES.adminDashboard, { replace: true });
   };
 
+  // ── One-click demo login ──────────────────────────────────────────────────
+  function quickLogin(userId: string) {
+    const { loginByUserId } = useAuthStore.getState();
+    const result = loginByUserId(userId);
+    if (result.success) {
+      goAfterLogin();
+    }
+  }
+
   // ── Screen: phone → continue ───────────────────────────────────────────────
   function handleContinue() {
     setPhoneError('');
     if (!phone.trim()) { setPhoneError('Please enter your phone number.'); return; }
     setPhoneLoading(true);
     setTimeout(() => {
-      const role = lookupPhoneRole(normPhone(phone));
+      let role = lookupPhoneRole(normPhone(phone));
+      // If phone not found → treat as demo client so the flow always works
+      if (!role) {
+        role = 'client';
+        setPhone('+1-555-0101'); // align with demo account for OTP verify step
+      }
       setPhoneLoading(false);
-      if (!role) { setPhoneError('No account found with this phone number. Try +1-555-0101 (client) or +1-555-0201 (provider).'); return; }
       setDetectedRole(role);
       if (role === 'client') {
         setClientOtp('');
@@ -282,12 +295,53 @@ export default function Login() {
   if (screen === 'phone') return wrap(card(
     <>
       <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>Sign In</Text>
-      <Text size="sm" mb="xl" style={{ color: 'var(--ot-text-sub)' }}>
-        Enter your registered phone number to continue.
+      <Text size="sm" mb="md" style={{ color: 'var(--ot-text-sub)' }}>
+        Enter your phone number or use a demo account below.
       </Text>
 
+      {/* ── Quick demo login buttons ── */}
+      <Stack gap="xs" mb="lg">
+        <Text size="xs" fw={700} tt="uppercase" style={{ color: 'var(--ot-text-muted)', letterSpacing: '0.05em' }}>Quick Demo Access</Text>
+        <Button
+          fullWidth
+          variant="light"
+          color="teal"
+          size="md"
+          leftSection={<IconUser size={16} />}
+          onClick={() => quickLogin('client-001')}
+        >
+          Login as Client
+        </Button>
+        <Button
+          fullWidth
+          variant="light"
+          color="blue"
+          size="md"
+          leftSection={<IconUser size={16} />}
+          onClick={() => quickLogin('provider-001')}
+        >
+          Login as Provider
+        </Button>
+        <Button
+          fullWidth
+          variant="light"
+          color="gray"
+          size="sm"
+          leftSection={<IconShieldCheck size={14} />}
+          onClick={() => quickLogin('admin-001')}
+        >
+          Login as Admin
+        </Button>
+      </Stack>
+
+      <Group gap="xs" mb="lg" align="center">
+        <Box style={{ flex: 1, height: 1, background: 'var(--ot-border)' }} />
+        <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>OR enter phone manually</Text>
+        <Box style={{ flex: 1, height: 1, background: 'var(--ot-border)' }} />
+      </Group>
+
       {phoneError && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">{phoneError}</Alert>
+        <Alert icon={<IconAlertCircle size={16} />} color="orange" mb="md" radius="md">{phoneError}</Alert>
       )}
 
       <Stack gap="md">
@@ -321,10 +375,21 @@ export default function Login() {
       </Text>
 
       <Box mt="lg" p={12} style={{ borderRadius: 10, background: 'var(--ot-bg-row)', border: '1px solid var(--ot-border)' }}>
-        <Text size="xs" c="var(--ot-text-muted)" fw={600} mb={6}>Demo accounts</Text>
+        <Text size="xs" c="var(--ot-text-muted)" fw={600} mb={6}>Phone number OTP demo credentials</Text>
         <Stack gap={4}>
-          <Text size="xs" c="var(--ot-text-muted)">Client (OTP login): <strong>+1-555-0101</strong></Text>
-          <Text size="xs" c="var(--ot-text-muted)">Provider (password): <strong>+1-555-0201</strong> · pw: <strong>demo123</strong></Text>
+          <Group gap="xs" wrap="nowrap">
+            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>Client:</Text>
+            <Text size="xs" fw={700} style={{ color: teal, cursor: 'pointer' }}
+              onClick={() => setPhone('+1-555-0101')}>+1-555-0101</Text>
+            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>→ OTP: <strong>{MOCK_OTP}</strong></Text>
+          </Group>
+          <Group gap="xs" wrap="nowrap">
+            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>Provider:</Text>
+            <Text size="xs" fw={700} style={{ color: teal, cursor: 'pointer' }}
+              onClick={() => setPhone('+1-555-0201')}>+1-555-0201</Text>
+            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>→ pw: <strong>demo123</strong></Text>
+          </Group>
+          <Text size="xs" c="dimmed" mt={4}>💡 Any unrecognized phone will log you in as a demo client with OTP <strong>{MOCK_OTP}</strong></Text>
         </Stack>
       </Box>
     </>
