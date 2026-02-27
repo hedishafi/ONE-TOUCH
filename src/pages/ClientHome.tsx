@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, useComputedColorScheme,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, ScrollArea, useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
@@ -133,6 +133,17 @@ export function ClientHome() {
   const [pickOpen,setPickOpen]=useState(false);
   const [pickCat, setPickCat] =useState('');
 
+  // Chat-based decline flow
+  type ChatMsg = {from:'ai'|'user'; text:string};
+  type ChatStep = 'reason'|'price'|'searching'|'found'|'none'|'done';
+  const [chatOpen,setChatOpen]=useState(false);
+  const [chatMsgs,setChatMsgs]=useState<ChatMsg[]>([]);
+  const [chatStep,setChatStep]=useState<ChatStep>('reason');
+  const [chatInput,setChatInput]=useState('');
+  const [chatProv,setChatProv]=useState(FAKE_PROVIDERS[0]);
+  const [chatPriceNum,setChatPriceNum]=useState(0);
+  const chatTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+
   const colorScheme=useComputedColorScheme('light');
   const isDark=colorScheme==='dark';
   const TILE_LIGHT='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -142,7 +153,7 @@ export function ClientHome() {
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}
     fetchNotifications(currentUser.id);
-    return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);};
+    return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(chatTimer.current)clearTimeout(chatTimer.current);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
 
@@ -183,6 +194,78 @@ export function ClientHome() {
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
+  // Client declines the found provider — open conversational chat AI
+  function cancelFromFound(){
+    setAOpen(false);
+    setTimeout(()=>{
+      setAStage('idle');
+      setChatMsgs([{from:'ai',text:'I understand you declined the offer. Could you please tell me why?'}]);
+      setChatStep('reason');
+      setChatInput('');
+      setChatOpen(true);
+    },300);
+  }
+  // Chat message handler
+  function handleChatSend(){
+    const text=chatInput.trim();if(!text)return;
+    setChatInput('');
+    const userMsg:ChatMsg={from:'user',text};
+    if(chatStep==='reason'){
+      const isPriceRelated=/expens|price|cost|cheap|afford|high|much|birr|money|budget/i.test(text);
+      setChatMsgs(m=>[...m,userMsg]);
+      if(isPriceRelated){
+        setChatStep('price');
+        setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:'I understand. What is your last price?'}]),400);
+      }else{
+        setChatStep('done');
+        setTimeout(()=>{
+          setChatMsgs(m=>[...m,{from:'ai',text:"Thank you for letting me know. Feel free to start a new request whenever you're ready."}]);
+          setTimeout(()=>setChatOpen(false),2500);
+        },400);
+      }
+    }else if(chatStep==='price'){
+      const match=text.match(/\d+/);
+      const p=match?parseInt(match[0],10):null;
+      setChatMsgs(m=>[...m,userMsg]);
+      if(!p||p<10){
+        setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:'Please enter a valid price amount (e.g. 150).'}]),400);
+        return;
+      }
+      setChatPriceNum(p);
+      setChatStep('searching');
+      setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:`Got it. I'll try to assign a provider at ${CURRENCY_SYMBOL} ${p}. Searching now…`}]),400);
+      const willFind=Math.random()>0.3;
+      chatTimer.current=setTimeout(()=>{
+        if(willFind){
+          const prov=FAKE_PROVIDERS[Math.floor(Math.random()*FAKE_PROVIDERS.length)];
+          setChatProv(prov);
+          setChatStep('found');
+          setChatMsgs(m=>[...m,{from:'ai',text:`Great news! ${prov.name} (⭐ ${prov.rating}, ${prov.dist} km away) has accepted your price of ${CURRENCY_SYMBOL} ${p}. They will contact you shortly. Would you like to confirm?`}]);
+        }else{
+          setChatStep('none');
+          setChatMsgs(m=>[...m,{from:'ai',text:`Unfortunately, no provider is available at ${CURRENCY_SYMBOL} ${p} right now. Your request has been closed. You can search again after one hour.`}]);
+          setTimeout(()=>setChatOpen(false),4000);
+        }
+      },2500);
+    }
+  }
+  // Confirm job from chat flow
+  function confirmFromChat(){
+    if(!currentUser)return;
+    const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
+    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
+      subcategoryId:'sub-001',description:desc||'Service request',estimatedPrice:chatPriceNum||estPrice.min,
+      status:'pending_agreement',commissionRate:10,
+      clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
+      createdAt:new Date().toISOString()} as any);
+    addNotification({id:`n-${Date.now()}`,userId:'provider-001',type:'new_job' as any,
+      title:'New Job Request',message:`Client confirmed at ${CURRENCY_SYMBOL} ${chatPriceNum}`,
+      isRead:false,createdAt:new Date().toISOString()});
+    setChatMsgs(m=>[...m,{from:'ai',text:`Confirmed! ${chatProv.name} will call you within 10 minutes.`}]);
+    setChatStep('done');
+    notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
+    setTimeout(()=>setChatOpen(false),2500);
+  }
   function closeAssist(){if(aTimer.current)clearTimeout(aTimer.current);setAOpen(false);setTimeout(()=>setAStage('idle'),300);}
 
   /* ── Category call ───────────────────────────────────────────────────────── */
@@ -206,6 +289,18 @@ export function ClientHome() {
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
   function closeCall(){if(cTimer.current)clearTimeout(cTimer.current);setCOpen(false);setTimeout(()=>setCStage('idle'),300);}
+  // Client declines via category call modal — open chat AI
+  function cancelFromCall(){
+    if(cTimer.current)clearTimeout(cTimer.current);
+    setCOpen(false);
+    setTimeout(()=>{
+      setCStage('idle');
+      setChatMsgs([{from:'ai',text:'I understand you declined the offer. Could you please tell me why?'}]);
+      setChatStep('reason');
+      setChatInput('');
+      setChatOpen(true);
+    },300);
+  }
 
   function openPick(catName:string){setPickCat(catName);setPickOpen(true);}
   function pickAI(){setPickOpen(false);if(pickCat)startCall(pickCat);else startAssist();}
@@ -627,8 +722,8 @@ export function ClientHome() {
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 onClick={confirmJob}>Confirm & Request</Button>
-              <Button flex={1} size="md" radius="xl" variant="light" color="gray"
-                onClick={closeAssist}>Cancel</Button>
+              <Button flex={1} size="md" radius="xl" variant="light" color="red"
+                onClick={cancelFromFound}>Decline</Button>
             </Group>
           </Stack>
         )}
@@ -743,12 +838,79 @@ export function ClientHome() {
                 <Button flex={1} size="md" radius="xl"
                   style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                   onClick={confirmCall}>Confirm</Button>
-                <Button flex={1} size="md" radius="xl" variant="light" color="gray"
-                  onClick={closeCall}>Cancel</Button>
+                <Button flex={1} size="md" radius="xl" variant="light" color="red"
+                  onClick={cancelFromCall}>Decline</Button>
               </Group>
             </Stack>
           )}
         </Stack>
+      </Modal>
+
+      {/* ══ CHAT DECLINE MODAL ════════════════════════════════════════════════ */}
+      <Modal opened={chatOpen} onClose={()=>setChatOpen(false)} centered radius="xl" size="sm"
+        withCloseButton={false}
+        styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>  
+        <Box p="md">
+          {/* Header */}
+          <Group justify="space-between" mb="md">
+            <Group gap={10}>
+              <Box w={36} h={36} style={{borderRadius:12,background:`linear-gradient(135deg,${N},${T})`,
+                display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <IconSparkles size={18} color="white"/>
+              </Box>
+              <Box>
+                <Text fw={700} size="sm" c={N}>OneTouch AI</Text>
+                <Text size="10px" c="dimmed">Here to help</Text>
+              </Box>
+            </Group>
+            <ActionIcon variant="subtle" onClick={()=>setChatOpen(false)}><IconX size={18}/></ActionIcon>
+          </Group>
+          {/* Messages */}
+          <ScrollArea.Autosize mah={300} scrollbarSize={4} mb="md">
+            <Stack gap={10}>
+              {chatMsgs.map((m,i)=>(
+                <Box key={i} style={{display:'flex',justifyContent:m.from==='ai'?'flex-start':'flex-end'}}>
+                  <Box px={14} py={10} style={{
+                    maxWidth:'80%',borderRadius:m.from==='ai'?'4px 18px 18px 18px':'18px 4px 18px 18px',
+                    background:m.from==='ai'?`${N}12`:`linear-gradient(135deg,${N},${T})`,
+                    color:m.from==='ai'?'var(--ot-text-body)':'white'}}>
+                    <Text size="sm">{m.text}</Text>
+                  </Box>
+                </Box>
+              ))}
+              {chatStep==='searching'&&<Box style={{display:'flex',justifyContent:'flex-start'}}>
+                <Box px={14} py={10} style={{borderRadius:'4px 18px 18px 18px',background:`${N}12`}}>
+                  <Text size="sm" c="dimmed">Searching… ●●●</Text>
+                </Box>
+              </Box>}
+            </Stack>
+          </ScrollArea.Autosize>
+          {/* Confirm/Cancel when provider found via chat */}
+          {chatStep==='found'&&(
+            <Group gap={8} mb={10}>
+              <Button flex={1} size="sm" radius="xl"
+                style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
+                onClick={confirmFromChat}>Confirm</Button>
+              <Button flex={1} size="sm" radius="xl" variant="light" color="gray"
+                onClick={()=>setChatOpen(false)}>Cancel</Button>
+            </Group>
+          )}
+          {/* Text input — visible only during reason/price steps */}
+          {(chatStep==='reason'||chatStep==='price')&&(
+            <Group gap={8} align="flex-end">
+              <Textarea flex={1} autosize minRows={1} maxRows={4}
+                placeholder={chatStep==='price'?'Enter amount (e.g. 150)':'Type your reason…'}
+                value={chatInput} onChange={e=>setChatInput(e.currentTarget.value)}
+                radius="xl" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleChatSend();}}}
+                styles={{input:{border:`1.5px solid ${T}55`,fontSize:14,borderRadius:24}}}/>
+              <ActionIcon size="xl" radius="xl" aria-label="Send"
+                style={{background:`linear-gradient(135deg,${N},${T})`,flexShrink:0}}
+                onClick={handleChatSend} disabled={!chatInput.trim()}>
+                <IconArrowRight size={18} color="white"/>
+              </ActionIcon>
+            </Group>
+          )}
+        </Box>
       </Modal>
 
       {/* ══ SERVICE CHOICE MODAL ══════════════════════════════════════════════ */}
