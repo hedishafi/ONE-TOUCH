@@ -19,6 +19,9 @@ const seedMockData = () => {
     storage.set(STORAGE_KEYS.fraudFlags, MOCK_FRAUD_FLAGS);
     storage.set(STORAGE_KEYS.commissionConfig, DEFAULT_COMMISSION_CONFIG);
     storage.set(STORAGE_KEYS.savedProviders, ['provider-002', 'provider-004']);
+  } else {
+    // Always refresh provider coordinates to Addis Ababa (fixes stale NY coords)
+    storage.set(STORAGE_KEYS.providerProfiles, MOCK_PROVIDER_PROFILES);
   }
   // Seed default passwords for mock users (always ensure this exists)
   if (!storage.get(STORAGE_KEYS.passwords, null)) {

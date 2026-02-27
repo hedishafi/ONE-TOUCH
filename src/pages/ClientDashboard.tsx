@@ -59,8 +59,8 @@ export function BrowseServices() {
   const [bookProviderId, setBookProviderId] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
-  const userLat = 40.7128;
-  const userLng = -74.0059;
+  const userLat = 9.0320;  // Addis Ababa, Ethiopia
+  const userLng = 38.7469;
 
   useEffect(() => {
     const ps = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
@@ -77,7 +77,7 @@ export function BrowseServices() {
 
   const withDistance = filtered.map(p => ({
     ...p,
-    distance: calcDistance(userLat, userLng, p.lat ?? 40.7128, p.lng ?? -74.006),
+    distance: calcDistance(userLat, userLng, p.lat ?? 9.0320, p.lng ?? 38.7469),
   })).sort((a, b) => a.distance - b.distance);
 
   const toggleSave = (uid: string) => {
