@@ -5,13 +5,13 @@
 import { useState, useEffect } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, Switch,
-  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, useComputedColorScheme,
+  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, PasswordInput, useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconBriefcase, IconTrendingUp, IconUser, IconWallet,
   IconBell, IconBellFilled, IconMenu2, IconX, IconLogout,
   IconCheck, IconClock, IconMapPin, IconCircleFilled, IconGift,
-  IconShieldCheck, IconCurrencyDollar, IconTool, IconPhoneCall, IconRadar, IconStar,
+  IconShieldCheck, IconCurrencyDollar, IconPhoneCall, IconRadar, IconStar,
   IconStarFilled, IconAlertCircle, IconWifiOff,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
@@ -25,7 +25,7 @@ import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import { ChapaModal } from '../components/ChapaModal';
+// import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile } from '../types';
 
 // Fix Leaflet icons
@@ -72,18 +72,24 @@ const CANCEL_REASONS = [
 ];
 
 const DEMO: Req[] = [
-  { id:'r1', clientName:'Alex J.',  clientRating:4.7, clientJobsDone:12, clientId:'client-001', catId:'cat-001',
-    desc:"Engine light on — car won't start reliably.",
-    addr:'Bole Road, Addis Ababa', price:280, dist:1.4, coords:jitter(),
-    at: new Date(Date.now()-3*60000).toISOString() },
-  { id:'r2', clientName:'Sara M.',  clientRating:4.9, clientJobsDone:7,  clientId:'client-002', catId:'cat-002',
-    desc:'Deep-clean 3-bed flat before move-out.',
-    addr:'Kazanchis, Addis Ababa', price:140, dist:2.1, coords:jitter(),
-    at: new Date(Date.now()-8*60000).toISOString() },
-  { id:'r3', clientName:'Yared T.', clientRating:4.5, clientJobsDone:31, clientId:'client-001', catId:'cat-003',
-    desc:'Kitchen sink leaking beneath the cabinet.',
-    addr:'Piazza, Addis Ababa', price:95, dist:3.2, coords:jitter(),
-    at: new Date(Date.now()-14*60000).toISOString() },
+  {
+    id: 'r1', clientName: 'Alex J.', clientRating: 4.7, clientJobsDone: 12, clientId: 'client-001', catId: 'cat-003',
+    desc: 'Water leaking from pipe under kitchen sink.',
+    addr: 'Bole Road, Addis Ababa', price: 0, dist: 1.4, coords: jitter(),
+    at: new Date(Date.now() - 3 * 60000).toISOString()
+  },
+  {
+    id: 'r2', clientName: 'Sara M.', clientRating: 4.9, clientJobsDone: 7, clientId: 'client-002', catId: 'cat-003',
+    desc: 'Bathroom faucet won’t shut off completely.',
+    addr: 'Kazanchis, Addis Ababa', price: 0, dist: 2.1, coords: jitter(),
+    at: new Date(Date.now() - 8 * 60000).toISOString()
+  },
+  {
+    id: 'r3', clientName: 'Yared T.', clientRating: 4.5, clientJobsDone: 31, clientId: 'client-003', catId: 'cat-003',
+    desc: 'Low water pressure in shower, possible clog.',
+    addr: 'Piazza, Addis Ababa', price: 0, dist: 3.2, coords: jitter(),
+    at: new Date(Date.now() - 14 * 60000).toISOString()
+  },
 ];
 
 const ago = (iso: string) => {
@@ -91,7 +97,6 @@ const ago = (iso: string) => {
   return m<1?'Just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`;
 };
 const catName  = (id: string) => MOCK_CATEGORIES.find(c=>c.id===id)?.name ?? 'Service';
-const catColor = (id: string) => MOCK_CATEGORIES.find(c=>c.id===id)?.color ?? T;
 
 function dot(color: string) {
   return L.divIcon({
@@ -142,8 +147,12 @@ export function ProviderHome() {
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const [trials,    setTrials]    = useState(FREE_TRIAL_TOTAL);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [chapaOpen, setChapaOpen] = useState(false);
+  // const [chapaOpen, setChapaOpen] = useState(false);
   const [pending,   setPending]   = useState<Req|null>(null);
+  const [payOpen,   setPayOpen]   = useState(false);
+  const [payPassword, setPayPassword] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState('');
   const [revOpen,   setRevOpen]   = useState(false);
   const [revealed,  setRevealed]  = useState<{req:Req;phone:string}|null>(null);
 
@@ -182,8 +191,13 @@ export function ProviderHome() {
   }
 
   function accept(req:Req) {
-    if (trials>0) { const n=trials-1; setTrials(n); if(currentUser) saveTrials(currentUser.id,n); finalize(req); }
-    else { setPending(req); setChapaOpen(true); }
+    if (trials>0) {
+      const n = trials - 1; setTrials(n); if (currentUser) saveTrials(currentUser.id, n); finalize(req);
+    } else {
+      // open TeleBirr confirmation modal
+      setPending(req);
+      setPayOpen(true);
+    }
   }
 
   function finalize(req:Req) {
@@ -450,9 +464,8 @@ export function ProviderHome() {
               <ScrollArea.Autosize mah={440} scrollbarSize={4}>
                 <Stack gap={12}>
                   {visible.map(req=>{
-                    const isFree=trials>0;
-                    const comm=req.price*commPct/100;
-                    const youGet=req.price-(isFree?0:comm);
+                    const isFree = trials>0;
+                    const commissionLabel = isFree ? 'FREE' : `${commPct}% platform fee`;
                     return (
                       <Paper key={req.id} p="md" radius="xl"
                         style={{background:'var(--ot-bg-card)',border:`2px solid ${COLORS.warning}55`,
@@ -479,38 +492,26 @@ export function ProviderHome() {
                             <Badge color="yellow" variant="light" size="xs" style={{flexShrink:0}}>New</Badge>
                           </Group>
                           <Group gap={14}>
-                            <Group gap={4}>
-                              <Box style={{width:18,height:18,borderRadius:6,background:`${catColor(req.catId)}20`,
-                                display:'flex',alignItems:'center',justifyContent:'center',color:catColor(req.catId),flexShrink:0}}>
-                                <IconTool size={11}/>
-                              </Box>
-                              <Text size="xs" fw={600} c={N}>{catName(req.catId)}</Text>
-                            </Group>
                             <Group gap={4}><IconMapPin size={11}/><Text size="xs" c="var(--ot-text-muted)">{req.dist} km</Text></Group>
                             <Group gap={4}><IconClock   size={11}/><Text size="xs" c="var(--ot-text-muted)">{ago(req.at)}</Text></Group>
                           </Group>
                           <Group gap={4} py={8} px={12} style={{background:'var(--ot-bg-row)',borderRadius:10}}>
                             <Box style={{flex:1,textAlign:'center'}}>
-                              <Text size="10px" c="var(--ot-text-muted)">Job</Text>
-                              <Text size="xs" fw={700}>{CURRENCY_SYMBOL} {req.price}</Text>
-                            </Box>
-                            <Box style={{flex:1,textAlign:'center'}}>
                               <Text size="10px" c="var(--ot-text-muted)">Commission</Text>
                               {isFree
-                                ?<Badge size="xs" color="teal" variant="light">FREE</Badge>
-                                :<Text size="xs" fw={700} c={COLORS.error}>-{CURRENCY_SYMBOL}{comm.toFixed(0)}</Text>}
-                            </Box>
-                            <Box style={{flex:1,textAlign:'center'}}>
-                              <Text size="10px" c="var(--ot-text-muted)">You get</Text>
-                              <Text size="xs" fw={800} c={COLORS.success}>{CURRENCY_SYMBOL} {youGet.toFixed(0)}</Text>
+                                ? <Badge size="xs" color="teal" variant="light">FREE</Badge>
+                                : <Text size="xs" fw={700} c={COLORS.error}>{commissionLabel}</Text>}
                             </Box>
                           </Group>
                           <Group gap={8}>
                             <Button flex={1} size="xs" radius="xl"
                               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-                              leftSection={<IconCheck size={13}/>}
-                              onClick={()=>accept(req)}>
-                              {isFree?'Accept (Free Trial)':'Accept & Pay'}
+                              leftSection={<IconCheck size={13}/>} 
+                              onClick={() => {
+                                try { accept(req); }
+                                catch(e){ notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
+                              }}>
+                              {isFree ? 'Accept (Free Trial)' : 'Accept & Pay'}
                             </Button>
                             <ActionIcon size="lg" radius="xl" variant="light" color="red"
                               onClick={()=>decline(req.id)}><IconX size={15}/></ActionIcon>
@@ -595,14 +596,42 @@ export function ProviderHome() {
       </Modal>
 
       {/* Chapa Modal */}
-      <ChapaModal
-        opened={chapaOpen} onClose={()=>setChapaOpen(false)}
-        onSuccess={()=>{setChapaOpen(false);if(pending)finalize(pending);}}
-        amount={pending?+(pending.price*commPct/100).toFixed(2):0}
-        description={pending?catName(pending.catId):''}
-        providerName={profile?.fullName??'Provider'}
-        jobId={pending?.id??'demo'}
-      />
+        {/* TeleBirr / payment confirmation modal (TeleBirr-only) */}
+        <Modal opened={payOpen} onClose={()=>{ if(!pending) setPayOpen(false); }} centered radius="xl" size="sm" withCloseButton={false}
+          styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
+          <Stack gap="md" p="lg" align="center">
+            <Box w={64} h={64} style={{borderRadius:'50%',background:`linear-gradient(135deg,${COLORS.warning},${T})`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <IconCurrencyDollar size={32} color="white"/>
+            </Box>
+            <Text fw={800} size="lg" c={N}>TeleBirr Payment</Text>
+            <Text size="sm" c="dimmed" ta="center">Confirm you have received TeleBirr payment from the client, or that the client will pay on arrival.</Text>
+            <Box style={{width:'100%'}}>
+              <PasswordInput placeholder="TeleBirr password" value={payPassword} onChange={(e)=>{setPayPassword(e.currentTarget.value); setPayError('');}} required />
+              {payError && <Text size="xs" c="red" mt={6}>{payError}</Text>}
+              <Group w="100%" mt="md">
+                <Button flex={1} size="md" radius="xl" color="teal" loading={payLoading} onClick={async ()=>{
+                  if (!pending) { notifications.show({title:'Error',message:'No pending request.',color:'red'}); return; }
+                  if (!payPassword || payPassword.trim().length < 4) { setPayError('Enter your TeleBirr password (min 4 chars)'); return; }
+                  try {
+                    setPayLoading(true);
+                    // simulate TeleBirr verification delay
+                    await new Promise(r=>setTimeout(r,1200));
+                    finalize(pending);
+                    setPayOpen(false);
+                    setPending(null);
+                    setPayPassword('');
+                    notifications.show({title:'Payment confirmed',message:'Client phone revealed.',color:'teal'});
+                  } catch(err) {
+                    console.error(err);
+                    setPayError('Unable to verify TeleBirr password.');
+                    notifications.show({title:'Payment error',message:'Unable to verify payment.',color:'red'});
+                  } finally { setPayLoading(false); }
+                }}>Confirm & Reveal</Button>
+                <Button flex={1} size="md" radius="xl" variant="light" color="gray" onClick={()=>{ setPayOpen(false); setPending(null); setPayPassword(''); setPayError(''); }}>Cancel</Button>
+              </Group>
+            </Box>
+          </Stack>
+        </Modal>
 
       {/* Reveal phone modal */}
       <Modal opened={revOpen} onClose={()=>setRevOpen(false)} centered radius="xl" size="sm"
