@@ -298,9 +298,9 @@ export function Landing() {
 
                 <Stack gap="sm">
                   {[
-                    { name:'Yohannes Teferi', service:'Engine Repair', rating:4.9, dist:'1.2 km', price:'ETB 500/hr', color:'#E74C3C' },
-                    { name:'Meron Tesfaye',   service:'Home Cleaning',  rating:4.8, dist:'0.8 km', price:'ETB 800 fixed', color:'#3498DB' },
-                    { name:'Tigist Mengesha', service:'Electrical Work', rating:4.7, dist:'2.1 km', price:'Estimate', color:'#F39C12' },
+                    { name:'Yohannes Teferi', service:'Engine Repair', rating:4.9, dist:'1.2 km', price:'ETB 400-600', color:'#E74C3C' },
+                      { name:'Meron Tesfaye',   service:'Home Cleaning',  rating:4.8, dist:'0.8 km', price:'ETB 700-900 ', color:'#3498DB' },
+                      { name:'Tigist Mengesha', service:'Electrical Work', rating:4.7, dist:'2.1 km', price:'ETB 800-2000', color:'#F39C12' },
                   ].map((p,i) => (
                     <Box key={i} p="sm" style={{ background:'#F8F9FA',borderRadius:12,border:'1px solid #E9ECEF' }}>
                       <Group justify="space-between" wrap="nowrap">
