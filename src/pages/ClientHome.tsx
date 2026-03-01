@@ -685,33 +685,66 @@ export function ClientHome() {
           </Stack>
         )}
 
-        {/* Found */}
+        {/* Found — provider list */}
         {aStage==='found'&&(
           <Stack gap="md" p={4}>
-            <Paper p="lg" radius="xl"
-              style={{background:`linear-gradient(135deg,${N}f0,${T}e0)`}}>
-              <Stack align="center" gap={8}>
-                <Badge size="lg" variant="filled" color="yellow"
-                  leftSection={<IconSparkles size={12}/>}>Provider Found!</Badge>
-                <Avatar size={60} radius="xl" color="teal" fw={800}
-                  style={{fontSize:24}}>{foundProv.name.charAt(0)}</Avatar>
-                <Text fw={900} size="lg" c="white">{foundProv.name}</Text>
-                <Group gap={16}>
-                  <Group gap={4}><IconStarFilled size={13} color={COLORS.warning}/><Text size="sm" fw={700} c="white">{foundProv.rating}</Text></Group>
-                  <Group gap={4}><IconMapPin size={13} color="rgba(255,255,255,.7)"/><Text size="sm" c="rgba(255,255,255,.85)">{foundProv.dist} km</Text></Group>
-                </Group>
-              </Stack>
-            </Paper>
-            <Paper p="md" radius="lg" style={{background:'var(--ot-bg-row)',border:'1px solid var(--ot-border)'}}>
-              <Group justify="space-between">
-                <Text size="sm" c="var(--ot-text-sub)">Estimated price</Text>
-                <Text size="lg" fw={800} c={N}>{CURRENCY_SYMBOL} {estPrice.min}–{estPrice.max}</Text>
-              </Group>
-            </Paper>
+            <Group gap={8} justify="space-between" align="center">
+              <Badge size="lg" variant="filled" color="yellow"
+                leftSection={<IconSparkles size={12}/>}>
+                {foundProviders.length} Nearby Providers Found
+              </Badge>
+              <Text size="xs" c="dimmed">Tap a card to select</Text>
+            </Group>
+            <Box style={{maxHeight:340,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
+              {foundProviders.map((prov)=>{
+                const active=selectedProv?.name===prov.name;
+                return(
+                  <Paper key={prov.name} p="md" radius="xl"
+                    onClick={()=>setSelectedProv(prov)}
+                    style={{cursor:'pointer',transition:'box-shadow .18s',
+                      border:active?'none':'1px solid var(--ot-border)',
+                      background:active?`linear-gradient(135deg,${N}f0,${T}dd)`:'var(--ot-bg-card)',
+                      boxShadow:active?`0 4px 20px ${N}44`:'none'}}>
+                    <Group justify="space-between" wrap="nowrap" align="flex-start">
+                      <Group gap={12} wrap="nowrap">
+                        <Avatar size={48} radius="xl" color="teal"
+                          style={{border:active?'2px solid rgba(255,255,255,.5)':'none'}}>
+                          {prov.avatar}
+                        </Avatar>
+                        <Stack gap={3}>
+                          <Text fw={800} size="sm" c={active?'white':N}>{prov.name}</Text>
+                          <Text size="xs" c={active?'rgba(255,255,255,.75)':'dimmed'}>{prov.specialty}</Text>
+                          <Group gap={8}>
+                            <Group gap={3}>
+                              <IconStarFilled size={11} color={COLORS.warning}/>
+                              <Text size="xs" fw={700} c={active?'white':'var(--ot-text-body)'}>{prov.rating}</Text>
+                            </Group>
+                            <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
+                            <Group gap={3}>
+                              <IconMapPin size={11} color={active?'rgba(255,255,255,.7)':T}/>
+                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
+                            </Group>
+                            <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
+                            <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                          </Group>
+                        </Stack>
+                      </Group>
+                      <Stack gap={4} align="flex-end" style={{flexShrink:0}}>
+                        <Text size="sm" fw={900} c={active?'white':N}>
+                          {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
+                        </Text>
+                        {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                      </Stack>
+                    </Group>
+                  </Paper>
+                );
+              })}
+            </Box>
             <Group gap={8}>
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-                onClick={confirmJob}>Confirm & Request</Button>
+                disabled={!selectedProv}
+                onClick={confirmJob}>Confirm &amp; Request</Button>
               <Button flex={1} size="md" radius="xl" variant="light" color="red"
                 onClick={cancelFromFound}>Decline</Button>
             </Group>
