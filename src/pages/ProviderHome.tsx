@@ -12,6 +12,7 @@ import {
   IconBell, IconBellFilled, IconMenu2, IconX, IconLogout,
   IconCheck, IconClock, IconMapPin, IconCircleFilled, IconGift,
   IconShieldCheck, IconCurrencyDollar, IconTool, IconPhoneCall, IconRadar, IconStar,
+  IconStarFilled, IconAlertCircle, IconWifiOff,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
@@ -56,21 +57,30 @@ const jitter = (): [number, number] =>
   [MAP_CTR[0] + (Math.random() - 0.5) * 0.04, MAP_CTR[1] + (Math.random() - 0.5) * 0.04];
 
 interface Req {
-  id: string; clientName: string; clientId: string;
+  id: string; clientName: string; clientId: string; clientRating: number; clientJobsDone: number;
   catId: string; desc: string; addr: string;
   price: number; dist: number; coords: [number, number]; at: string;
 }
 
+const CANCEL_REASONS = [
+  'Already on another job',
+  'Location is too far',
+  'Price does not match my rate',
+  'Service outside my expertise',
+  'Personal emergency',
+  'Other',
+];
+
 const DEMO: Req[] = [
-  { id:'r1', clientName:'Alex J.',  clientId:'client-001', catId:'cat-001',
+  { id:'r1', clientName:'Alex J.',  clientRating:4.7, clientJobsDone:12, clientId:'client-001', catId:'cat-001',
     desc:"Engine light on — car won't start reliably.",
     addr:'Bole Road, Addis Ababa', price:280, dist:1.4, coords:jitter(),
     at: new Date(Date.now()-3*60000).toISOString() },
-  { id:'r2', clientName:'Sara M.',  clientId:'client-002', catId:'cat-002',
+  { id:'r2', clientName:'Sara M.',  clientRating:4.9, clientJobsDone:7,  clientId:'client-002', catId:'cat-002',
     desc:'Deep-clean 3-bed flat before move-out.',
     addr:'Kazanchis, Addis Ababa', price:140, dist:2.1, coords:jitter(),
     at: new Date(Date.now()-8*60000).toISOString() },
-  { id:'r3', clientName:'Yared T.', clientId:'client-001', catId:'cat-003',
+  { id:'r3', clientName:'Yared T.', clientRating:4.5, clientJobsDone:31, clientId:'client-001', catId:'cat-003',
     desc:'Kitchen sink leaking beneath the cabinet.',
     addr:'Piazza, Addis Ababa', price:95, dist:3.2, coords:jitter(),
     at: new Date(Date.now()-14*60000).toISOString() },
@@ -137,6 +147,11 @@ export function ProviderHome() {
   const [revOpen,   setRevOpen]   = useState(false);
   const [revealed,  setRevealed]  = useState<{req:Req;phone:string}|null>(null);
 
+  // Cancel-reason modal
+  const [cancelTarget,  setCancelTarget]  = useState<Req|null>(null);
+  const [cancelReason,  setCancelReason]  = useState('');
+  const [cancelDone,    setCancelDone]    = useState(false);
+
   const tier     = profile?.loyaltyTier ?? 'rising_pro';
   const tierInfo = LOYALTY_CONFIG.providerTiers.find(t=>t.tier===tier);
   const commPct  = 10-(tierInfo?.commissionDiscount??0);
@@ -183,8 +198,21 @@ export function ProviderHome() {
   }
 
   function decline(id:string) {
-    setDismissed(s=>new Set([...s,id]));
-    notifications.show({title:'Request declined',message:'Passed to next provider.',color:'gray'});
+    const req = DEMO.find(r=>r.id===id) ?? null;
+    setCancelTarget(req);
+    setCancelReason('');
+    setCancelDone(false);
+  }
+  function submitCancel() {
+    if (!cancelReason || !cancelTarget) return;
+    setCancelDone(true);
+    setTimeout(() => {
+      setDismissed(s=>new Set([...s, cancelTarget.id]));
+      notifications.show({title:'Request declined', message:'Passed to next available provider.', color:'gray'});
+      setCancelTarget(null);
+      setCancelDone(false);
+      setCancelReason('');
+    }, 1800);
   }
 
   /* ── RENDER ─────────────────────────────────────────────────────────────── */
@@ -432,21 +460,32 @@ export function ProviderHome() {
                         <Box style={{position:'absolute',top:0,left:0,width:4,height:'100%',
                           background:COLORS.warning,borderRadius:'4px 0 0 4px'}}/>
                         <Stack gap={10} pl={8}>
-                          <Group justify="space-between" wrap="nowrap">
-                            <Group gap={10} wrap="nowrap">
-                              <Box style={{width:42,height:42,borderRadius:12,flexShrink:0,
-                                background:`${catColor(req.catId)}20`,display:'flex',
-                                alignItems:'center',justifyContent:'center',color:catColor(req.catId)}}>
-                                <IconTool size={20}/>
-                              </Box>
-                              <Box>
-                                <Text size="sm" fw={700}>{catName(req.catId)}</Text>
-                                <Text size="xs" c="var(--ot-text-sub)" lineClamp={1}>{req.desc}</Text>
-                              </Box>
-                            </Group>
-                            <Badge color="yellow" variant="light" size="xs">New</Badge>
+                          {/* Client info row */}
+                          <Group gap={10} wrap="nowrap">
+                            <Avatar size={36} radius="xl" color="teal" style={{flexShrink:0}}>
+                              {req.clientName.charAt(0)}
+                            </Avatar>
+                            <Box style={{flex:1,minWidth:0}}>
+                              <Group gap={6}>
+                                <Text size="sm" fw={700} c={N}>{req.clientName}</Text>
+                                <Group gap={3}>
+                                  <IconStarFilled size={11} color={COLORS.warning}/>
+                                  <Text size="xs" fw={700}>{req.clientRating}</Text>
+                                </Group>
+                                <Text size="xs" c="dimmed">· {req.clientJobsDone} jobs</Text>
+                              </Group>
+                              <Text size="xs" c="var(--ot-text-sub)" lineClamp={1}>{req.desc}</Text>
+                            </Box>
+                            <Badge color="yellow" variant="light" size="xs" style={{flexShrink:0}}>New</Badge>
                           </Group>
                           <Group gap={14}>
+                            <Group gap={4}>
+                              <Box style={{width:18,height:18,borderRadius:6,background:`${catColor(req.catId)}20`,
+                                display:'flex',alignItems:'center',justifyContent:'center',color:catColor(req.catId),flexShrink:0}}>
+                                <IconTool size={11}/>
+                              </Box>
+                              <Text size="xs" fw={600} c={N}>{catName(req.catId)}</Text>
+                            </Group>
                             <Group gap={4}><IconMapPin size={11}/><Text size="xs" c="var(--ot-text-muted)">{req.dist} km</Text></Group>
                             <Group gap={4}><IconClock   size={11}/><Text size="xs" c="var(--ot-text-muted)">{ago(req.at)}</Text></Group>
                           </Group>
@@ -486,6 +525,74 @@ export function ProviderHome() {
           </Box>
         </SimpleGrid>
       </Box>
+
+      {/* Cancel reason modal */}
+      <Modal opened={!!cancelTarget} onClose={()=>{if(!cancelDone)setCancelTarget(null);}}
+        centered radius="xl" size="sm" withCloseButton={false}
+        styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
+        <Stack gap="md" p="md">
+          {!cancelDone ? (
+            <>
+              <Group justify="space-between">
+                <Text fw={800} size="md" c={N}>Why are you declining?</Text>
+                <ActionIcon variant="subtle" onClick={()=>setCancelTarget(null)}><IconX size={18}/></ActionIcon>
+              </Group>
+              {cancelTarget&&(
+                <Group gap={8} p="sm"
+                  style={{background:`${N}08`,borderRadius:12,border:`1px solid ${N}18`}}>
+                  <Avatar size={32} radius="xl" color="teal">{cancelTarget.clientName.charAt(0)}</Avatar>
+                  <Box>
+                    <Text size="xs" fw={700} c={N}>{cancelTarget.clientName}</Text>
+                    <Text size="xs" c="dimmed">{catName(cancelTarget.catId)} · {cancelTarget.dist} km</Text>
+                  </Box>
+                </Group>
+              )}
+              <Text size="xs" c="dimmed">Select a reason — this helps us improve job matching.</Text>
+              <Stack gap={8}>
+                {CANCEL_REASONS.map(r=>(
+                  <Button key={r} size="sm" radius="xl" fullWidth
+                    variant={cancelReason===r?'filled':'light'}
+                    color={cancelReason===r?'red':'gray'}
+                    styles={{root:{justifyContent:'flex-start',paddingLeft:20,fontWeight:600}}}
+                    onClick={()=>setCancelReason(r)}>{r}</Button>
+                ))}
+              </Stack>
+              {/* Offline nudge */}
+              <Paper p="sm" radius="lg"
+                style={{background:`${COLORS.warning}18`,border:`1px solid ${COLORS.warning}44`}}>
+                <Group gap={8}>
+                  <IconAlertCircle size={16} color={COLORS.warning}/>
+                  <Text size="xs" c="dimmed" style={{flex:1}}>
+                    Not available? Switch to
+                    <Text span fw={700} c={N}> Offline</Text> so clients won’t send requests.
+                  </Text>
+                </Group>
+                <Group gap={8} mt={10} align="center">
+                  <IconWifiOff size={14} color={COLORS.warning}/>
+                  <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
+                  <Switch size="xs" color="orange"
+                    onChange={e=>{if(e.currentTarget.checked){toggle(false);notifications.show({title:'You are now Offline',message:'No new requests will reach you.',color:'orange'});}}} />
+                </Group>
+              </Paper>
+              <Button size="md" radius="xl" color="red" disabled={!cancelReason} onClick={submitCancel}>
+                Submit &amp; Decline
+              </Button>
+            </>
+          ):(
+            <Stack align="center" gap="md" py={12}>
+              <Box w={64} h={64} style={{borderRadius:'50%',
+                background:`linear-gradient(135deg,${COLORS.warning},#ff6b35)`,
+                display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <IconCheck size={32} color="white"/>
+              </Box>
+              <Text fw={800} size="lg" c={N}>Decline recorded</Text>
+              <Text size="sm" c="dimmed" ta="center">
+                We’ve noted your reason. Consider going Offline if you’re unavailable.
+              </Text>
+            </Stack>
+          )}
+        </Stack>
+      </Modal>
 
       {/* Chapa Modal */}
       <ChapaModal

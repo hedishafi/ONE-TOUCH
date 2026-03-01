@@ -10,8 +10,10 @@ import {
   IconCheck, IconClock, IconMapPin, IconPhoto, IconUpload,
   IconEdit, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
   IconBolt, IconShieldCheck, IconPhone, IconCircleFilled,
-  IconBell, IconCurrencyDollar,
+  IconBell, IconCurrencyDollar, IconX, IconAlertCircle,
+  IconLock, IconLockOpen, IconWifi, IconWifiOff, IconStarFilled,
 } from '@tabler/icons-react';
+import { Modal } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -35,55 +37,330 @@ const PROVIDER_NAV: NavItem[] = [
   { path: ROUTES.providerLoyalty, label: 'Loyalty & Tier', icon: <IconStar size={18} /> },
 ];
 
+// ─── MOCK incoming job request (replace with real data source as needed) ─────
+const MOCK_JOB_REQUEST = {
+  clientName:    'Selam A.',
+  clientRating:  4.7,
+  clientJobs:    12,
+  service:       'Home Cleaning',
+  description:   'Deep clean of a 3-bedroom apartment — kitchen & bathrooms included.',
+  location:      'Bole, Addis Ababa',
+  distance:      2.4,   // km
+  priceMin:      180,
+  priceMax:      280,
+  phone:         '+251911234567',
+};
+
+const CANCEL_REASONS = [
+  'Already on another job',
+  'Location is too far',
+  'Price does not match my rate',
+  'Service outside my expertise',
+  'Personal emergency',
+  'Other',
+];
+
 // ─── ACTIVE JOBS ─────────────────────────────────────────────────────────────
 export function ActiveJobs() {
   const { t } = useTranslation();
   const { currentUser } = useAuthStore();
   const { jobs } = useJobStore();
-  const [hasIncoming, setHasIncoming] = useState(true);
+
+  // Job request card state
+  const [reqState, setReqState] = useState<'idle'|'pending'|'dismissed'>('pending');
+
+  // TeleBirr payment modal
+  const [payOpen,   setPayOpen]   = useState(false);
+  const [paying,    setPaying]    = useState(false);
+  const [phoneVisible, setPhoneVisible] = useState(false);
+
+  // Cancel reason modal
+  const [cancelOpen,    setCancelOpen]    = useState(false);
+  const [cancelReason,  setCancelReason]  = useState('');
+  const [cancelDone,    setCancelDone]    = useState(false);
 
   const myJobs = jobs.filter(j => j.providerId === currentUser?.id);
   const grouped: Record<string, typeof myJobs> = {
     pending_agreement: myJobs.filter(j => j.status === 'pending_agreement'),
-    in_progress: myJobs.filter(j => j.status === 'in_progress'),
-    active: myJobs.filter(j => j.status === 'active'),
-    completed: myJobs.filter(j => j.status === 'completed'),
+    in_progress:       myJobs.filter(j => j.status === 'in_progress'),
+    active:            myJobs.filter(j => j.status === 'active'),
+    completed:         myJobs.filter(j => j.status === 'completed'),
   };
+
+  function handleConfirm() {
+    setPayOpen(true);
+  }
+  function handlePay() {
+    setPaying(true);
+    setTimeout(() => {
+      setPaying(false);
+      setPhoneVisible(true);
+      notifications.show({ title: 'Payment verified!', message: 'Client phone number is now visible.', color: 'teal' });
+    }, 2200);
+  }
+  function handleCancelSubmit() {
+    if (!cancelReason) return;
+    setCancelDone(true);
+    setTimeout(() => {
+      setCancelOpen(false);
+      setTimeout(() => {
+        setCancelDone(false);
+        setCancelReason('');
+        setReqState('dismissed');
+      }, 300);
+    }, 2000);
+  }
+
+  const N = COLORS.navyBlue;
+  const T = COLORS.tealBlue;
 
   return (
     <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.my_jobs')}>
       <Stack gap="md">
-        {/* Incoming call banner */}
-        {hasIncoming && (
-          <Paper
-            p="md"
-            radius="xl"
-            style={{
-              background: `linear-gradient(135deg, ${COLORS.tealBlue} 0%, ${COLORS.tealDark} 100%)`,
-              animation: 'pulse 2s infinite',
-            }}
-          >
-            <Group justify="space-between">
-              <Group gap="md">
-                <ThemeIcon size={48} radius="xl" color="white" variant="filled" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                  <IconPhone size={24} color={COLORS.tealBlue} />
-                </ThemeIcon>
-                <Stack gap={2}>
-                  <Text fw={700} c="white">Incoming Call from Alex J.</Text>
-                  <Text size="sm" c="rgba(255,255,255,0.8)">House Cleaning · 3.2 km away · $80/session</Text>
-                </Stack>
+
+        {/* ── NEW JOB REQUEST CARD ──────────────────────────────────────── */}
+        {reqState === 'pending' && (
+          <Paper p="lg" radius="xl"
+            style={{ border: `2px solid ${T}55`, background: 'var(--ot-bg-card)',
+              boxShadow: `0 4px 24px ${N}18` }}>
+
+            {/* Header */}
+            <Group justify="space-between" mb="md">
+              <Group gap={8}>
+                <Box style={{ width: 10, height: 10, borderRadius: '50%',
+                  background: COLORS.success, boxShadow: `0 0 0 3px ${COLORS.success}44`,
+                  animation: 'pulse 1.6s ease-in-out infinite' }}/>
+                <Text size="xs" fw={700} c={T}>New Job Request</Text>
               </Group>
-              <Group>
-                <Button variant="white" color="red" size="sm" radius="xl" onClick={() => setHasIncoming(false)}>
-                  Decline
-                </Button>
-                <Button color="yellow" size="sm" radius="xl" onClick={() => { setHasIncoming(false); notifications.show({ title: 'Call Accepted!', message: 'Job session started', color: 'teal' }); }}>
-                  Accept
-                </Button>
+              <Badge size="sm" color="teal" variant="light">{MOCK_JOB_REQUEST.service}</Badge>
+            </Group>
+
+            {/* Client info */}
+            <Group gap={14} mb="md" align="flex-start">
+              <Avatar size={52} radius="xl" color="teal" fw={800}>
+                {MOCK_JOB_REQUEST.clientName.charAt(0)}
+              </Avatar>
+              <Stack gap={4} style={{ flex: 1 }}>
+                <Group gap={8}>
+                  <Text fw={800} size="md" c={N}>{MOCK_JOB_REQUEST.clientName}</Text>
+                  <Group gap={3}>
+                    <IconStarFilled size={12} color={COLORS.warning}/>
+                    <Text size="xs" fw={700}>{MOCK_JOB_REQUEST.clientRating}</Text>
+                  </Group>
+                  <Text size="xs" c="dimmed">· {MOCK_JOB_REQUEST.clientJobs} jobs done</Text>
+                </Group>
+                <Text size="sm" c="dimmed" lineClamp={2}>{MOCK_JOB_REQUEST.description}</Text>
+              </Stack>
+            </Group>
+
+            {/* Location + Distance + Price */}
+            <Paper p="sm" radius="lg" mb="md"
+              style={{ background: `${N}08`, border: `1px solid ${N}18` }}>
+              <Group justify="space-between" wrap="nowrap">
+                <Group gap={6}>
+                  <IconMapPin size={14} color={T}/>
+                  <Text size="sm" fw={600} c={N}>{MOCK_JOB_REQUEST.location}</Text>
+                </Group>
+                <Badge size="sm" color="blue" variant="light">
+                  {MOCK_JOB_REQUEST.distance} km away
+                </Badge>
               </Group>
+              <Group justify="space-between" mt={8}>
+                <Text size="xs" c="dimmed">Estimated pay</Text>
+                <Text size="sm" fw={800} c={N}>
+                  ETB {MOCK_JOB_REQUEST.priceMin}–{MOCK_JOB_REQUEST.priceMax}
+                </Text>
+              </Group>
+            </Paper>
+
+            {/* Client phone — hidden until payment */}
+            <Paper p="sm" radius="lg" mb="lg"
+              style={{ background: phoneVisible ? `${T}12` : `${N}06`,
+                border: `1px solid ${phoneVisible ? T : N}22`,
+                display: 'flex', alignItems: 'center', gap: 10 }}>
+              {phoneVisible
+                ? <><IconLockOpen size={16} color={T}/>
+                    <Text size="sm" fw={700} c={N}>{MOCK_JOB_REQUEST.phone}</Text>
+                    <Badge size="xs" color="teal" variant="light" ml="auto">Visible</Badge>
+                  </>
+                : <><IconLock size={16} color="gray"/>
+                    <Text size="sm" c="dimmed">Client phone hidden · Confirm &amp; pay to reveal</Text>
+                  </>
+              }
+            </Paper>
+
+            {/* Action buttons */}
+            <Group gap={10}>
+              <Button flex={1} size="md" radius="xl"
+                style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
+                leftSection={<IconCheck size={16}/>}
+                onClick={handleConfirm}>
+                Confirm
+              </Button>
+              <Button flex={1} size="md" radius="xl" variant="light" color="red"
+                leftSection={<IconX size={16}/>}
+                onClick={() => setCancelOpen(true)}>
+                Cancel
+              </Button>
             </Group>
           </Paper>
         )}
+
+        {/* ── TELEBIRR PAYMENT MODAL ──────────────────────────────────── */}
+        <Modal opened={payOpen} onClose={() => { if (!paying) setPayOpen(false); }}
+          centered radius="xl" size="sm" withCloseButton={false}
+          styles={{ content: { background: 'var(--ot-bg-card)' }, header: { display: 'none' } }}>
+          <Stack gap="lg" p="md">
+            {/* Header */}
+            <Group justify="space-between">
+              <Group gap={10}>
+                <Box w={40} h={40} style={{ borderRadius: 12,
+                  background: `linear-gradient(135deg,${N},${T})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text fw={900} size="xs" c="white">TB</Text>
+                </Box>
+                <Box>
+                  <Text fw={800} size="sm" c={N}>TeleBirr Payment</Text>
+                  <Text size="10px" c="dimmed">Secure mobile payment</Text>
+                </Box>
+              </Group>
+              {!paying && !phoneVisible &&
+                <ActionIcon variant="subtle" onClick={() => setPayOpen(false)}>
+                  <IconX size={18}/>
+                </ActionIcon>
+              }
+            </Group>
+
+            {!phoneVisible ? (
+              <>
+                {/* Amount summary */}
+                <Paper p="md" radius="lg"
+                  style={{ background: `${T}10`, border: `1px solid ${T}33` }}>
+                  <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Service fee</Text>
+                    <Text fw={800} size="lg" c={N}>
+                      ETB {MOCK_JOB_REQUEST.priceMin}
+                    </Text>
+                  </Group>
+                  <Text size="xs" c="dimmed" mt={4}>
+                    Paying confirms your commitment. The client's phone will be revealed instantly.
+                  </Text>
+                </Paper>
+
+                {/* TeleBirr branding */}
+                <Stack align="center" gap={6}>
+                  <Box w={64} h={64} style={{ borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#E6007A,#FF6B35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text fw={900} size="sm" c="white">TB</Text>
+                  </Box>
+                  <Text size="xs" c="dimmed" ta="center">
+                    You will be charged ETB {MOCK_JOB_REQUEST.priceMin} via your TeleBirr account
+                  </Text>
+                </Stack>
+
+                <Button size="md" radius="xl" loading={paying}
+                  style={{ background: 'linear-gradient(135deg,#E6007A,#FF6B35)', border: 'none' }}
+                  onClick={handlePay}>
+                  Pay with TeleBirr
+                </Button>
+              </>
+            ) : (
+              /* Payment success + phone reveal */
+              <Stack align="center" gap="md" py={8}>
+                <Box w={72} h={72} style={{ borderRadius: '50%',
+                  background: `linear-gradient(135deg,${COLORS.success},${T})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconCheck size={36} color="white"/>
+                </Box>
+                <Text fw={800} size="lg" c={N}>Payment Confirmed!</Text>
+                <Paper p="md" radius="lg" w="100%"
+                  style={{ background: `${T}12`, border: `1px solid ${T}44`, textAlign: 'center' }}>
+                  <Text size="xs" c="dimmed" mb={4}>Client's Phone Number</Text>
+                  <Group gap={8} justify="center">
+                    <IconPhone size={18} color={T}/>
+                    <Text fw={800} size="lg" c={N}>{MOCK_JOB_REQUEST.phone}</Text>
+                  </Group>
+                </Paper>
+                <Button size="md" radius="xl" fullWidth
+                  style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
+                  onClick={() => { setPayOpen(false); setReqState('dismissed'); }}>
+                  Start Job
+                </Button>
+              </Stack>
+            )}
+          </Stack>
+        </Modal>
+
+        {/* ── CANCEL REASON MODAL ─────────────────────────────────────── */}
+        <Modal opened={cancelOpen} onClose={() => { if (!cancelDone) setCancelOpen(false); }}
+          centered radius="xl" size="sm" withCloseButton={false}
+          styles={{ content: { background: 'var(--ot-bg-card)' }, header: { display: 'none' } }}>
+          <Stack gap="md" p="md">
+            {!cancelDone ? (
+              <>
+                <Group justify="space-between">
+                  <Text fw={800} size="md" c={N}>Why are you cancelling?</Text>
+                  <ActionIcon variant="subtle" onClick={() => setCancelOpen(false)}>
+                    <IconX size={18}/>
+                  </ActionIcon>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Select a reason — this helps us improve job matching.
+                </Text>
+                <Stack gap={8}>
+                  {CANCEL_REASONS.map(r => (
+                    <Button key={r} size="sm" radius="xl" fullWidth
+                      variant={cancelReason === r ? 'filled' : 'light'}
+                      color={cancelReason === r ? 'red' : 'gray'}
+                      styles={{ root: { justifyContent: 'flex-start', paddingLeft: 20, fontWeight: 600 } }}
+                      onClick={() => setCancelReason(r)}>
+                      {r}
+                    </Button>
+                  ))}
+                </Stack>
+
+                {/* Offline nudge */}
+                <Paper p="sm" radius="lg"
+                  style={{ background: `${COLORS.warning}18`, border: `1px solid ${COLORS.warning}44` }}>
+                  <Group gap={8}>
+                    <IconAlertCircle size={16} color={COLORS.warning}/>
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      If you're not available, consider switching to
+                      <Text span fw={700} c={N}> Offline</Text> so clients don't send requests.
+                    </Text>
+                  </Group>
+                  <Group gap={8} mt={10}>
+                    <IconWifiOff size={14} color={COLORS.warning}/>
+                    <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
+                    <Switch size="xs" color="orange"
+                      onChange={e => {
+                        if (e.currentTarget.checked)
+                          notifications.show({ title: 'You are now Offline', message: 'No new requests will be sent your way.', color: 'orange' });
+                      }}/>
+                  </Group>
+                </Paper>
+
+                <Button size="md" radius="xl" color="red" disabled={!cancelReason}
+                  onClick={handleCancelSubmit}>
+                  Submit Cancellation
+                </Button>
+              </>
+            ) : (
+              <Stack align="center" gap="md" py={12}>
+                <Box w={64} h={64} style={{ borderRadius: '50%',
+                  background: `linear-gradient(135deg,${COLORS.warning},#ff6b35)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconCheck size={32} color="white"/>
+                </Box>
+                <Text fw={800} size="lg" c={N}>Cancellation recorded</Text>
+                <Text size="sm" c="dimmed" ta="center">
+                  We've noted your reason. Consider going Offline if you're unavailable for a while.
+                </Text>
+              </Stack>
+            )}
+          </Stack>
+        </Modal>
 
         {myJobs.length === 0 ? (
           <Center py={60}>
