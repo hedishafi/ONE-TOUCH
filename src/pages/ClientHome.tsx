@@ -348,11 +348,18 @@ export function ClientHome() {
               </Group>
             </Group>
             <Group gap={10}>
-              <Box px={12} py={5} visibleFrom="sm"
-                style={{borderRadius:20,background:`${T}15`,border:`1px solid ${T}40`}}>
-                <Text size="xs" fw={600} c={T}>
-                  Hi, {clientProfile?.fullName?.split(' ')[0]??'there'} 👋
-                </Text>
+              {/* AI Call button */}
+              <Box
+                role="button" aria-label="Call In-App AI" tabIndex={0}
+                onClick={()=>startCall('AI Assistant')}
+                onKeyDown={e=>e.key==='Enter'&&startCall('AI Assistant')}
+                style={{display:'flex',alignItems:'center',gap:6,
+                  padding:'7px 13px',borderRadius:20,flexShrink:0,cursor:'pointer',
+                  background:`linear-gradient(135deg,${T},${N})`,
+                  color:'white',fontWeight:700,fontSize:13,
+                  boxShadow:`0 2px 10px ${T}55`,minHeight:44}}>
+                <IconMicrophone size={15} color="white"/>
+                <Text size="xs" fw={800} c="white" visibleFrom="xs">AI Call</Text>
               </Box>
               {/* Call Center button */}
               <Box
@@ -529,21 +536,7 @@ export function ClientHome() {
               })}
             </Stack>
           </Box>
-        ):(
-          <Paper p="xl" radius="xl"
-            style={{background:'var(--ot-bg-card)',border:'2px dashed var(--ot-border)',textAlign:'center'}}>
-            <Stack align="center" gap={12}>
-              <Text style={{fontSize:44}}>🛠️</Text>
-              <Text fw={700} size="md" c={N}>No requests yet</Text>
-              <Text size="sm" c="var(--ot-text-sub)">Tap "Chat in App" or choose a category above.</Text>
-              <Button size="sm" radius="xl"
-                style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-                leftSection={<IconPhoneCall size={15}/>} onClick={startAssist}>
-                Call AI Assistant
-              </Button>
-            </Stack>
-          </Paper>
-        )}
+        ):null}
       </Box>
 
       {/* ══ VOICE ASSISTANT MODAL ══════════════════════════════════════════════ */}
