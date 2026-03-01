@@ -80,11 +80,33 @@ function followupFor(desc: string): string {
 type AStage = 'idle'|'dialing'|'connected'|'listening'|'followup'|'searching'|'found'|'confirmed';
 type CStage = 'idle'|'dialing'|'connected'|'listening'|'processing'|'done';
 
-const FAKE_PROVIDERS = [
-  {name:'Abebe T.', rating:4.9, dist:1.2},
-  {name:'Sara M.',  rating:4.8, dist:1.7},
-  {name:'Dawit K.', rating:4.7, dist:2.0},
+type Provider = {
+  name:string; rating:number; dist:number;
+  priceMin:number; priceMax:number; yearsExp:number;
+  specialty:string; avatar:string;
+};
+
+const PROVIDER_POOL: Provider[] = [
+  {name:'Abebe T.',   rating:4.9, dist:1.2, priceMin:120, priceMax:280, yearsExp:7,  specialty:'Plumbing & Repairs',    avatar:'A'},
+  {name:'Sara M.',    rating:4.8, dist:1.7, priceMin:100, priceMax:250, yearsExp:5,  specialty:'Cleaning & Organizing', avatar:'S'},
+  {name:'Dawit K.',   rating:4.7, dist:2.0, priceMin:150, priceMax:320, yearsExp:9,  specialty:'Electrical Work',       avatar:'D'},
+  {name:'Tigist A.',  rating:4.9, dist:0.9, priceMin:90,  priceMax:200, yearsExp:4,  specialty:'Beauty & Wellness',     avatar:'T'},
+  {name:'Yared T.',   rating:4.6, dist:2.3, priceMin:110, priceMax:240, yearsExp:6,  specialty:'Moving & Delivery',     avatar:'Y'},
+  {name:'Hana B.',    rating:4.8, dist:1.4, priceMin:130, priceMax:300, yearsExp:8,  specialty:'Home Maintenance',      avatar:'H'},
+  {name:'Bereket G.', rating:4.7, dist:1.8, priceMin:80,  priceMax:180, yearsExp:3,  specialty:'Car Services',          avatar:'B'},
+  {name:'Meron S.',   rating:4.9, dist:1.1, priceMin:140, priceMax:260, yearsExp:10, specialty:'Tutoring & Education',  avatar:'M'},
 ];
+
+/** Return 4 nearby providers, sorted by distance, randomised each call. */
+function getNearbyProviders(): Provider[] {
+  return [...PROVIDER_POOL]
+    .sort(()=>Math.random()-0.5)
+    .slice(0,4)
+    .sort((a,b)=>a.dist-b.dist);
+}
+
+// keep a single alias so legacy references still compile
+const FAKE_PROVIDERS = PROVIDER_POOL;
 
 const DECLINE_REASONS = [
   'Not available right now',
@@ -128,7 +150,9 @@ export function ClientHome() {
   const [desc,setDesc]=useState('');
   const [fQ,setFQ]=useState('');
   const [fA,setFA]=useState('');
-  const [foundProv,setFoundProv]=useState(FAKE_PROVIDERS[0]);
+  const [foundProv,setFoundProv]=useState<Provider>(PROVIDER_POOL[0]);
+  const [foundProviders,setFoundProviders]=useState<Provider[]>([]);
+  const [selectedProv,setSelectedProv]=useState<Provider|null>(null);
   const [estPrice,setEstPrice]=useState({min:120,max:280});
   const aTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
@@ -136,6 +160,8 @@ export function ClientHome() {
   const [cStage,setCStage]=useState<CStage>('idle');
   const [cCat,setCCat]=useState('');
   const [cPrice,setCPrice]=useState({min:80,max:200});
+  const [cProviders,setCProviders]=useState<Provider[]>([]);
+  const [cSelectedProv,setCSelectedProv]=useState<Provider|null>(null);
   const cTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   // Service-choice picker
@@ -177,18 +203,22 @@ export function ClientHome() {
   function submitFollowup(){
     if(!fA.trim())return;
     setAStage('searching');
-    const min=80+Math.floor(Math.random()*120);
-    setEstPrice({min,max:min+130});
     aTimer.current=setTimeout(()=>{
-      setFoundProv(FAKE_PROVIDERS[Math.floor(Math.random()*FAKE_PROVIDERS.length)]);
+      const providers=getNearbyProviders();
+      setFoundProviders(providers);
+      setFoundProv(providers[0]);
+      setSelectedProv(null);
+      setEstPrice({min:providers[0].priceMin,max:providers[0].priceMax});
       setAStage('found');
     },3500);
   }
   function confirmJob(){
     if(!currentUser)return;
+    const prov=selectedProv??foundProviders[0]??foundProv;
+    setFoundProv(prov);
     const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
     createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
-      subcategoryId:'sub-001',description:desc,estimatedPrice:estPrice.min,
+      subcategoryId:'sub-001',description:desc,estimatedPrice:prov.priceMin,
       status:'pending_agreement',commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
       createdAt:new Date().toISOString()} as any);
@@ -225,17 +255,19 @@ export function ClientHome() {
   function startCall(catName:string){
     setCCat(catName);const min=80+Math.floor(Math.random()*80);setCPrice({min,max:min+100});
     setCOpen(true);setCStage('dialing');
+    setCSelectedProv(null);
     cTimer.current=setTimeout(()=>setCStage('connected'),1800);
     setTimeout(()=>setCStage('listening'),3200);
     setTimeout(()=>setCStage('processing'),8000);
-    setTimeout(()=>setCStage('done'),10200);
+    setTimeout(()=>{setCProviders(getNearbyProviders());setCStage('done');},10200);
   }
   function confirmCall(){
     if(!currentUser)return;
+    const prov=cSelectedProv??cProviders[0]??PROVIDER_POOL[0];
     const cat=MOCK_CATEGORIES.find(c=>c.name===cCat);
     createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
       subcategoryId:'sub-001',description:`${cCat} service request`,
-      estimatedPrice:cPrice.min,status:'pending_agreement',commissionRate:10,
+      estimatedPrice:prov.priceMin,status:'pending_agreement',commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location'},
       createdAt:new Date().toISOString()} as any);
     closeCall();
@@ -779,22 +811,62 @@ export function ClientHome() {
 
           {cStage==='done'&&(
             <Stack gap="md">
-              <Paper p="lg" radius="xl"
-                style={{background:`linear-gradient(135deg,${N}f0,${T}dd)`}}>
-                <Stack align="center" gap={8}>
-                  <Badge size="lg" color="yellow" variant="filled"
-                    leftSection={<IconCheck size={11}/>}>Provider Ready!</Badge>
-                  <Text fw={900} size="xl" c="white">{FAKE_PROVIDERS[0].name}</Text>
-                  <Group gap={16}>
-                    <Group gap={4}><IconStarFilled size={13} color={COLORS.warning}/><Text size="sm" fw={700} c="white">{FAKE_PROVIDERS[0].rating}</Text></Group>
-                    <Group gap={4}><IconMapPin size={13} color="rgba(255,255,255,.7)"/><Text size="sm" c="rgba(255,255,255,.85)">{FAKE_PROVIDERS[0].dist} km</Text></Group>
-                  </Group>
-                  <Text size="xl" fw={800} c="white">{CURRENCY_SYMBOL} {cPrice.min}–{cPrice.max}</Text>
-                </Stack>
-              </Paper>
+              <Group gap={8} justify="space-between" align="center">
+                <Badge size="lg" color="yellow" variant="filled"
+                  leftSection={<IconCheck size={11}/>}>
+                  {cProviders.length} Providers Ready!
+                </Badge>
+                <Text size="xs" c="dimmed">Tap a card to select</Text>
+              </Group>
+              <Box style={{maxHeight:320,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
+                {cProviders.map((prov)=>{
+                  const active=cSelectedProv?.name===prov.name;
+                  return(
+                    <Paper key={prov.name} p="md" radius="xl"
+                      onClick={()=>setCSelectedProv(prov)}
+                      style={{cursor:'pointer',transition:'box-shadow .18s',
+                        border:active?'none':'1px solid var(--ot-border)',
+                        background:active?`linear-gradient(135deg,${N}f0,${T}dd)`:'var(--ot-bg-card)',
+                        boxShadow:active?`0 4px 20px ${N}44`:'none'}}>
+                      <Group justify="space-between" wrap="nowrap" align="flex-start">
+                        <Group gap={12} wrap="nowrap">
+                          <Avatar size={48} radius="xl" color="teal"
+                            style={{border:active?'2px solid rgba(255,255,255,.5)':'none'}}>
+                            {prov.avatar}
+                          </Avatar>
+                          <Stack gap={3}>
+                            <Text fw={800} size="sm" c={active?'white':N}>{prov.name}</Text>
+                            <Text size="xs" c={active?'rgba(255,255,255,.75)':'dimmed'}>{prov.specialty}</Text>
+                            <Group gap={8}>
+                              <Group gap={3}>
+                                <IconStarFilled size={11} color={COLORS.warning}/>
+                                <Text size="xs" fw={700} c={active?'white':'var(--ot-text-body)'}>{prov.rating}</Text>
+                              </Group>
+                              <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
+                              <Group gap={3}>
+                                <IconMapPin size={11} color={active?'rgba(255,255,255,.7)':T}/>
+                                <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
+                              </Group>
+                              <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
+                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                            </Group>
+                          </Stack>
+                        </Group>
+                        <Stack gap={4} align="flex-end" style={{flexShrink:0}}>
+                          <Text size="sm" fw={900} c={active?'white':N}>
+                            {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
+                          </Text>
+                          {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                        </Stack>
+                      </Group>
+                    </Paper>
+                  );
+                })}
+              </Box>
               <Group gap={8}>
                 <Button flex={1} size="md" radius="xl"
                   style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
+                  disabled={!cSelectedProv}
                   onClick={confirmCall}>Confirm</Button>
                 <Button flex={1} size="md" radius="xl" variant="light" color="red"
                   onClick={cancelFromCall}>Decline</Button>
