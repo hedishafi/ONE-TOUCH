@@ -1,6 +1,6 @@
 /**
  * ClientHome.tsx — Client dashboard
- * Request Service · Only Call in App (AI voice assistant with 7 stages)
+ * Request Service · Chat in app (AI voice assistant with 7 stages)
  */
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
+  IconMessage,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
 import L from 'leaflet';
@@ -426,14 +427,14 @@ export function ClientHome() {
                   <IconPhoneCall size={22} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>Only Call in App</Text>
+                  <Text fw={800} size="sm" c={N}>Chat in App</Text>
                   <Text size="xs" c="dimmed">AI finds &amp; connects you to the right pro</Text>
                 </Box>
               </Group>
               <Button size="sm" radius="xl" onClick={startAssist}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
-                leftSection={<IconPhoneCall size={14}/>}>
-                Call Now
+                leftSection={<IconMessage size={14}/>}>
+                Chat Now
               </Button>
             </Group>
           </Paper>
@@ -506,7 +507,7 @@ export function ClientHome() {
             <Stack align="center" gap={12}>
               <Text style={{fontSize:44}}>🛠️</Text>
               <Text fw={700} size="md" c={N}>No requests yet</Text>
-              <Text size="sm" c="var(--ot-text-sub)">Tap "Only Call in App" or choose a category above.</Text>
+              <Text size="sm" c="var(--ot-text-sub)">Tap "Chat in App" or choose a category above.</Text>
               <Button size="sm" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 leftSection={<IconPhoneCall size={15}/>} onClick={startAssist}>
