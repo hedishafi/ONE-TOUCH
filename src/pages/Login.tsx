@@ -328,7 +328,6 @@ export default function Login() {
           color="gray"
           size="sm"
           leftSection={<IconShieldCheck size={14} />}
-          onClick={() => quickLogin('admin-001')}
         >
           Login as Admin
         </Button>
