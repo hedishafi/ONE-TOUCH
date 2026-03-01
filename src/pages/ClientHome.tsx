@@ -459,7 +459,7 @@ export function ClientHome() {
                 <Box w={44} h={44} style={{borderRadius:14,flexShrink:0,
                   background:`linear-gradient(135deg,${N},${T})`,
                   display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <IconPhoneCall size={22} color="white"/>
+                  <IconMessage size={22} color="white"/>
                 </Box>
                 <Box>
                   <Text fw={800} size="sm" c={N}>Chat in App</Text>
@@ -554,15 +554,14 @@ export function ClientHome() {
               <Box w={100} h={100} style={{borderRadius:'50%',
                 background:`linear-gradient(135deg,${N},${T})`,
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <IconPhoneCall size={44} color="white"/>
+                <IconMessage size={44} color="white"/>
               </Box>
             </Box>
             <Stack align="center" gap={4}>
               <Text fw={800} size="lg" c={N}>Connecting…</Text>
               <Text size="sm" c="dimmed">Reaching OneTouch AI</Text>
             </Stack>
-            <Button variant="light" color="red" radius="xl" size="sm"
-              leftSection={<IconPhoneOff size={14}/>} onClick={closeAssist}>Cancel</Button>
+            
           </Stack>
         )}
 
