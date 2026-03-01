@@ -261,6 +261,19 @@ export function Landing() {
                 </Button>
               </Group>
 
+              {/* Customer support number */}
+              <Box component="a" href="tel:8182"
+                style={{ display:'inline-flex',alignItems:'center',gap:10,textDecoration:'none',
+                  padding:'10px 20px',borderRadius:40,width:'fit-content',
+                  background:`linear-gradient(135deg,${COLORS.navyBlue},${COLORS.tealBlue})`,
+                  boxShadow:`0 4px 18px ${COLORS.navyBlue}40` }}>
+                <IconPhone size={18} color="white"/>
+                <Box>
+                  <Text size="xs" c="rgba(255,255,255,0.75)" fw={600} lh={1}>Call us free</Text>
+                  <Text size="md" c="white" fw={900} lh={1.2}>8182</Text>
+                </Box>
+              </Box>
+
               <Group className="afu4" gap="xl" wrap="wrap">
                 {[['10,000+','Happy Users'],['4.8★','Avg Rating'],['98%','Satisfaction']].map(([v,l]) => {
                   const raw = String(v);
