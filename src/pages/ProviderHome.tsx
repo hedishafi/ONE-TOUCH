@@ -163,7 +163,8 @@ export function ProviderHome() {
 
   const tier     = profile?.loyaltyTier ?? 'rising_pro';
   const tierInfo = LOYALTY_CONFIG.providerTiers.find(t=>t.tier===tier);
-  const commPct  = 10-(tierInfo?.commissionDiscount??0);
+  // Platform commission percentage (fixed)
+  const commPct  = 2;
   const mapCtr: [number,number] = (profile?.lat&&profile?.lng) ? [profile.lat,profile.lng] : MAP_CTR;
 
   useEffect(()=>{
