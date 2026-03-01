@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, useComputedColorScheme,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
@@ -173,11 +173,7 @@ export function ClientHome() {
   const [declineStage,setDeclineStage]=useState<'asking'|'confirmed'>('asking');
   const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  const colorScheme=useComputedColorScheme('light');
-  const isDark=colorScheme==='dark';
-  const TILE_LIGHT='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const TILE_DARK ='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const mapTile=isDark?TILE_DARK:TILE_LIGHT;
+  const mapTile='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}

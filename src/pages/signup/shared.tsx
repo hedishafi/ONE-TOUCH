@@ -11,7 +11,7 @@ import {
   Box, Button, Center, Container, Group, Paper,
   PinInput, Stack, Text, TextInput, ActionIcon,
   Alert, FileButton, Badge, SimpleGrid, RingProgress,
-  Loader, Checkbox, useMantineColorScheme,
+  Loader, Checkbox,
 } from '@mantine/core';
 import {
   IconShieldLock, IconArrowRight, IconArrowLeft,
@@ -25,7 +25,6 @@ import { notifications } from '@mantine/notifications';
 import { COLORS, MOCK_OTP, ROUTES } from '../../utils/constants';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { AIHelpCenter } from '../../components/AIHelpCenter';
-import { DarkModeToggle } from '../../components/DarkModeToggle';
 
 // ─── Global CSS (animations; id-opt uses CSS vars) ────────────────────────────
 export const SHARED_CSS = `
@@ -54,10 +53,6 @@ export const SHARED_CSS = `
   border-color: #000080;
   background: var(--ot-id-opt-sel-bg);
   box-shadow: 0 2px 12px rgba(0,0,128,0.14);
-}
-[data-mantine-color-scheme="dark"] .sf-id-opt.sel {
-  border-color: #7B9FFF;
-  box-shadow: 0 2px 12px rgba(123,159,255,0.18);
 }
 `;
 
@@ -256,7 +251,6 @@ export function Shell({ children, step, labels = STEP_LABELS }: { children: Reac
               </Text>
             </Group>
             <Group gap={8}>
-              <DarkModeToggle />
               <LanguageSwitcher />
               <Button variant="subtle" size="xs" color="gray" onClick={() => navigate(ROUTES.login)}>
                 Sign In
@@ -433,8 +427,6 @@ export function UploadZone({ label, preview, onFile, scanning }: {
 // ─── STEP 1 — Identity Verification ──────────────────────────────────────────
 export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }) {
   const navigate = useNavigate();
-  const { colorScheme } = useMantineColorScheme();
-
   const [idType, setIdType]       = useState<IdType | null>(null);
   const [frontUrl, setFrontUrl]   = useState<string | null>(null);
   const [backUrl, setBackUrl]     = useState<string | null>(null);

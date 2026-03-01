@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { DarkModeToggle } from './DarkModeToggle';
 import { useMediaQuery } from '@mantine/hooks';
 
 const NAV_STYLE = `
@@ -134,7 +133,6 @@ export function LandingNavbar() {
 
               {/* Right Actions */}
               <Group gap="lg" align="center" wrap="nowrap">
-                <DarkModeToggle />
                 <LanguageSwitcher />
                 <Button
                   variant="subtle"

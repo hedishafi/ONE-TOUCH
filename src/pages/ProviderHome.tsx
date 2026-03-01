@@ -2,10 +2,10 @@
  * ProviderHome.tsx — Provider dashboard
  * Live map · Online/Offline toggle · Incoming requests · Accept → Chapa → Reveal phone
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useCallback } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, Switch,
-  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, PasswordInput, useComputedColorScheme,
+  ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, PasswordInput,
 } from '@mantine/core';
 import {
   IconBriefcase, IconTrendingUp, IconUser, IconWallet,
@@ -106,6 +106,57 @@ function dot(color: string) {
   });
 }
 
+// Memoized map component — prevents Leaflet from re-mounting when sidebar opens/closes
+interface ProviderMapProps {
+  mapCtr: [number,number];
+  mapTile: string;
+  online: boolean;
+  profileName: string;
+  visible: Req[];
+  onAccept: (r: Req) => void;
+  onGoOnline: () => void;
+}
+const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, profileName, visible, onAccept, onGoOnline }: ProviderMapProps) {
+  return (
+    <Paper radius="xl" style={{overflow:'hidden',border:'1px solid var(--ot-border)',position:'relative'}}>
+      <MapContainer center={mapCtr} zoom={14} style={{width:'100%',height:420}}>
+        <TileLayer url={mapTile} attribution="&copy; OpenStreetMap contributors"/>
+        <Marker position={mapCtr} icon={dot(N)}>
+          <Popup><Text size="sm" fw={600}>{profileName} — {online?'Online':'Offline'}</Text></Popup>
+        </Marker>
+        <PulseRings ctr={mapCtr} on={online}/>
+        {visible.map(r=>(
+          <Marker key={r.id} position={r.coords} icon={dot(COLORS.warning)}>
+            <Popup>
+              <Stack gap={6}>
+                <Text size="sm" fw={700}>{catName(r.catId)}</Text>
+                <Text size="xs">{r.desc}</Text>
+                <Text size="xs" c="dimmed">{r.addr}</Text>
+                <Button mt={4} size="xs" color="teal" onClick={()=>onAccept(r)}>Accept</Button>
+              </Stack>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+      <Box style={{position:'absolute',bottom:12,left:12,zIndex:1000,
+        background:'rgba(255,255,255,.95)',borderRadius:10,padding:'8px 12px',
+        boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
+        <Stack gap={5}>
+          <Group gap={8}><Box w={10} h={10} style={{borderRadius:'50%',background:N,border:'2px solid white'}}/><Text size="xs" fw={600}>You</Text></Group>
+          <Group gap={8}><Box w={10} h={10} style={{borderRadius:'50%',background:COLORS.warning,border:'2px solid white'}}/><Text size="xs" fw={600}>Job request</Text></Group>
+        </Stack>
+      </Box>
+      {!online&&(
+        <Box style={{position:'absolute',inset:0,zIndex:600,background:'rgba(0,0,0,.55)',
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+          <Text fw={800} size="lg" c="white">Go Online to See Requests</Text>
+          <Button size="sm" style={{background:T}} onClick={onGoOnline}>Go Online</Button>
+        </Box>
+      )}
+    </Paper>
+  );
+});
+
 function PulseRings({ctr, on}: {ctr:[number,number]; on:boolean}) {
   const [r, setR] = useState(400);
   useEffect(()=>{
@@ -140,11 +191,7 @@ export function ProviderHome() {
   const [online,    setOnline]    = useState(authProf?.isOnline ?? false);
   const [sidebar,   setSidebar]   = useState(false);
 
-  const colorScheme = useComputedColorScheme('light');
-  const isDark = colorScheme === 'dark';
-  const mapTile = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const mapTile = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const [trials,    setTrials]    = useState(FREE_TRIAL_TOTAL);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   // const [chapaOpen, setChapaOpen] = useState(false);
@@ -185,21 +232,28 @@ export function ProviderHome() {
     .reduce((s,j)=>s+(j.netProviderEarning??0),0);
   const totalEarn = done.reduce((s,j)=>s+(j.netProviderEarning??0),0);
 
-  function toggle(v:boolean) {
+  const toggle = useCallback((v:boolean) => {
     setOnline(v); updateProviderOnlineStatus(v);
     notifications.show({title:v?'You are Online':'You are Offline',
       message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[updateProviderOnlineStatus]);
 
-  function accept(req:Req) {
-    if (trials>0) {
-      const n = trials - 1; setTrials(n); if (currentUser) saveTrials(currentUser.id, n); finalize(req);
-    } else {
-      // open TeleBirr confirmation modal
-      setPending(req);
-      setPayOpen(true);
-    }
-  }
+  const accept = useCallback((req:Req) => {
+    setTrials(prev => {
+      if (prev>0) {
+        const n = prev - 1;
+        if (currentUser) saveTrials(currentUser.id, n);
+        finalize(req);
+        return n;
+      } else {
+        setPending(req);
+        setPayOpen(true);
+        return prev;
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[currentUser?.id]);
 
   function finalize(req:Req) {
     setDismissed(s=>new Set([...s,req.id]));
@@ -400,44 +454,16 @@ export function ProviderHome() {
         {/* Map + Requests */}
         <SimpleGrid cols={{base:1,md:2}} spacing={20}>
 
-          {/* Map */}
-          <Paper radius="xl" style={{overflow:'hidden',border:'1px solid var(--ot-border)',position:'relative'}}>
-            <MapContainer center={mapCtr} zoom={14} style={{width:'100%',height:420}}>
-              <TileLayer url={mapTile}
-                attribution="&copy; OpenStreetMap contributors"/>
-              <Marker position={mapCtr} icon={dot(N)}>
-                <Popup><Text size="sm" fw={600}>{profile?.fullName??'You'} — {online?'Online':'Offline'}</Text></Popup>
-              </Marker>
-              <PulseRings ctr={mapCtr} on={online}/>
-              {visible.map(r=>(
-                <Marker key={r.id} position={r.coords} icon={dot(COLORS.warning)}>
-                  <Popup>
-                    <Stack gap={6}>
-                      <Text size="sm" fw={700}>{catName(r.catId)}</Text>
-                      <Text size="xs">{r.desc}</Text>
-                      <Text size="xs" c="dimmed">{r.addr}</Text>
-                      <Button mt={4} size="xs" color="teal" onClick={()=>accept(r)}>Accept</Button>
-                    </Stack>
-                  </Popup>
-                </Marker>
-              ))}
-            </MapContainer>
-            <Box style={{position:'absolute',bottom:12,left:12,zIndex:1000,
-              background:'rgba(255,255,255,.95)',borderRadius:10,padding:'8px 12px',
-              boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
-              <Stack gap={5}>
-                <Group gap={8}><Box w={10} h={10} style={{borderRadius:'50%',background:N,border:'2px solid white'}}/><Text size="xs" fw={600}>You</Text></Group>
-                <Group gap={8}><Box w={10} h={10} style={{borderRadius:'50%',background:COLORS.warning,border:'2px solid white'}}/><Text size="xs" fw={600}>Job request</Text></Group>
-              </Stack>
-            </Box>
-            {!online&&(
-              <Box style={{position:'absolute',inset:0,zIndex:600,background:'rgba(0,0,0,.55)',
-                display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-                <Text fw={800} size="lg" c="white">Go Online to See Requests</Text>
-                <Button size="sm" style={{background:T}} onClick={()=>toggle(true)}>Go Online</Button>
-              </Box>
-            )}
-          </Paper>
+          {/* Map — memoized to prevent Leaflet re-mount on sidebar toggle */}
+          <ProviderMap
+            mapCtr={mapCtr}
+            mapTile={mapTile}
+            online={online}
+            profileName={profile?.fullName??'You'}
+            visible={visible}
+            onAccept={accept}
+            onGoOnline={() => toggle(true)}
+          />
 
           {/* Request list */}
           <Box>

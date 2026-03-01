@@ -8,7 +8,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { DarkModeToggle } from '../components/DarkModeToggle';
 import { AIHelpCenter } from '../components/AIHelpCenter';
 
 const S = `
@@ -121,11 +120,7 @@ export function Signup() {
               <Text fw={900} size="md" c={COLORS.navyBlue} style={{ letterSpacing: 0.3 }}>ONE TOUCH</Text>
             </Group>
             <Group gap={8}>
-              <DarkModeToggle />
               <LanguageSwitcher />
-              <Button variant="subtle" color="gray" size="sm" onClick={() => navigate(ROUTES.login)}>
-                Already have an account?
-              </Button>
               <Button
                 size="sm" radius="xl"
                 style={{ background: COLORS.navyBlue, color: 'white' }}

@@ -46,36 +46,7 @@
   --ot-header-border:  #F1F3F5;
 }
 
-/* ── Design tokens (dark) ──────────────────────────────────────────────────── */
-[data-mantine-color-scheme="dark"] {
-  --ot-bg-page:        #111318;
-  --ot-bg-card:        #1C1F2E;
-  --ot-bg-card-inner:  #171A28;
-  --ot-bg-row:         #1F2235;
 
-  --ot-border:         #2A2E42;
-  --ot-border-inner:   #252840;
-  --ot-border-input:   #333750;
-
-  --ot-text-navy:      #7B9FFF;
-  --ot-text-sub:       #A0AABB;
-  --ot-text-muted:     #6B7280;
-  --ot-text-body:      #D1D5DB;
-
-  --ot-id-opt-bg:      #1C1F2E;
-  --ot-id-opt-border:  #2A2E42;
-  --ot-id-opt-hover:   rgba(0,128,128,0.08);
-  --ot-id-opt-sel-bg:  rgba(100,130,255,0.07);
-
-  --ot-upload-bg:      #171A28;
-  --ot-upload-icon-bg: #252840;
-
-  --ot-nav-bg:         #161924;
-  --ot-nav-border:     #2A2E42;
-
-  --ot-header-bg:      #161924;
-  --ot-header-border:  #2A2E42;
-}
 
 *,
 *::before,

@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import {
   Box, Button, FileButton, Group, MultiSelect,
   PasswordInput, Progress, Select, Stack, Text,
-  Avatar, Badge, Radio, Alert, SimpleGrid,
+  Avatar, Badge, Radio, Alert, SimpleGrid, Textarea, NumberInput,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconArrowRight, IconCamera, IconLock,
@@ -35,6 +35,10 @@ interface ProviderProfileData {
   categoryId: string;
   subcategoryIds: string[];
   pricingMethod: 'fixed' | 'platform_calculated';
+  priceMin: number | null;
+  priceMax: number | null;
+  yearsOfExperience: number | null;
+  whatMakesYouSpecial: string;
 }
 
 // ─── Step 3 – Provider Profile Setup ─────────────────────────────────────────
@@ -49,13 +53,17 @@ function StepProfileProvider({
   onBack: () => void;
   onDone: (data: ProviderProfileData) => void;
 }) {
-  const [photoUrl, setPhotoUrl]           = useState<string | null>(faceUrl);
-  const [password, setPassword]           = useState('');
-  const [confirm, setConfirm]             = useState('');
-  const [categoryId, setCategoryId]       = useState('');
-  const [subcategoryIds, setSubcategoryIds] = useState<string[]>([]);
-  const [pricingMethod, setPricingMethod] = useState<'fixed' | 'platform_calculated'>('fixed');
-  const [errors, setErrors]               = useState<Record<string, string>>({});
+  const [photoUrl, setPhotoUrl]               = useState<string | null>(faceUrl);
+  const [password, setPassword]               = useState('');
+  const [confirm, setConfirm]                 = useState('');
+  const [categoryId, setCategoryId]           = useState('');
+  const [subcategoryIds, setSubcategoryIds]   = useState<string[]>([]);
+  const [pricingMethod, setPricingMethod]     = useState<'fixed' | 'platform_calculated'>('fixed');
+  const [priceMin, setPriceMin]               = useState<number | null>(null);
+  const [priceMax, setPriceMax]               = useState<number | null>(null);
+  const [yearsOfExperience, setYearsOfExperience] = useState<number | null>(null);
+  const [whatMakesYouSpecial, setWhatMakesYouSpecial] = useState('');
+  const [errors, setErrors]                   = useState<Record<string, string>>({});
 
   const handlePhoto = (file: File | null) => {
     if (!file) return;
@@ -74,13 +82,15 @@ function StepProfileProvider({
     if (password !== confirm)             e.confirm = 'Passwords do not match';
     if (!categoryId)                      e.category = 'Please select a service category';
     if (subcategoryIds.length === 0)      e.subcategory = 'Please select at least one sub-service';
+    if (priceMin !== null && priceMax !== null && priceMin >= priceMax)
+      e.priceRange = 'Min price must be less than max price';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onDone({ password, photoUrl, categoryId, subcategoryIds, pricingMethod });
+    onDone({ password, photoUrl, categoryId, subcategoryIds, pricingMethod, priceMin, priceMax, yearsOfExperience, whatMakesYouSpecial });
   };
 
   const displayName = prefill.extracted.fullName ?? 'Provider';
@@ -268,6 +278,70 @@ function StepProfileProvider({
             </Text>
           </Alert>
         </Box>
+
+        {/* Price Range (optional) */}
+        <Box>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>
+            Price Range (ETB) <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+          </Text>
+          <SimpleGrid cols={2} spacing={10}>
+            <NumberInput
+              placeholder="Min (e.g. 200)"
+              prefix="ETB "
+              min={0}
+              value={priceMin ?? ''}
+              onChange={v => setPriceMin(v === '' ? null : Number(v))}
+              size="sm"
+              styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+            />
+            <NumberInput
+              placeholder="Max (e.g. 800)"
+              prefix="ETB "
+              min={0}
+              value={priceMax ?? ''}
+              onChange={v => setPriceMax(v === '' ? null : Number(v))}
+              size="sm"
+              error={errors.priceRange}
+              styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+            />
+          </SimpleGrid>
+          <Text size="10px" c="var(--ot-text-muted)" mt={4}>
+            Set a price range so clients know what to expect. Leave blank to negotiate per job.
+          </Text>
+        </Box>
+
+        {/* Years of Experience (optional) */}
+        <NumberInput
+          label={
+            <Text size="sm" fw={600} c="var(--ot-text-navy)">
+              Years of Experience <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+            </Text>
+          }
+          placeholder="e.g. 5"
+          min={0}
+          max={50}
+          value={yearsOfExperience ?? ''}
+          onChange={v => setYearsOfExperience(v === '' ? null : Number(v))}
+          size="sm"
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+        />
+
+        {/* What Makes You Special (optional) */}
+        <Textarea
+          label={
+            <Text size="sm" fw={600} c="var(--ot-text-navy)">
+              What Makes You Special <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+            </Text>
+          }
+          placeholder="Tell clients what sets you apart — certifications, unique skills, approach to work…"
+          value={whatMakesYouSpecial}
+          onChange={e => setWhatMakesYouSpecial(e.target.value)}
+          minRows={3}
+          maxRows={5}
+          size="sm"
+          autosize
+          styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
+        />
 
         <Button
           fullWidth

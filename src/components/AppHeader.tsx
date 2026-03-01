@@ -16,7 +16,6 @@ import { formatCurrency } from '../utils/formatting';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationCenter } from './NotificationCenter';
 import { useEffect } from 'react';
-import { DarkModeToggle } from './DarkModeToggle';
 
 export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?: () => void; mobileMenuOpened?: boolean }) {
   const { t } = useTranslation();
@@ -127,9 +126,6 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
 
         {/* Language Switcher */}
         <LanguageSwitcher />
-
-        {/* Dark mode toggle */}
-        <DarkModeToggle />
 
         {/* Notifications */}
         <Indicator
