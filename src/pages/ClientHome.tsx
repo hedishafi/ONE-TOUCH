@@ -561,15 +561,15 @@ export function ClientHome() {
         {/* Listening — voice call style */}
         {aStage==='listening'&&(
           <Stack gap="md" p={4}>
-            {/* Active call pill */}
+            {/* Active chat pill */}
             <Group gap={8} px={14} py={8}
               style={{background:`${N}08`,borderRadius:24,alignSelf:'center'}}>
               <Box w={8} h={8} style={{borderRadius:'50%',background:COLORS.success,
                 boxShadow:`0 0 0 3px ${COLORS.success}33`,flexShrink:0,
                 animation:'pulse 1.4s ease-in-out infinite'}}/>
-              <Text size="xs" fw={700} c={N}>AI Connected · Listening</Text>
+              <Text size="xs" fw={700} c={N}>AI Connected . Start Chatting</Text>
             </Group>
-            {/* Pulsing mic orb */}
+            {/* Pulsing message orb */}
             <Stack align="center" py={20} gap={0}>
               <Box style={{position:'relative',width:110,height:110}}>
                 <Box style={{position:'absolute',inset:-18,borderRadius:'50%',
@@ -580,7 +580,7 @@ export function ClientHome() {
                   background:`linear-gradient(135deg,${N},${T})`,
                   display:'flex',alignItems:'center',justifyContent:'center',
                   boxShadow:`0 6px 28px ${N}55`}}>
-                  <IconMicrophone size={46} color="white"/>
+                  <IconMessage size={46} color="white"/>
                 </Box>
               </Box>
               <Text size="xs" c="dimmed" mt={16}>Describe what you need below</Text>
@@ -596,10 +596,7 @@ export function ClientHome() {
                 disabled={!desc.trim()} onClick={submitDesc}>
                 Continue <IconArrowRight size={16}/>
               </Button>
-              <ActionIcon size="xl" radius="xl" variant="light" color="red" onClick={closeAssist}
-                aria-label="End call">
-                <IconPhoneOff size={18}/>
-              </ActionIcon>
+              {/* Removed End Call button */}
             </Group>
           </Stack>
         )}
