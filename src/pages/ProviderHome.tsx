@@ -227,10 +227,7 @@ export function ProviderHome() {
   const visible   = DEMO.filter(r=>!dismissed.has(r.id)&&online);
   const myJobs    = jobs.filter(j=>j.providerId===currentUser?.id);
   const done      = myJobs.filter(j=>j.status==='completed');
-  const todayEarn = done
-    .filter(j=>j.completedAt&&new Date(j.completedAt).toDateString()===new Date().toDateString())
-    .reduce((s,j)=>s+(j.netProviderEarning??0),0);
-  const totalEarn = done.reduce((s,j)=>s+(j.netProviderEarning??0),0);
+  
 
   const toggle = useCallback((v:boolean) => {
     setOnline(v); updateProviderOnlineStatus(v);
@@ -413,12 +410,10 @@ export function ProviderHome() {
         </Paper>
 
         {/* Stats */}
-        <SimpleGrid cols={{base:2,sm:4}} spacing={12} mb={20}>
+        <SimpleGrid cols={{base:2,sm:2}} spacing={12} mb={20}>
           {[
-            {label:"Today's Earnings",value:`${CURRENCY_SYMBOL} ${todayEarn.toFixed(0)}`,icon:<IconCurrencyDollar size={18}/>,c:COLORS.success},
-            {label:'Total Earned',    value:`${CURRENCY_SYMBOL} ${totalEarn.toFixed(0)}`,icon:<IconTrendingUp size={18}/>,   c:N},
-            {label:'Rating',          value:`${(profile?.rating??0).toFixed(1)} \u2605`,  icon:<IconStar size={18}/>,         c:COLORS.warning},
-            {label:'Jobs Done',       value:`${profile?.totalJobsCompleted??done.length}`,icon:<IconCheck size={18}/>,        c:T},
+            {label:'Rating',        value:`${(profile?.rating??0).toFixed(1)} \u2605`, icon:<IconStar size={18}/>, c:COLORS.warning},
+            {label:'Jobs Accepted', value:`${profile?.totalJobsCompleted??done.length}`, icon:<IconCheck size={18}/>,   c:T},
           ].map(s=>(
             <Paper key={s.label} p="md" radius="xl"
               style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>

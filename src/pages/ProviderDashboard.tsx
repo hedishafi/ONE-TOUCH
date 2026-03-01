@@ -416,9 +416,8 @@ export function Earnings() {
     <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.earnings')}>
       <Stack gap="lg">
         {/* KPI Row */}
-        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           {[
-            { label: 'Total Earned', value: formatCurrency(totalEarned), color: COLORS.tealBlue, icon: <IconTrendingUp size={20} /> },
             { label: `Commission (10%)`, value: `-${formatCurrency(totalCommission)}`, color: '#E63946', icon: <IconCurrencyDollar size={20} /> },
             { label: 'Net Earnings', value: formatCurrency(netEarnings), color: COLORS.navyBlue, icon: <IconCheck size={20} /> },
           ].map(kpi => (
