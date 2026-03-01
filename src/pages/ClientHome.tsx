@@ -88,13 +88,13 @@ type Provider = {
 
 const PROVIDER_POOL: Provider[] = [
   {name:'Abebe T.',   rating:4.9, dist:1.2, priceMin:120, priceMax:280, yearsExp:7,  specialty:'Plumbing & Repairs',    avatar:'A'},
-  {name:'Sara M.',    rating:4.8, dist:1.7, priceMin:100, priceMax:250, yearsExp:5,  specialty:'Cleaning & Organizing', avatar:'S'},
-  {name:'Dawit K.',   rating:4.7, dist:2.0, priceMin:150, priceMax:320, yearsExp:9,  specialty:'Electrical Work',       avatar:'D'},
-  {name:'Tigist A.',  rating:4.9, dist:0.9, priceMin:90,  priceMax:200, yearsExp:4,  specialty:'Beauty & Wellness',     avatar:'T'},
-  {name:'Yared T.',   rating:4.6, dist:2.3, priceMin:110, priceMax:240, yearsExp:6,  specialty:'Moving & Delivery',     avatar:'Y'},
-  {name:'Hana B.',    rating:4.8, dist:1.4, priceMin:130, priceMax:300, yearsExp:8,  specialty:'Home Maintenance',      avatar:'H'},
-  {name:'Bereket G.', rating:4.7, dist:1.8, priceMin:80,  priceMax:180, yearsExp:3,  specialty:'Car Services',          avatar:'B'},
-  {name:'Meron S.',   rating:4.9, dist:1.1, priceMin:140, priceMax:260, yearsExp:10, specialty:'Tutoring & Education',  avatar:'M'},
+  {name:'Sara M.',    rating:4.8, dist:1.7, priceMin:100, priceMax:250, yearsExp:5,  specialty:'Plumbing & Repairs', avatar:'S'},
+  {name:'Dawit K.',   rating:4.7, dist:2.0, priceMin:150, priceMax:320, yearsExp:9,  specialty:'Plumbing & Repairs',       avatar:'D'},
+  {name:'Tigist A.',  rating:4.9, dist:0.9, priceMin:90,  priceMax:200, yearsExp:4,  specialty:'Plumbing & Repairs',     avatar:'T'},
+  {name:'Yared T.',   rating:4.6, dist:2.3, priceMin:110, priceMax:240, yearsExp:6,  specialty:'Plumbing & Repairs',     avatar:'Y'},
+  {name:'Hana B.',    rating:4.8, dist:1.4, priceMin:130, priceMax:300, yearsExp:8,  specialty:'Plumbing & Repairs',      avatar:'H'},
+  {name:'Bereket G.', rating:4.7, dist:1.8, priceMin:80,  priceMax:180, yearsExp:3,  specialty:'Plumbing & Repairs',          avatar:'B'},
+  {name:'Meron S.',   rating:4.9, dist:1.1, priceMin:140, priceMax:260, yearsExp:10, specialty:'Plumbing & Repairs',  avatar:'M'},
 ];
 
 /** Return 4 nearby providers, sorted by distance, randomised each call. */
