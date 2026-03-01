@@ -10,12 +10,11 @@ import { useState, useEffect } from 'react';
 import {
   Box, Button, FileButton, Group, MultiSelect,
   PasswordInput, Progress, Select, Stack, Text,
-  Avatar, Badge, Radio, Alert, SimpleGrid, Textarea, NumberInput,
+  Avatar, Badge, Alert, SimpleGrid, Textarea, NumberInput,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconArrowRight, IconCamera, IconLock,
-  IconBriefcase, IconCircleCheck, IconInfoCircle, IconUser,
-  IconCheck,
+  IconBriefcase, IconCircleCheck, IconUser,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
@@ -34,7 +33,6 @@ interface ProviderProfileData {
   photoUrl: string | null;
   categoryId: string;
   subcategoryIds: string[];
-  pricingMethod: 'fixed' | 'platform_calculated';
   priceMin: number | null;
   priceMax: number | null;
   yearsOfExperience: number | null;
@@ -58,7 +56,6 @@ function StepProfileProvider({
   const [confirm, setConfirm]                 = useState('');
   const [categoryId, setCategoryId]           = useState('');
   const [subcategoryIds, setSubcategoryIds]   = useState<string[]>([]);
-  const [pricingMethod, setPricingMethod]     = useState<'fixed' | 'platform_calculated'>('fixed');
   const [priceMin, setPriceMin]               = useState<number | null>(null);
   const [priceMax, setPriceMax]               = useState<number | null>(null);
   const [yearsOfExperience, setYearsOfExperience] = useState<number | null>(null);
@@ -90,7 +87,7 @@ function StepProfileProvider({
 
   const handleSubmit = () => {
     if (!validate()) return;
-    onDone({ password, photoUrl, categoryId, subcategoryIds, pricingMethod, priceMin, priceMax, yearsOfExperience, whatMakesYouSpecial });
+    onDone({ password, photoUrl, categoryId, subcategoryIds, priceMin, priceMax, yearsOfExperience, whatMakesYouSpecial });
   };
 
   const displayName = prefill.extracted.fullName ?? 'Provider';
@@ -195,21 +192,7 @@ function StepProfileProvider({
           />
         </SimpleGrid>
 
-        {/* Verified phone */}
-        <Box
-          p={12}
-          style={{
-            borderRadius: 10,
-            background: 'var(--ot-bg-row)',
-            border: '1px solid var(--ot-border)',
-          }}
-        >
-          <Text size="xs" c="var(--ot-text-muted)" mb={2}>Verified Phone Number</Text>
-          <Group gap={6}>
-            <Text size="sm" fw={600} c={COLORS.tealBlue}>{prefill.selectedPhone}</Text>
-            <Badge size="xs" color="teal" leftSection={<IconCheck size={9} />} variant="light">Verified</Badge>
-          </Group>
-        </Box>
+        {/* Verified phone removed from profile setup UI */}
 
         {/* Service Category */}
         <Box>
@@ -243,41 +226,7 @@ function StepProfileProvider({
           </Box>
         )}
 
-        {/* Pricing method */}
-        <Box>
-          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={12}>Payment Structure</Text>
-          <SimpleGrid cols={2} spacing={10}>
-            {([
-              { value: 'fixed',               label: 'Fixed Price',       desc: 'You set a fixed rate per job' },
-              { value: 'platform_calculated', label: 'Platform Calculated', desc: 'Platform determines fair pricing' },
-            ] as const).map(opt => (
-              <Box
-                key={opt.value}
-                className={`sf-id-opt${pricingMethod === opt.value ? ' sel' : ''}`}
-                p={14}
-                onClick={() => setPricingMethod(opt.value)}
-              >
-                <Group gap={10} wrap="nowrap">
-                  <Radio
-                    checked={pricingMethod === opt.value}
-                    onChange={() => setPricingMethod(opt.value)}
-                    color="blue"
-                    size="sm"
-                  />
-                  <Stack gap={2}>
-                    <Text size="sm" fw={700} c="var(--ot-text-navy)">{opt.label}</Text>
-                    <Text size="10px" c="var(--ot-text-muted)">{opt.desc}</Text>
-                  </Stack>
-                </Group>
-              </Box>
-            ))}
-          </SimpleGrid>
-          <Alert icon={<IconInfoCircle size={14} />} color="blue" variant="light" radius="md" mt={10}>
-            <Text size="xs">
-              Per-hour pricing is not supported on ONE TOUCH to ensure fair, transparent job-based compensation.
-            </Text>
-          </Alert>
-        </Box>
+        {/* Payment structure removed — default platform/negotiated pricing will be used */}
 
         {/* Price Range (optional) */}
         <Box>
