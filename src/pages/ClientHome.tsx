@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, ScrollArea, useComputedColorScheme,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, useComputedColorScheme,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
@@ -85,6 +85,14 @@ const FAKE_PROVIDERS = [
   {name:'Dawit K.', rating:4.7, dist:2.0},
 ];
 
+const DECLINE_REASONS = [
+  'Not available right now',
+  'Price is too high',
+  'Found another provider',
+  'Service not needed anymore',
+  'Other',
+];
+
 function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
   const [r,setR]=useState(300);
   useEffect(()=>{const id=setInterval(()=>setR(p=>(p>=2500?300:p+60)),90);return()=>clearInterval(id);},[]);
@@ -133,16 +141,10 @@ export function ClientHome() {
   const [pickOpen,setPickOpen]=useState(false);
   const [pickCat, setPickCat] =useState('');
 
-  // Chat-based decline flow
-  type ChatMsg = {from:'ai'|'user'; text:string};
-  type ChatStep = 'reason'|'price'|'searching'|'found'|'none'|'done';
-  const [chatOpen,setChatOpen]=useState(false);
-  const [chatMsgs,setChatMsgs]=useState<ChatMsg[]>([]);
-  const [chatStep,setChatStep]=useState<ChatStep>('reason');
-  const [chatInput,setChatInput]=useState('');
-  const [chatProv,setChatProv]=useState(FAKE_PROVIDERS[0]);
-  const [chatPriceNum,setChatPriceNum]=useState(0);
-  const chatTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  // Decline voice flow
+  const [declineOpen,setDeclineOpen]=useState(false);
+  const [declineStage,setDeclineStage]=useState<'asking'|'confirmed'>('asking');
+  const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const colorScheme=useComputedColorScheme('light');
   const isDark=colorScheme==='dark';
@@ -153,7 +155,7 @@ export function ClientHome() {
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}
     fetchNotifications(currentUser.id);
-    return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(chatTimer.current)clearTimeout(chatTimer.current);};
+    return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(declineTimer.current)clearTimeout(declineTimer.current);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
 
@@ -194,77 +196,27 @@ export function ClientHome() {
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
-  // Client declines the found provider — open conversational chat AI
+  // Open decline voice modal
+  function openDecline(){
+    setDeclineStage('asking');
+    setDeclineOpen(true);
+  }
+  function pickReason(_reason:string){
+    setDeclineStage('confirmed');
+    declineTimer.current=setTimeout(()=>{
+      setDeclineOpen(false);
+      setTimeout(()=>setDeclineStage('asking'),300);
+    },2800);
+  }
+  function closeDecline(){
+    if(declineTimer.current)clearTimeout(declineTimer.current);
+    setDeclineOpen(false);
+    setTimeout(()=>setDeclineStage('asking'),300);
+  }
+  // Client declines found provider — open voice decline modal
   function cancelFromFound(){
     setAOpen(false);
-    setTimeout(()=>{
-      setAStage('idle');
-      setChatMsgs([{from:'ai',text:'I understand you declined the offer. Could you please tell me why?'}]);
-      setChatStep('reason');
-      setChatInput('');
-      setChatOpen(true);
-    },300);
-  }
-  // Chat message handler
-  function handleChatSend(){
-    const text=chatInput.trim();if(!text)return;
-    setChatInput('');
-    const userMsg:ChatMsg={from:'user',text};
-    if(chatStep==='reason'){
-      const isPriceRelated=/expens|price|cost|cheap|afford|high|much|birr|money|budget/i.test(text);
-      setChatMsgs(m=>[...m,userMsg]);
-      if(isPriceRelated){
-        setChatStep('price');
-        setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:'I understand. What is your last price?'}]),400);
-      }else{
-        setChatStep('done');
-        setTimeout(()=>{
-          setChatMsgs(m=>[...m,{from:'ai',text:"Thank you for letting me know. Feel free to start a new request whenever you're ready."}]);
-          setTimeout(()=>setChatOpen(false),2500);
-        },400);
-      }
-    }else if(chatStep==='price'){
-      const match=text.match(/\d+/);
-      const p=match?parseInt(match[0],10):null;
-      setChatMsgs(m=>[...m,userMsg]);
-      if(!p||p<10){
-        setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:'Please enter a valid price amount (e.g. 150).'}]),400);
-        return;
-      }
-      setChatPriceNum(p);
-      setChatStep('searching');
-      setTimeout(()=>setChatMsgs(m=>[...m,{from:'ai',text:`Got it. I'll try to assign a provider at ${CURRENCY_SYMBOL} ${p}. Searching now…`}]),400);
-      const willFind=Math.random()>0.3;
-      chatTimer.current=setTimeout(()=>{
-        if(willFind){
-          const prov=FAKE_PROVIDERS[Math.floor(Math.random()*FAKE_PROVIDERS.length)];
-          setChatProv(prov);
-          setChatStep('found');
-          setChatMsgs(m=>[...m,{from:'ai',text:`Great news! ${prov.name} (⭐ ${prov.rating}, ${prov.dist} km away) has accepted your price of ${CURRENCY_SYMBOL} ${p}. They will contact you shortly. Would you like to confirm?`}]);
-        }else{
-          setChatStep('none');
-          setChatMsgs(m=>[...m,{from:'ai',text:`Unfortunately, no provider is available at ${CURRENCY_SYMBOL} ${p} right now. Your request has been closed. You can search again after one hour.`}]);
-          setTimeout(()=>setChatOpen(false),4000);
-        }
-      },2500);
-    }
-  }
-  // Confirm job from chat flow
-  function confirmFromChat(){
-    if(!currentUser)return;
-    const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
-    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
-      subcategoryId:'sub-001',description:desc||'Service request',estimatedPrice:chatPriceNum||estPrice.min,
-      status:'pending_agreement',commissionRate:10,
-      clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
-      createdAt:new Date().toISOString()} as any);
-    addNotification({id:`n-${Date.now()}`,userId:'provider-001',type:'new_job' as any,
-      title:'New Job Request',message:`Client confirmed at ${CURRENCY_SYMBOL} ${chatPriceNum}`,
-      isRead:false,createdAt:new Date().toISOString()});
-    setChatMsgs(m=>[...m,{from:'ai',text:`Confirmed! ${chatProv.name} will call you within 10 minutes.`}]);
-    setChatStep('done');
-    notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
-    setTimeout(()=>setChatOpen(false),2500);
+    setTimeout(()=>{setAStage('idle');openDecline();},300);
   }
   function closeAssist(){if(aTimer.current)clearTimeout(aTimer.current);setAOpen(false);setTimeout(()=>setAStage('idle'),300);}
 
@@ -289,17 +241,11 @@ export function ClientHome() {
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
   function closeCall(){if(cTimer.current)clearTimeout(cTimer.current);setCOpen(false);setTimeout(()=>setCStage('idle'),300);}
-  // Client declines via category call modal — open chat AI
+  // Client declines via category call modal — open voice decline modal
   function cancelFromCall(){
     if(cTimer.current)clearTimeout(cTimer.current);
     setCOpen(false);
-    setTimeout(()=>{
-      setCStage('idle');
-      setChatMsgs([{from:'ai',text:'I understand you declined the offer. Could you please tell me why?'}]);
-      setChatStep('reason');
-      setChatInput('');
-      setChatOpen(true);
-    },300);
+    setTimeout(()=>{setCStage('idle');openDecline();},300);
   }
 
   function openPick(catName:string){setPickCat(catName);setPickOpen(true);}
@@ -611,21 +557,34 @@ export function ClientHome() {
           </Stack>
         )}
 
-        {/* Listening */}
+        {/* Listening — voice call style */}
         {aStage==='listening'&&(
           <Stack gap="md" p={4}>
-            <Group gap={12} p="md" style={{background:`${N}08`,borderRadius:16}}>
-              <Box w={44} h={44} style={{borderRadius:'50%',
-                background:`linear-gradient(135deg,${N},${T})`,
-                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <IconMicrophone size={22} color="white"/>
-              </Box>
-              <Box>
-                <Text fw={700} size="sm" c={N}>Describe your problem</Text>
-                <Text size="xs" c="dimmed">What service do you need today?</Text>
-              </Box>
+            {/* Active call pill */}
+            <Group gap={8} px={14} py={8}
+              style={{background:`${N}08`,borderRadius:24,alignSelf:'center'}}>
+              <Box w={8} h={8} style={{borderRadius:'50%',background:COLORS.success,
+                boxShadow:`0 0 0 3px ${COLORS.success}33`,flexShrink:0,
+                animation:'pulse 1.4s ease-in-out infinite'}}/>
+              <Text size="xs" fw={700} c={N}>AI Connected · Listening</Text>
             </Group>
-            <Textarea autosize minRows={3} maxRows={7}
+            {/* Pulsing mic orb */}
+            <Stack align="center" py={20} gap={0}>
+              <Box style={{position:'relative',width:110,height:110}}>
+                <Box style={{position:'absolute',inset:-18,borderRadius:'50%',
+                  border:`3px solid ${T}22`,animation:'pulse 1.4s ease-in-out infinite'}}/>
+                <Box style={{position:'absolute',inset:-7,borderRadius:'50%',
+                  border:`3px solid ${T}44`,animation:'pulse 1.4s ease-in-out .5s infinite'}}/>
+                <Box w={110} h={110} style={{borderRadius:'50%',
+                  background:`linear-gradient(135deg,${N},${T})`,
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  boxShadow:`0 6px 28px ${N}55`}}>
+                  <IconMicrophone size={46} color="white"/>
+                </Box>
+              </Box>
+              <Text size="xs" c="dimmed" mt={16}>Describe what you need below</Text>
+            </Stack>
+            <Textarea autosize minRows={2} maxRows={6}
               placeholder="e.g. My kitchen sink is leaking under the cabinet…"
               value={desc} onChange={e=>setDesc(e.currentTarget.value)}
               radius="lg"
@@ -636,8 +595,9 @@ export function ClientHome() {
                 disabled={!desc.trim()} onClick={submitDesc}>
                 Continue <IconArrowRight size={16}/>
               </Button>
-              <ActionIcon size="xl" radius="xl" variant="light" color="gray" onClick={closeAssist}>
-                <IconX size={18}/>
+              <ActionIcon size="xl" radius="xl" variant="light" color="red" onClick={closeAssist}
+                aria-label="End call">
+                <IconPhoneOff size={18}/>
               </ActionIcon>
             </Group>
           </Stack>
@@ -846,69 +806,57 @@ export function ClientHome() {
         </Stack>
       </Modal>
 
-      {/* ══ CHAT DECLINE MODAL ════════════════════════════════════════════════ */}
-      <Modal opened={chatOpen} onClose={()=>setChatOpen(false)} centered radius="xl" size="sm"
+      {/* ══ DECLINE VOICE MODAL ════════════════════════════════════════════════ */}
+      <Modal opened={declineOpen} onClose={closeDecline} centered radius="xl" size="sm"
         withCloseButton={false}
-        styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>  
-        <Box p="md">
-          {/* Header */}
-          <Group justify="space-between" mb="md">
-            <Group gap={10}>
-              <Box w={36} h={36} style={{borderRadius:12,background:`linear-gradient(135deg,${N},${T})`,
-                display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <IconSparkles size={18} color="white"/>
-              </Box>
-              <Box>
-                <Text fw={700} size="sm" c={N}>OneTouch AI</Text>
-                <Text size="10px" c="dimmed">Here to help</Text>
-              </Box>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setChatOpen(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-          {/* Messages */}
-          <ScrollArea.Autosize mah={300} scrollbarSize={4} mb="md">
-            <Stack gap={10}>
-              {chatMsgs.map((m,i)=>(
-                <Box key={i} style={{display:'flex',justifyContent:m.from==='ai'?'flex-start':'flex-end'}}>
-                  <Box px={14} py={10} style={{
-                    maxWidth:'80%',borderRadius:m.from==='ai'?'4px 18px 18px 18px':'18px 4px 18px 18px',
-                    background:m.from==='ai'?`${N}12`:`linear-gradient(135deg,${N},${T})`,
-                    color:m.from==='ai'?'var(--ot-text-body)':'white'}}>
-                    <Text size="sm">{m.text}</Text>
-                  </Box>
+        styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
+        <Box p="xl">
+          {declineStage==='asking'&&(
+            <Stack gap="lg" align="center">
+              {/* Pulsing AI orb */}
+              <Box style={{position:'relative',width:88,height:88}}>
+                <Box style={{position:'absolute',inset:-16,borderRadius:'50%',
+                  border:`3px solid ${T}22`,animation:'pulse 1.4s ease-in-out infinite'}}/>
+                <Box style={{position:'absolute',inset:-6,borderRadius:'50%',
+                  border:`3px solid ${T}44`,animation:'pulse 1.4s ease-in-out .5s infinite'}}/>
+                <Box w={88} h={88} style={{borderRadius:'50%',
+                  background:`linear-gradient(135deg,${N},${T})`,
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  boxShadow:`0 4px 20px ${N}44`}}>
+                  <IconSparkles size={36} color="white"/>
                 </Box>
-              ))}
-              {chatStep==='searching'&&<Box style={{display:'flex',justifyContent:'flex-start'}}>
-                <Box px={14} py={10} style={{borderRadius:'4px 18px 18px 18px',background:`${N}12`}}>
-                  <Text size="sm" c="dimmed">Searching… ●●●</Text>
-                </Box>
-              </Box>}
+              </Box>
+              <Stack gap={4} align="center">
+                <Text fw={800} size="md" c={N}>Why did you decline?</Text>
+                <Text size="xs" c="dimmed">Select a reason — we'll improve your matches</Text>
+              </Stack>
+              <Stack gap={10} w="100%">
+                {DECLINE_REASONS.map(r=>(
+                  <Button key={r} size="sm" radius="xl" variant="light" color="gray"
+                    fullWidth onClick={()=>pickReason(r)}
+                    styles={{root:{fontWeight:600,justifyContent:'flex-start',paddingLeft:20}}}>
+                    {r}
+                  </Button>
+                ))}
+              </Stack>
+              <Button size="xs" radius="xl" variant="subtle" color="gray"
+                onClick={closeDecline}>Never mind</Button>
             </Stack>
-          </ScrollArea.Autosize>
-          {/* Confirm/Cancel when provider found via chat */}
-          {chatStep==='found'&&(
-            <Group gap={8} mb={10}>
-              <Button flex={1} size="sm" radius="xl"
-                style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-                onClick={confirmFromChat}>Confirm</Button>
-              <Button flex={1} size="sm" radius="xl" variant="light" color="gray"
-                onClick={()=>setChatOpen(false)}>Cancel</Button>
-            </Group>
           )}
-          {/* Text input — visible only during reason/price steps */}
-          {(chatStep==='reason'||chatStep==='price')&&(
-            <Group gap={8} align="flex-end">
-              <Textarea flex={1} autosize minRows={1} maxRows={4}
-                placeholder={chatStep==='price'?'Enter amount (e.g. 150)':'Type your reason…'}
-                value={chatInput} onChange={e=>setChatInput(e.currentTarget.value)}
-                radius="xl" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleChatSend();}}}
-                styles={{input:{border:`1.5px solid ${T}55`,fontSize:14,borderRadius:24}}}/>
-              <ActionIcon size="xl" radius="xl" aria-label="Send"
-                style={{background:`linear-gradient(135deg,${N},${T})`,flexShrink:0}}
-                onClick={handleChatSend} disabled={!chatInput.trim()}>
-                <IconArrowRight size={18} color="white"/>
-              </ActionIcon>
-            </Group>
+          {declineStage==='confirmed'&&(
+            <Stack align="center" gap="lg" py={12}>
+              <Box w={80} h={80} style={{borderRadius:'50%',
+                background:`linear-gradient(135deg,${COLORS.success},${T})`,
+                display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <IconCheck size={40} color="white"/>
+              </Box>
+              <Stack gap={6} align="center">
+                <Text fw={800} size="lg" c={N}>Noted!</Text>
+                <Text size="sm" c="dimmed" ta="center">
+                  I've recorded your reason. Feel free to order again anytime.
+                </Text>
+              </Stack>
+            </Stack>
           )}
         </Box>
       </Modal>
