@@ -259,7 +259,7 @@ function StepProfileProvider({
           </Text>
           <Box mt={6} p={8} style={{ borderRadius: 8, background: 'rgba(231,76,60,0.07)', border: '1px solid rgba(231,76,60,0.25)' }}>
             <Text size="xs" fw={600} style={{ color: '#C0392B' }}>
-              ⚠️ Per-hour payments are disabled on this platform to prevent fraud. Clients pay a fixed agreed amount held in escrow until the job is confirmed complete.
+              ⚠️ Per-hour payments are disabled on this platform to prevent fraud.
             </Text>
           </Box>
         </Box>
