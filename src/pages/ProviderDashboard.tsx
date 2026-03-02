@@ -3,7 +3,7 @@ import {
   Box, Text, Group, Stack, SimpleGrid, Card, Badge, Button,
   Table, ScrollArea, Progress, RingProgress, Paper, Divider,
   ThemeIcon, Center, NumberInput, Select, Textarea,
-  FileButton, Avatar, Switch, Slider, ActionIcon,
+  FileButton, Avatar, Switch, Slider, ActionIcon, Modal, PasswordInput,
 } from '@mantine/core';
 import {
   IconBriefcase, IconWallet, IconUser, IconStar, IconTrendingUp,
@@ -11,9 +11,8 @@ import {
   IconGift, IconTrophy,
   IconShieldCheck, IconPhone,
   IconCurrencyDollar, IconX, IconAlertCircle,
-  IconLock, IconLockOpen, IconWifiOff, IconStarFilled,
+  IconLock, IconLockOpen, IconWifiOff, IconStarFilled, IconShieldLock,
 } from '@tabler/icons-react';
-import { Modal } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
@@ -69,10 +68,12 @@ export function ActiveJobs() {
   // Job request card state
   const [reqState, setReqState] = useState<'idle'|'pending'|'dismissed'>('pending');
 
-  // TeleBirr payment modal
-  const [payOpen,   setPayOpen]   = useState(false);
-  const [paying,    setPaying]    = useState(false);
-  const [phoneVisible, setPhoneVisible] = useState(false);
+  // TeleBirr payment modal — step machine: input → verifying → error → success
+  const [payOpen,       setPayOpen]       = useState(false);
+  const [payStep,       setPayStep]       = useState<'input'|'verifying'|'error'|'success'>('input');
+  const [telebirrPass,  setTelebirrPass]  = useState('');
+  const [payError,      setPayError]      = useState('');
+  const [phoneVisible,  setPhoneVisible]  = useState(false);
 
   // Cancel reason modal
   const [cancelOpen,    setCancelOpen]    = useState(false);
@@ -88,15 +89,60 @@ export function ActiveJobs() {
   };
 
   function handleConfirm() {
+    setTelebirrPass('');
+    setPayError('');
+    setPayStep('input');
     setPayOpen(true);
   }
+
   function handlePay() {
-    setPaying(true);
+    // Client-side validation
+    if (!telebirrPass.trim()) {
+      setPayError('Please enter your TeleBirr password.');
+      return;
+    }
+    if (telebirrPass.trim().length < 4) {
+      setPayError('Password must be at least 4 characters.');
+      return;
+    }
+
+    setPayError('');
+    setPayStep('verifying');
+
+    // Simulate TeleBirr verification (2.2 s)
     setTimeout(() => {
-      setPaying(false);
-      setPhoneVisible(true);
-      notifications.show({ title: 'Payment verified!', message: 'Client phone number is now visible.', color: 'teal' });
+      // In production this would be the API response.
+      // For the demo any ≥4-char password succeeds.
+      const verified = telebirrPass.trim().length >= 4;
+
+      if (verified) {
+        setPayStep('success');
+        setPhoneVisible(true);
+        setTelebirrPass('');
+        notifications.show({
+          title: '✅ Payment Verified',
+          message: "Client's phone number is now visible on your dashboard.",
+          color: 'teal',
+          autoClose: 5000,
+        });
+      } else {
+        setPayStep('error');
+        setPayError('Incorrect TeleBirr password. Please try again.');
+        notifications.show({
+          title: 'Verification Failed',
+          message: 'TeleBirr could not verify your password. Please retry.',
+          color: 'red',
+        });
+      }
     }, 2200);
+  }
+
+  function handlePayModalClose() {
+    // Prevent closing while verifying
+    if (payStep === 'verifying') return;
+    setPayOpen(false);
+    setTelebirrPass('');
+    setPayError('');
   }
   function handleCancelSubmit() {
     if (!cancelReason) return;
@@ -207,88 +253,224 @@ export function ActiveJobs() {
         )}
 
         {/* ── TELEBIRR PAYMENT MODAL ──────────────────────────────────── */}
-        <Modal opened={payOpen} onClose={() => { if (!paying) setPayOpen(false); }}
-          centered radius="xl" size="sm" withCloseButton={false}
-          styles={{ content: { background: 'var(--ot-bg-card)' }, header: { display: 'none' } }}>
+        <Modal
+          opened={payOpen}
+          onClose={handlePayModalClose}
+          centered
+          radius="xl"
+          size="sm"
+          withCloseButton={false}
+          styles={{ content: { background: 'var(--ot-bg-card)' }, header: { display: 'none' } }}
+        >
           <Stack gap="lg" p="md">
-            {/* Header */}
-            <Group justify="space-between">
+
+            {/* ── Modal header ── */}
+            <Group justify="space-between" align="center">
               <Group gap={10}>
-                <Box w={40} h={40} style={{ borderRadius: 12,
-                  background: `linear-gradient(135deg,${N},${T})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Box w={40} h={40} style={{
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg,#E6007A,#FF6B35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
                   <Text fw={900} size="xs" c="white">TB</Text>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>TeleBirr Payment</Text>
-                  <Text size="10px" c="dimmed">Secure mobile payment</Text>
+                  <Text fw={800} size="sm" c={N}>TeleBirr Secure Payment</Text>
+                  <Text size="10px" c="dimmed">End-to-end encrypted · Ethio Telecom</Text>
                 </Box>
               </Group>
-              {!paying && !phoneVisible &&
-                <ActionIcon variant="subtle" onClick={() => setPayOpen(false)}>
-                  <IconX size={18}/>
+              {payStep !== 'verifying' && payStep !== 'success' && (
+                <ActionIcon variant="subtle" radius="xl" onClick={handlePayModalClose}>
+                  <IconX size={18} />
                 </ActionIcon>
-              }
+              )}
             </Group>
 
-            {!phoneVisible ? (
+            {/* ── STEP: input / error ── */}
+            {(payStep === 'input' || payStep === 'error') && (
               <>
                 {/* Amount summary */}
                 <Paper p="md" radius="lg"
                   style={{ background: `${T}10`, border: `1px solid ${T}33` }}>
-                  <Group justify="space-between">
+                  <Group justify="space-between" mb={6}>
                     <Text size="sm" c="dimmed">Service fee</Text>
                     <Text fw={800} size="lg" c={N}>
                       ETB {MOCK_JOB_REQUEST.priceMin}
                     </Text>
                   </Group>
-                  <Text size="xs" c="dimmed" mt={4}>
-                    Paying confirms your commitment. The client's phone will be revealed instantly.
+                  <Group justify="space-between">
+                    <Text size="xs" c="dimmed">Job</Text>
+                    <Text size="xs" fw={600} c={N}>{MOCK_JOB_REQUEST.service}</Text>
+                  </Group>
+                  <Group justify="space-between" mt={4}>
+                    <Text size="xs" c="dimmed">Client</Text>
+                    <Text size="xs" fw={600} c={N}>{MOCK_JOB_REQUEST.clientName}</Text>
+                  </Group>
+                  <Text size="xs" c="dimmed" mt={8}>
+                    After payment, the client's phone number is immediately revealed.
                   </Text>
                 </Paper>
 
-                {/* TeleBirr branding */}
+                {/* TeleBirr logo area */}
                 <Stack align="center" gap={6}>
-                  <Box w={64} h={64} style={{ borderRadius: '50%',
+                  <Box w={56} h={56} style={{
+                    borderRadius: '50%',
                     background: 'linear-gradient(135deg,#E6007A,#FF6B35)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text fw={900} size="sm" c="white">TB</Text>
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 16px #E6007A44',
+                  }}>
+                    <IconShieldLock size={26} color="white" />
                   </Box>
                   <Text size="xs" c="dimmed" ta="center">
-                    You will be charged ETB {MOCK_JOB_REQUEST.priceMin} via your TeleBirr account
+                    Enter your TeleBirr account password to authorise
                   </Text>
                 </Stack>
 
-                <Button size="md" radius="xl" loading={paying}
-                  style={{ background: 'linear-gradient(135deg,#E6007A,#FF6B35)', border: 'none' }}
-                  onClick={handlePay}>
-                  Pay with TeleBirr
+                {/* Password field */}
+                <PasswordInput
+                  label="TeleBirr Password"
+                  placeholder="Enter your TeleBirr password"
+                  value={telebirrPass}
+                  onChange={e => {
+                    setTelebirrPass(e.currentTarget.value);
+                    if (payError) setPayError('');
+                  }}
+                  error={payError || undefined}
+                  radius="lg"
+                  size="md"
+                  autoComplete="current-password"
+                  data-autofocus
+                  onKeyDown={e => { if (e.key === 'Enter') handlePay(); }}
+                  styles={{
+                    input: {
+                      borderColor: payError ? '#FA5252' : `${T}55`,
+                      background: 'var(--ot-bg-card)',
+                    },
+                    label: { fontWeight: 600, fontSize: 13 },
+                  }}
+                />
+
+                {/* Error banner */}
+                {payStep === 'error' && payError && (
+                  <Paper p="sm" radius="lg"
+                    style={{ background: '#FFF0F0', border: '1px solid #FA525244', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <IconAlertCircle size={16} color="#FA5252" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <Text size="xs" c="red">{payError}</Text>
+                  </Paper>
+                )}
+
+                {/* Security note */}
+                <Paper p="sm" radius="lg"
+                  style={{ background: `${N}06`, border: `1px solid ${N}18`, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <IconLock size={14} color="gray" style={{ flexShrink: 0 }} />
+                  <Text size="xs" c="dimmed">
+                    Your password is never stored. It is used only to authenticate this
+                    single transaction with TeleBirr.
+                  </Text>
+                </Paper>
+
+                <Button
+                  size="md"
+                  radius="xl"
+                  fullWidth
+                  disabled={!telebirrPass.trim()}
+                  style={{
+                    background: telebirrPass.trim()
+                      ? 'linear-gradient(135deg,#E6007A,#FF6B35)'
+                      : undefined,
+                    border: 'none',
+                  }}
+                  leftSection={<IconCurrencyDollar size={16} />}
+                  onClick={handlePay}
+                >
+                  Pay ETB {MOCK_JOB_REQUEST.priceMin} via TeleBirr
                 </Button>
               </>
-            ) : (
-              /* Payment success + phone reveal */
-              <Stack align="center" gap="md" py={8}>
-                <Box w={72} h={72} style={{ borderRadius: '50%',
-                  background: `linear-gradient(135deg,${COLORS.success},${T})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconCheck size={36} color="white"/>
+            )}
+
+            {/* ── STEP: verifying ── */}
+            {payStep === 'verifying' && (
+              <Stack align="center" gap="lg" py="md">
+                <Box w={72} h={72} style={{
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg,#E6007A22,#FF6B3522)',
+                  border: '3px solid #E6007A66',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <IconShieldLock size={32} color="#E6007A" />
                 </Box>
-                <Text fw={800} size="lg" c={N}>Payment Confirmed!</Text>
+                <Stack gap={4} align="center">
+                  <Text fw={800} size="md" c={N}>Verifying with TeleBirr…</Text>
+                  <Text size="xs" c="dimmed" ta="center">
+                    Authenticating your credentials securely.
+                    <br />Please do not close this window.
+                  </Text>
+                </Stack>
+                <Progress
+                  value={100}
+                  animated
+                  color="pink"
+                  radius="xl"
+                  size="sm"
+                  w="100%"
+                />
+                <Text size="xs" c="dimmed">Connecting to Ethio Telecom servers…</Text>
+              </Stack>
+            )}
+
+            {/* ── STEP: success ── */}
+            {payStep === 'success' && (
+              <Stack align="center" gap="md" py={8}>
+                <Box w={72} h={72} style={{
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg,${COLORS.success},${T})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 6px 24px ${COLORS.success}55`,
+                }}>
+                  <IconCheck size={36} color="white" />
+                </Box>
+                <Stack gap={2} align="center">
+                  <Text fw={800} size="lg" c={N}>Payment Confirmed!</Text>
+                  <Text size="xs" c="dimmed">
+                    ETB {MOCK_JOB_REQUEST.priceMin} deducted from your TeleBirr account
+                  </Text>
+                </Stack>
+
+                {/* Phone reveal */}
                 <Paper p="md" radius="lg" w="100%"
-                  style={{ background: `${T}12`, border: `1px solid ${T}44`, textAlign: 'center' }}>
-                  <Text size="xs" c="dimmed" mb={4}>Client's Phone Number</Text>
+                  style={{
+                    background: `${T}12`,
+                    border: `1.5px solid ${T}55`,
+                    textAlign: 'center',
+                  }}>
+                  <Text size="xs" c="dimmed" mb={6} fw={600}>
+                    CLIENT'S PHONE NUMBER
+                  </Text>
                   <Group gap={8} justify="center">
-                    <IconPhone size={18} color={T}/>
-                    <Text fw={800} size="lg" c={N}>{MOCK_JOB_REQUEST.phone}</Text>
+                    <IconPhone size={20} color={T} />
+                    <Text fw={800} size="xl" c={N}>{MOCK_JOB_REQUEST.phone}</Text>
                   </Group>
+                  <Text size="xs" c="dimmed" mt={6}>
+                    Tap to call or save this number
+                  </Text>
                 </Paper>
-                <Button size="md" radius="xl" fullWidth
-                  style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
-                  onClick={() => { setPayOpen(false); setReqState('dismissed'); }}>
-                  Start Job
+
+                <Button
+                  size="md"
+                  radius="xl"
+                  fullWidth
+                  leftSection={<IconCheck size={16} />}
+                  style={{
+                    background: `linear-gradient(135deg,${N},${T})`,
+                    border: 'none',
+                  }}
+                  onClick={() => { setPayOpen(false); setReqState('dismissed'); }}
+                >
+                  Start the Job
                 </Button>
               </Stack>
             )}
+
           </Stack>
         </Modal>
 
