@@ -318,16 +318,15 @@ export function ClientHome() {
         <Stack gap={2} p="sm" style={{flex:1}}>
           {NAV.map(n=>(
             <Box key={n.label} p={10}
-              style={{borderRadius:10,cursor:'pointer',display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-body)'}}
-              onClick={()=>{nav(n.r);setSidebar(false);}}>
+              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
+                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)'}}>
               {n.icon} {n.label}
             </Box>
           ))}
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <Box p={10} style={{borderRadius:10,cursor:'pointer',display:'flex',alignItems:'center',
-            gap:10,color:COLORS.error}} onClick={()=>{logout();nav(ROUTES.login);}}>
+          <Box p={10} style={{borderRadius:10,display:'flex',alignItems:'center',
+            gap:10,color:'var(--ot-text-muted)'}}>
             <IconLogout size={18}/> Sign out
           </Box>
         </Box>

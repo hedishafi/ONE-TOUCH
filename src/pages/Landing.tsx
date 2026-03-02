@@ -161,7 +161,7 @@ const FEATURES = [
   { icon: <IconShieldCheck size={24} />, color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Identity Verified', desc: 'Every provider is government-ID checked before being listed on the platform.' },
   { icon: <IconBolt size={24} />,        color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Instant VoIP Call', desc: 'Connect in seconds with a free in-app call — no phone number sharing needed.' },
   { icon: <IconMapPin size={24} />,      color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Location-Based',   desc: 'See only providers within your chosen radius on a live Addis Ababa map.' },
-  { icon: <IconWallet size={24} />,      color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Escrow Protected', desc: 'Payment held securely until you confirm the job is done — zero risk.' },
+  { icon: <IconWallet size={24} />,      color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Payment Process', desc: 'Payments are processed upfront to confirm the booking. This platform connects clients with service providers and does not hold funds in escrow.' },
 ];
 
 const STATS = [
