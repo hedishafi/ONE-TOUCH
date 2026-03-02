@@ -36,7 +36,7 @@ export function ProviderCard({
   const tierLabel = formatProviderTier(provider.loyaltyTier);
 
   // Resolve category names from IDs
-  const firstCatId = provider.categoryIds?.[0];
+  const firstCatId = provider.categoryId;
   const cat = MOCK_CATEGORIES.find(c => c.id === firstCatId);
   const catName = cat?.name ?? 'General';
 

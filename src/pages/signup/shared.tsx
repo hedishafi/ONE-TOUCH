@@ -9,13 +9,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box, Button, Center, Container, Group, Paper,
-  PinInput, Stack, Text, TextInput, ActionIcon,
+  PinInput, Stack, Text, TextInput,
   Alert, FileButton, Badge, SimpleGrid, RingProgress,
   Loader, Checkbox,
 } from '@mantine/core';
 import {
-  IconShieldLock, IconArrowRight, IconArrowLeft,
-  IconPhone, IconUser, IconMessageCircle,
+  IconArrowRight, IconArrowLeft,
+  IconPhone, IconMessageCircle,
   IconCircleCheck, IconAlertCircle, IconUpload, IconCamera,
   IconScan, IconFileText, IconIdBadge, IconCheck, IconX, IconRotate,
   IconLock, IconInfoCircle, IconEPassport, IconCar, IconIdBadge2,

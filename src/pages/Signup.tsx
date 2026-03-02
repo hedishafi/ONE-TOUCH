@@ -1,6 +1,6 @@
 import {
   Box, Button, Center, Container, Group,
-  Stack, Text, ThemeIcon,
+  Stack, Text,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconArrowRight, IconUser, IconBriefcase, IconCheck, IconLock,

@@ -9,10 +9,10 @@
 import { useState } from 'react';
 import {
   Modal, Box, Text, Group, Stack, Button, Paper, ThemeIcon,
-  Divider, Badge, SimpleGrid, Loader, Center, TextInput,
+  Divider, Badge, SimpleGrid, Center, TextInput,
 } from '@mantine/core';
 import {
-  IconCurrencyDollar, IconCheck, IconX, IconPhone, IconCreditCard,
+  IconCheck, IconX, IconPhone, IconCreditCard,
   IconBuildingBank, IconShieldCheck, IconAlertCircle, IconLock,
   IconArrowRight,
 } from '@tabler/icons-react';
@@ -45,8 +45,8 @@ const PROCESSING_MS = 2800;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function ChapaModal({
-  opened, onClose, onSuccess, onFailure,
-  amount, description, providerName, jobId,
+  opened, onClose, onSuccess,
+  amount, description, jobId,
 }: ChapaPaymentProps) {
   const [stage, setStage] = useState<Stage>('select');
   const [method, setMethod] = useState<PayMethod | null>(null);

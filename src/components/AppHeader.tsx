@@ -1,10 +1,10 @@
 import {
   Group, Text, ActionIcon, Menu, Avatar, Badge, Indicator,
-  Switch, Burger, Drawer, Stack, Divider, Button, Box,
+  Switch, Burger, Box,
 } from '@mantine/core';
 import {
   IconBell, IconLogout, IconUser, IconWallet, IconChevronDown,
-  IconSettings, IconShieldCheck,
+  IconShieldCheck,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useNavigate } from 'react-router-dom';

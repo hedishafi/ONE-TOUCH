@@ -9,7 +9,7 @@ import {
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
-  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone, IconPhoneCall,
+  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone,
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
@@ -106,7 +106,7 @@ function getNearbyProviders(): Provider[] {
 }
 
 // keep a single alias so legacy references still compile
-const FAKE_PROVIDERS = PROVIDER_POOL;
+void (PROVIDER_POOL);
 
 const DECLINE_REASONS = [
   'Not available right now',
@@ -140,7 +140,7 @@ const NAV=[
 
 export function ClientHome() {
   const nav=useNavigate();
-  const {currentUser,clientProfile,logout}=useAuthStore();
+  const {currentUser,clientProfile}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
 
@@ -153,13 +153,13 @@ export function ClientHome() {
   const [foundProv,setFoundProv]=useState<Provider>(PROVIDER_POOL[0]);
   const [foundProviders,setFoundProviders]=useState<Provider[]>([]);
   const [selectedProv,setSelectedProv]=useState<Provider|null>(null);
-  const [estPrice,setEstPrice]=useState({min:120,max:280});
+  const [,setEstPrice]=useState({min:120,max:280});
   const aTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const [cOpen,setCOpen]=useState(false);
   const [cStage,setCStage]=useState<CStage>('idle');
   const [cCat,setCCat]=useState('');
-  const [cPrice,setCPrice]=useState({min:80,max:200});
+  const [,setCPrice]=useState({min:80,max:200});
   const [cProviders,setCProviders]=useState<Provider[]>([]);
   const [cSelectedProv,setCSelectedProv]=useState<Provider|null>(null);
   const cTimer=useRef<ReturnType<typeof setTimeout>|null>(null);

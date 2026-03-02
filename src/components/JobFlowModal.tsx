@@ -5,7 +5,7 @@ import {
   Progress, ActionIcon,
 } from '@mantine/core';
 import {
-  IconCheck, IconWallet, IconMapPin, IconBriefcase,
+  IconCheck, IconWallet, IconBriefcase,
   IconStar, IconAlertCircle, IconCreditCard, IconTruck,
   IconPlayerPlay, IconFlagCheck, IconShieldCheck,
 } from '@tabler/icons-react';
@@ -32,13 +32,12 @@ export function JobFlowModal({ opened, onClose, providerId, categoryId = 'cat-00
   const [step, setStep] = useState<FlowStep>('agreement');
   const [estimatedPrice, setEstimatedPrice] = useState<number>(100);
   const [reviewRating, setReviewRating] = useState(5);
-  const [reviewText, setReviewText] = useState('');
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const { createJob, updateJobStatus } = useJobStore();
   const { currentUser, clientProfile } = useAuthStore();
   const provider = MOCK_PROVIDER_PROFILES.find(p => p.userId === providerId);
-  const providerUser = MOCK_USERS.find(u => u.id === providerId);
+  void MOCK_USERS.find(u => u.id === providerId);
   const category = MOCK_CATEGORIES.find(c => c.id === categoryId);
   const walletBalance = clientProfile?.walletBalance ?? 0;
   const commissionRate = 10;

@@ -12,8 +12,6 @@ import './index.css';
 import App from './App.tsx';
 import { oneTouchTheme } from './theme';
 
-const colorSchemeManager = undefined;
-
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider

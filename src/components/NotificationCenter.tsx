@@ -1,7 +1,7 @@
-import { Drawer, Stack, Text, Group, Badge, ActionIcon, Box, Button, ThemeIcon, ScrollArea } from '@mantine/core';
+import { Drawer, Stack, Text, Group, Badge, Box, Button, ThemeIcon, ScrollArea } from '@mantine/core';
 import {
   IconBell, IconPhone, IconBriefcase, IconWallet,
-  IconStar, IconAlertTriangle, IconCheck,
+  IconStar, IconAlertTriangle,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '../store/jobStore';

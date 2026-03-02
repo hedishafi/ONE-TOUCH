@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-  Box, Text, Group, Stack, SimpleGrid, Card, Badge, Button, Tabs,
+  Box, Text, Group, Stack, SimpleGrid, Card, Badge, Button,
   Table, ScrollArea, Progress, RingProgress, Paper, Divider,
-  ThemeIcon, Center, Alert, NumberInput, Select, Textarea,
-  FileButton, Avatar, Switch, Slider, ActionIcon, Timeline,
+  ThemeIcon, Center, NumberInput, Select, Textarea,
+  FileButton, Avatar, Switch, Slider, ActionIcon,
 } from '@mantine/core';
 import {
   IconBriefcase, IconWallet, IconUser, IconStar, IconTrendingUp,
-  IconCheck, IconClock, IconMapPin, IconPhoto, IconUpload,
-  IconEdit, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
-  IconBolt, IconShieldCheck, IconPhone, IconCircleFilled,
-  IconBell, IconCurrencyDollar, IconX, IconAlertCircle,
-  IconLock, IconLockOpen, IconWifi, IconWifiOff, IconStarFilled,
+  IconCheck, IconMapPin, IconPhoto, IconUpload,
+  IconGift, IconTrophy,
+  IconShieldCheck, IconPhone,
+  IconCurrencyDollar, IconX, IconAlertCircle,
+  IconLock, IconLockOpen, IconWifiOff, IconStarFilled,
 } from '@tabler/icons-react';
 import { Modal } from '@mantine/core';
 import { BarChart } from '@mantine/charts';
@@ -25,9 +25,9 @@ import { useJobStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo, formatProviderTier } from '../utils/formatting';
 import { COLORS, ROUTES, PROVIDER_TIER_COLORS } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import type { NavItem, WalletTransaction, ProviderProfile } from '../types';
+import type { WalletTransaction, ProviderProfile, PricingModel } from '../types';
+import type { NavItem } from '../types/nav';
 
 const PROVIDER_NAV: NavItem[] = [
   { path: ROUTES.providerDashboard, label: 'Active Jobs', icon: <IconBriefcase size={18} /> },
@@ -381,7 +381,7 @@ export function ActiveJobs() {
                   <Text size="sm" c="dimmed">({items.length})</Text>
                 </Group>
                 {items.map(job => (
-                  <JobCard key={job.id} job={job} role="provider" />
+                  <JobCard key={job.id} job={job} viewAs="provider" />
                 ))}
               </Stack>
             ))}
@@ -399,7 +399,7 @@ export function Earnings() {
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, [])
     .filter(tx => tx.userId === currentUser?.id);
 
-  const totalEarned = txns.filter(t => t.type === 'job_payment' || t.type === 'cashback').reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalEarned = txns.filter(t => t.type === 'payment' || t.type === 'cashback').reduce((s, t) => s + Math.abs(t.amount), 0);
   const totalCommission = txns.filter(t => t.type === 'commission').reduce((s, t) => s + Math.abs(t.amount), 0);
   const netEarnings = totalEarned - totalCommission;
 
@@ -468,7 +468,7 @@ export function Earnings() {
                     <Table.Td><Text size="sm" tt="capitalize">{tx.type.replace(/_/g, ' ')}</Text></Table.Td>
                     <Table.Td><Text size="sm" fw={600} c={tx.amount >= 0 ? 'teal' : 'red'}>{tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}</Text></Table.Td>
                     <Table.Td><Text size="xs" c="dimmed">{formatTimeAgo(tx.createdAt)}</Text></Table.Td>
-                    <Table.Td><Badge size="xs" color={tx.status === 'completed' ? 'teal' : 'yellow'}>{tx.status}</Badge></Table.Td>
+                    <Table.Td><Badge size="xs" color={tx.type === 'payment' || tx.type === 'commission' ? 'teal' : 'yellow'}>{tx.type}</Badge></Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>
@@ -508,14 +508,14 @@ export function ProviderProfile() {
           <Group gap="lg">
             <Box style={{ position: 'relative' }}>
               <Avatar size={80} radius="xl" color="teal">
-                {currentUser?.name?.charAt(0) ?? 'P'}
+                {myProfile?.fullName?.charAt(0) ?? 'P'}
               </Avatar>
               <Box style={{ position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, background: COLORS.tealBlue, borderRadius: '50%', border: '2px solid white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <IconCheck size={10} color="white" />
               </Box>
             </Box>
             <Stack gap="xs">
-              <Text fw={700} size="lg">{currentUser?.name}</Text>
+              <Text fw={700} size="lg">{myProfile?.fullName}</Text>
               <Text c="dimmed" size="sm">{currentUser?.email}</Text>
               <Group gap="xs">
                 <Badge color="teal" size="sm" leftSection={<IconShieldCheck size={10} />}>Verified Provider</Badge>
@@ -553,7 +553,7 @@ export function ProviderProfile() {
                 { value: 'custom', label: '🤝 Custom Estimate' },
               ]}
               value={pricingModel}
-              onChange={v => setPricingModel(v ?? 'hourly')}
+              onChange={v => setPricingModel((v as PricingModel) ?? 'hourly')}
             />
             {pricingModel !== 'custom' && (
               <NumberInput
@@ -644,7 +644,7 @@ export function ProviderWallet() {
           }}
         >
           <Text size="sm" c="rgba(255,255,255,0.7)">Available Balance</Text>
-          <Text size={42} fw={800} c="white">{formatCurrency(balance)}</Text>
+          <Text style={{ fontSize: 42 }} fw={800} c="white">{formatCurrency(balance)}</Text>
           <Text size="xs" c="rgba(255,255,255,0.5)">After commission deductions</Text>
         </Box>
 
@@ -687,10 +687,10 @@ export function ProviderLoyalty() {
   const tier = myProfile?.loyaltyTier ?? 'rising_pro';
   const tiers = LOYALTY_CONFIG.providerTiers;
   const tierConfig = tiers.find(t => t.tier === tier) ?? tiers[0];
-  const nextTier = tiers.find(t => t.minJobs > (tierConfig?.minJobs ?? 0));
-  const completedJobs = myProfile?.completedJobs ?? 12;
+  const nextTier = tiers.find(t => t.minCompletions > (tierConfig?.minCompletions ?? 0));
+  const completedJobs = myProfile?.totalJobsCompleted ?? 12;
   const progress = nextTier
-    ? Math.min(100, (completedJobs / nextTier.minJobs) * 100)
+    ? Math.min(100, (completedJobs / nextTier.minCompletions) * 100)
     : 100;
   const tc = PROVIDER_TIER_COLORS[tier as keyof typeof PROVIDER_TIER_COLORS] ?? COLORS.tealBlue;
 
@@ -720,7 +720,7 @@ export function ProviderLoyalty() {
               <Text size="sm" c="dimmed">{completedJobs} jobs completed</Text>
               {nextTier && (
                 <Text size="xs" c="dimmed">
-                  {nextTier.minJobs - completedJobs} more jobs to reach {formatProviderTier(nextTier.tier)}
+                  {nextTier.minCompletions - completedJobs} more jobs to reach {formatProviderTier(nextTier.tier)}
                 </Text>
               )}
               <Progress value={progress} color={tc} size="sm" h={6} w={200} radius="xl" />
@@ -744,10 +744,10 @@ export function ProviderLoyalty() {
                   <Text fw={700} size="sm">
                     {t.commissionDiscount > 0 ? `-${t.commissionDiscount}%` : 'Standard'} Commission
                   </Text>
-                  <Text size="xs" c="dimmed">From {t.minJobs} jobs</Text>
+                  <Text size="xs" c="dimmed">From {t.minCompletions} jobs</Text>
                   <Divider />
                   <Stack gap={4}>
-                    {t.perks.map(perk => (
+                    {t.benefits.map(perk => (
                       <Group key={perk} gap="xs">
                         <IconGift size={12} color={color} />
                         <Text size="xs">{perk}</Text>

@@ -28,7 +28,7 @@ import { formatCurrency, formatTimeAgo, calcDistance } from '../utils/formatting
 import { COLORS, ROUTES, CLIENT_TIER_COLORS } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import type { ProviderProfile, Job, WalletTransaction } from '../types';
+import type { ProviderProfile, WalletTransaction } from '../types';
 import type { NavItem } from '../types/nav';
 
 // Fix Leaflet default icons
@@ -70,7 +70,7 @@ export function BrowseServices() {
   }, []);
 
   const filtered = providers.filter(p => {
-    const catMatch = !selectedCategory || p.categoryIds.includes(selectedCategory);
+    const catMatch = !selectedCategory || p.categoryId === selectedCategory;
     const qMatch = !searchQuery || p.bio?.toLowerCase().includes(searchQuery.toLowerCase());
     return catMatch && qMatch;
   });
@@ -453,7 +453,7 @@ export function ClientLoyalty() {
   const { currentUser } = useAuthStore();
   const profiles = storage.get<any[]>(STORAGE_KEYS.clientProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
-  const tier = myProfile?.loyaltyTier ?? 'bronze';
+  const tier = (myProfile?.loyaltyTier ?? 'bronze') as keyof typeof CLIENT_TIER_COLORS;
   const totalBookings = myProfile?.totalBookings ?? 3;
   const tiers = LOYALTY_CONFIG.clientTiers;
   const currentTierConfig = tiers.find(ct => ct.tier === tier) ?? tiers[0];

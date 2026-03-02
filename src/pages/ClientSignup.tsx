@@ -7,15 +7,14 @@
  */
 import { useState, useRef, useEffect } from 'react';
 import {
-  Box, Button, Center, Group, PinInput,
-  Progress, Stack, Text, ThemeIcon, Alert, Anchor, Badge,
+  Box, Center, Group, PinInput,
+  Progress, Stack, Text, Alert, Anchor,
 } from '@mantine/core';
 import {
-  IconShieldCheck, IconMessageCircle, IconArrowRight,
+  IconShieldCheck, IconMessageCircle,
   IconChevronLeft, IconAlertCircle, IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
 import { storage, STORAGE_KEYS } from '../utils/storage';

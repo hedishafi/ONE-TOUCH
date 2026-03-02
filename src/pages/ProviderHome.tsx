@@ -22,7 +22,7 @@ import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
-import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
+import { COLORS, ROUTES } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
 // import { ChapaModal } from '../components/ChapaModal';
@@ -183,7 +183,7 @@ const NAV = [
 
 export function ProviderHome() {
   const nav = useNavigate();
-  const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
+  const {currentUser, providerProfile:authProf, updateProviderOnlineStatus} = useAuthStore();
   const {jobs} = useJobStore();
   const {unreadCount, fetchNotifications, addNotification} = useNotificationStore();
 

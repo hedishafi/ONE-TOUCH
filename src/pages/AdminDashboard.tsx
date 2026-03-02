@@ -1,27 +1,26 @@
 import { useState } from 'react';
 import {
-  Box, Text, Group, Stack, SimpleGrid, Card, Badge, Button, Tabs,
-  Table, ScrollArea, Progress, Select, TextInput, NumberInput,
-  Slider, Divider, Modal, ActionIcon, Alert, ThemeIcon, Center,
-  Switch, Textarea, Avatar, Timeline,
+  Text, Group, Stack, SimpleGrid, Card, Badge, Button,
+  Table, ScrollArea, Select, TextInput, NumberInput,
+  Slider, Modal, ActionIcon, Alert, ThemeIcon, Center,
+  Textarea, Avatar,
 } from '@mantine/core';
 import {
   IconUsers, IconCurrencyDollar, IconCategory, IconShield,
   IconScale, IconReceipt, IconChartBar, IconLanguage,
   IconCheck, IconX, IconAlertTriangle, IconEdit, IconTrash,
-  IconPlus, IconRefresh, IconEye, IconTrendingUp, IconBolt,
+  IconPlus, IconRefresh, IconTrendingUp, IconBolt,
 } from '@tabler/icons-react';
-import { BarChart, LineChart } from '@mantine/charts';
+import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { StatusBadge } from '../components/StatusBadge';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo } from '../utils/formatting';
 import { COLORS, ROUTES } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import type {
-  User, ProviderProfile, Job, WalletTransaction,
+  User, Job, WalletTransaction,
   FraudFlag, Dispute, CommissionConfig,
 } from '../types';
 import type { NavItem } from '../types/nav';
@@ -242,12 +241,12 @@ export function CategoryManager() {
 
   const deletecat = (id: string) => {
     setCats(prev => prev.filter(c => c.id !== id));
-    notifications.show({ title: 'Category Deleted', color: 'red' });
+    notifications.show({ title: 'Category Deleted', message: '', color: 'red' });
   };
 
   const addCat = () => {
     if (!newName) return;
-    setCats(prev => [...prev, { id: Date.now().toString(), name: newName, icon: '🔧', subcategories: [] }]);
+    setCats(prev => [...prev, { id: Date.now().toString(), name: newName, icon: '🔧', color: '#777', subcategories: [] }]);
     setNewName('');
     setAddModal(false);
     notifications.show({ title: 'Category Added ✅', message: newName, color: 'teal' });
@@ -306,7 +305,7 @@ export function FraudMonitoring() {
     const updated = flags.filter(f => f.id !== id);
     storage.set(STORAGE_KEYS.fraudFlags, updated);
     setFlags(updated);
-    notifications.show({ title: 'Flag Dismissed', color: 'gray' });
+    notifications.show({ title: 'Flag Dismissed', message: '', color: 'gray' });
   };
 
   const ban = (id: string) => {
@@ -338,12 +337,12 @@ export function FraudMonitoring() {
               <Group justify="space-between">
                 <Stack gap="xs">
                   <Group gap="xs">
-                    <Badge color="red" size="sm">{f.type.replace(/_/g, ' ')}</Badge>
+                    <Badge color="red" size="sm">{f.reason.replace(/_/g, ' ')}</Badge>
                     <Badge color={f.severity === 'high' ? 'red' : f.severity === 'medium' ? 'yellow' : 'gray'} size="sm" variant="light">
                       {f.severity.toUpperCase()}
                     </Badge>
                   </Group>
-                  <Text size="sm">{f.description}</Text>
+                  <Text size="sm">{f.reason}</Text>
                   <Text size="xs" c="dimmed">User: {f.userId} · {formatTimeAgo(f.createdAt)}</Text>
                 </Stack>
                 <Group gap="xs">
@@ -368,13 +367,13 @@ export function DisputeResolution() {
   const resolve = () => {
     if (!resolveModal || !resolution) return;
     const updated = disputes.map(d =>
-      d.id === resolveModal.id ? { ...d, status: 'resolved' as const, resolution } : d
+      d.id === resolveModal.id ? { ...d, status: 'resolved_client' as const, resolution } : d
     );
     storage.set(STORAGE_KEYS.disputes, updated);
     setDisputes(updated);
     setResolveModal(null);
     setResolution('');
-    notifications.show({ title: 'Dispute Resolved ✅', color: 'teal' });
+    notifications.show({ title: 'Dispute Resolved ✅', message: '', color: 'teal' });
   };
 
   return (
@@ -386,7 +385,7 @@ export function DisputeResolution() {
             <Group justify="space-between">
               <Stack gap="xs">
                 <Group gap="xs">
-                  <Badge color={d.status === 'open' ? 'yellow' : d.status === 'resolved' ? 'teal' : 'blue'}>
+                  <Badge color={d.status === 'open' ? 'yellow' : (d.status === 'resolved_client' || d.status === 'resolved_provider') ? 'teal' : 'blue'}>
                     {d.status}
                   </Badge>
                   <Text size="sm" fw={600}>Job: {d.jobId}</Text>
@@ -459,7 +458,7 @@ export function TransactionMonitoring() {
                         {tx.amount >= 0 ? '+' : ''}{formatCurrency(tx.amount)}
                       </Text>
                     </Table.Td>
-                    <Table.Td><Badge size="xs" color={tx.status === 'completed' ? 'teal' : 'yellow'}>{tx.status}</Badge></Table.Td>
+                    <Table.Td><Badge size="xs" color={tx.type === 'payment' || tx.type === 'commission' ? 'teal' : 'yellow'}>{tx.type}</Badge></Table.Td>
                     <Table.Td><Text size="xs" c="dimmed">{formatTimeAgo(tx.createdAt)}</Text></Table.Td>
                   </Table.Tr>
                 ))}

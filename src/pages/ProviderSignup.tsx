@@ -10,11 +10,11 @@ import { useState, useEffect } from 'react';
 import {
   Box, Button, FileButton, Group, MultiSelect,
   PasswordInput, Progress, Select, Stack, Text,
-  Avatar, Badge, Alert, SimpleGrid, Textarea, NumberInput,
+  Avatar, Badge, SimpleGrid, Textarea, NumberInput,
 } from '@mantine/core';
 import {
   IconShieldCheck, IconArrowRight, IconCamera, IconLock,
-  IconBriefcase, IconCircleCheck, IconUser,
+  IconBriefcase, IconCircleCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
@@ -43,7 +43,7 @@ interface ProviderProfileData {
 function StepProfileProvider({
   prefill,
   faceUrl,
-  onBack,
+  onBack: _onBack,
   onDone,
 }: {
   prefill: IdentityResult;
