@@ -29,11 +29,11 @@ import type { WalletTransaction, ProviderProfile, PricingModel } from '../types'
 import type { NavItem } from '../types/nav';
 
 const PROVIDER_NAV: NavItem[] = [
-  { path: ROUTES.providerDashboard, label: 'Active Jobs', icon: <IconBriefcase size={18} /> },
-  { path: ROUTES.providerEarnings, label: 'Earnings', icon: <IconTrendingUp size={18} /> },
-  { path: ROUTES.providerProfile, label: 'My Profile', icon: <IconUser size={18} /> },
-  { path: ROUTES.providerWallet, label: 'Provider Wallet', icon: <IconWallet size={18} /> },
-  { path: ROUTES.providerLoyalty, label: 'Loyalty & Tier', icon: <IconStar size={18} /> },
+  { path: ROUTES.providerDashboard, label: 'Jobs',     icon: <IconBriefcase  size={20} /> },
+  { path: ROUTES.providerEarnings,  label: 'Earnings', icon: <IconTrendingUp size={20} /> },
+  { path: ROUTES.providerWallet,   label: 'Wallet',   icon: <IconWallet     size={20} /> },
+  { path: ROUTES.providerLoyalty,  label: 'Rewards',  icon: <IconStar       size={20} /> },
+  { path: ROUTES.providerProfile,  label: 'Profile',  icon: <IconUser       size={20} /> },
 ];
 
 // ─── MOCK incoming job request (replace with real data source as needed) ─────

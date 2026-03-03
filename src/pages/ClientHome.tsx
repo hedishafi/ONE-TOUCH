@@ -140,7 +140,7 @@ const NAV=[
 
 export function ClientHome() {
   const nav=useNavigate();
-  const {currentUser,clientProfile}=useAuthStore();
+  const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
 
@@ -318,15 +318,19 @@ export function ClientHome() {
         <Stack gap={2} p="sm" style={{flex:1}}>
           {NAV.map(n=>(
             <Box key={n.label} p={10}
+              onClick={()=>{setSidebar(false);nav(n.r);}}
               style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)'}}>
+                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
+                cursor:'pointer'}}>
               {n.icon} {n.label}
             </Box>
           ))}
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <Box p={10} style={{borderRadius:10,display:'flex',alignItems:'center',
-            gap:10,color:'var(--ot-text-muted)'}}>
+          <Box p={10}
+            onClick={()=>{logout();nav(ROUTES.landing);}}
+            style={{borderRadius:10,display:'flex',alignItems:'center',
+              gap:10,color:'var(--ot-text-muted)',cursor:'pointer'}}>
             <IconLogout size={18}/> Sign out
           </Box>
         </Box>

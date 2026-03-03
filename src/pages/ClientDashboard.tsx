@@ -40,11 +40,10 @@ L.Icon.Default.mergeOptions({
 });
 
 const CLIENT_NAV: NavItem[] = [
-  { path: ROUTES.clientDashboard, label: 'Browse Services', icon: <IconBuildingStore size={18} /> },
-  { path: ROUTES.clientHistory, label: 'Booking History', icon: <IconHistory size={18} /> },
-  { path: ROUTES.savedProviders, label: 'Saved Providers', icon: <IconHeart size={18} /> },
-  { path: ROUTES.clientWallet, label: 'My Wallet', icon: <IconWallet size={18} /> },
-  { path: ROUTES.clientLoyalty, label: 'Loyalty Rewards', icon: <IconStar size={18} /> },
+  { path: ROUTES.clientDashboard, label: 'Browse',   icon: <IconBuildingStore size={20} /> },
+  { path: ROUTES.clientHistory,   label: 'Bookings', icon: <IconHistory       size={20} /> },
+  { path: ROUTES.clientWallet,    label: 'Wallet',   icon: <IconWallet        size={20} /> },
+  { path: ROUTES.clientLoyalty,   label: 'Rewards',  icon: <IconStar          size={20} /> },
 ];
 
 // ─── BROWSE SERVICES (MAIN CLIENT PAGE) ───────────────────────────────────────
