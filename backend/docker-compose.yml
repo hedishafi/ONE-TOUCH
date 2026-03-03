@@ -1,0 +1,50 @@
+services:
+  web:
+    build: .
+    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --reload
+    volumes:
+      - .:/home/appuser/code        # live-reload: local changes reflect instantly
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${DB_NAME:-onetouch}
+      POSTGRES_USER: ${DB_USER:-onetouch}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-onetouch}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-onetouch}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: .
+    command: celery -A core worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/home/appuser/code
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
