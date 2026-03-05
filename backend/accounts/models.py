@@ -34,7 +34,7 @@ class User(AbstractUser):
     trial_ends_at  = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD  = 'username'
-    REQUIRED_FIELDS = ['email', 'phone_number']
+    REQUIRED_FIELDS = ['phone_number']
 
     class Meta:
         verbose_name = 'User'
@@ -128,3 +128,36 @@ class ProviderProfile(models.Model):
 
     def __str__(self):
         return f'ProviderProfile({self.user.username})'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHONE OTP  (for phone-only auth: register/login verification)
+# ─────────────────────────────────────────────────────────────────────────────
+class PhoneOTP(models.Model):
+    PURPOSE_REGISTER = 'register'
+    PURPOSE_LOGIN = 'login'
+    PURPOSE_CHOICES = [
+        (PURPOSE_REGISTER, 'Register'),
+        (PURPOSE_LOGIN, 'Login'),
+    ]
+
+    phone_number = models.CharField(max_length=30, db_index=True)
+    purpose = models.CharField(max_length=20, choices=PURPOSE_CHOICES)
+    code = models.CharField(max_length=6)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['phone_number', 'purpose', 'is_used']),
+        ]
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f'OTP({self.phone_number}, {self.purpose}, used={self.is_used})'

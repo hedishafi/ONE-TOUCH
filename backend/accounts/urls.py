@@ -1,12 +1,11 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
-# Register ViewSets here as you build them, e.g.:
-# from .views import UserViewSet
-# router.register(r'users', UserViewSet)
+from .views import ProfileView, RefreshView, RequestOTPView, VerifyOTPView
 
-router = DefaultRouter()
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('auth/otp/request/', RequestOTPView.as_view(), name='auth-otp-request'),
+    path('auth/otp/verify/', VerifyOTPView.as_view(), name='auth-otp-verify'),
+    path('auth/refresh/', RefreshView.as_view(), name='auth-refresh'),
+    path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
 ]
