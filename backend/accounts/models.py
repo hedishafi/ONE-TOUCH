@@ -1,9 +1,12 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# USER  (single auth table — role field controls access)
+# ─────────────────────────────────────────────────────────────────────────────
 class User(AbstractUser):
-    # ── Roles ────────────────────────────────────────────────────────────────
     ROLE_CLIENT   = 'client'
     ROLE_PROVIDER = 'provider'
     ROLE_ADMIN    = 'admin'
@@ -13,7 +16,6 @@ class User(AbstractUser):
         (ROLE_ADMIN,    'Admin'),
     ]
 
-    # ── Verification ─────────────────────────────────────────────────────────
     STATUS_PENDING  = 'pending'
     STATUS_VERIFIED = 'verified'
     STATUS_REJECTED = 'rejected'
@@ -27,10 +29,18 @@ class User(AbstractUser):
     role                = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
 
-    # phone_number is required — make username auto-derived
+    # Free-trial support: providers get trial_ends_at set on signup
+    is_on_trial    = models.BooleanField(default=False)
+    trial_ends_at  = models.DateTimeField(null=True, blank=True)
+
     USERNAME_FIELD  = 'username'
     REQUIRED_FIELDS = ['email', 'phone_number']
 
+    class Meta:
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
     @property
     def is_provider(self):
         return self.role == self.ROLE_PROVIDER
@@ -39,67 +49,82 @@ class User(AbstractUser):
     def is_client(self):
         return self.role == self.ROLE_CLIENT
 
+    @property
+    def trial_is_active(self):
+        """True when the provider is still within their free-trial window."""
+        if not self.is_on_trial or not self.trial_ends_at:
+            return False
+        return timezone.now() < self.trial_ends_at
+
     def __str__(self):
         return f'{self.username} ({self.role})'
 
 
-class ClientProfile(models.Model):
-    TIER_BRONZE = 'bronze'
-    TIER_SILVER = 'silver'
-    TIER_GOLD   = 'gold'
-    TIER_CHOICES = [(TIER_BRONZE, 'Bronze'), (TIER_SILVER, 'Silver'), (TIER_GOLD, 'Gold')]
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY DOCUMENT  (one user may upload multiple verification docs)
+# ─────────────────────────────────────────────────────────────────────────────
+class IdentityDocument(models.Model):
+    DOC_PASSPORT   = 'passport'
+    DOC_NATIONAL   = 'national_id'
+    DOC_COMPANY    = 'company_id'
+    DOC_DRIVER     = 'drivers_license'
+    DOC_CHOICES    = [
+        (DOC_PASSPORT, 'Passport'),
+        (DOC_NATIONAL, 'National ID'),
+        (DOC_COMPANY,  'Company ID'),
+        (DOC_DRIVER,   "Driver's License"),
+    ]
 
-    user           = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
-    full_name      = models.CharField(max_length=120)
-    wallet_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    loyalty_tier   = models.CharField(max_length=10, choices=TIER_CHOICES, default=TIER_BRONZE)
-    total_bookings = models.PositiveIntegerField(default=0)
-    created_at     = models.DateTimeField(auto_now_add=True)
+    STATUS_PENDING  = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES  = [
+        (STATUS_PENDING,  'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='identity_documents')
+    doc_type      = models.CharField(max_length=20, choices=DOC_CHOICES)
+    document_url  = models.FileField(upload_to='identity_documents/')
+    status        = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    # Admin/staff who reviewed this document
+    reviewed_by   = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reviewed_documents'
+    )
+    reviewed_at   = models.DateTimeField(null=True, blank=True)
+    rejection_note = models.TextField(blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Identity Document'
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f'ClientProfile({self.full_name})'
+        return f'{self.user.username} — {self.get_doc_type_display()} ({self.status})'
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER PROFILE  (created only when user.role == 'provider')
+# ─────────────────────────────────────────────────────────────────────────────
 class ProviderProfile(models.Model):
-    TIER_RISING  = 'rising_pro'
-    TIER_TRUSTED = 'trusted_pro'
-    TIER_ELITE   = 'elite_pro'
-    TIER_CHOICES = [
-        (TIER_RISING,  'Rising Pro'),
-        (TIER_TRUSTED, 'Trusted Pro'),
-        (TIER_ELITE,   'Elite Pro'),
-    ]
+    user               = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
+    bio                = models.TextField(blank=True)
+    address            = models.CharField(max_length=255, blank=True)
+    latitude           = models.FloatField(null=True, blank=True)
+    longitude          = models.FloatField(null=True, blank=True)
+    is_available       = models.BooleanField(default=True)
+    years_of_experience = models.PositiveSmallIntegerField(default=0)
+    # Denormalized cache — updated by signals after each Review
+    avg_rating         = models.FloatField(default=0.0)
+    total_reviews      = models.PositiveIntegerField(default=0)
+    total_jobs         = models.PositiveIntegerField(default=0)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    updated_at         = models.DateTimeField(auto_now=True)
 
-    PRICING_HOURLY = 'hourly'
-    PRICING_FIXED  = 'fixed'
-    PRICING_CUSTOM = 'custom'
-    PRICING_CHOICES = [
-        (PRICING_HOURLY, 'Hourly'),
-        (PRICING_FIXED,  'Fixed'),
-        (PRICING_CUSTOM, 'Custom'),
-    ]
-
-    user                 = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
-    full_name            = models.CharField(max_length=120)
-    bio                  = models.TextField(blank=True)
-    category_id          = models.CharField(max_length=50, blank=True)   # FK to services.Category (string id)
-    subcategory_id       = models.CharField(max_length=50, blank=True)
-    pricing_model        = models.CharField(max_length=10, choices=PRICING_CHOICES, default=PRICING_HOURLY)
-    hourly_rate          = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    fixed_rate           = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    coverage_radius_km   = models.IntegerField(default=20)
-    lat                  = models.FloatField(null=True, blank=True)
-    lng                  = models.FloatField(null=True, blank=True)
-    is_online            = models.BooleanField(default=False)
-    wallet_balance       = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    rating               = models.FloatField(default=0)
-    total_jobs_completed = models.PositiveIntegerField(default=0)
-    response_rate        = models.FloatField(default=0)
-    completion_rate      = models.FloatField(default=0)
-    loyalty_tier         = models.CharField(max_length=15, choices=TIER_CHOICES, default=TIER_RISING)
-    selfie_url           = models.ImageField(upload_to='provider/selfies/', blank=True, null=True)
-    id_document_url      = models.ImageField(upload_to='provider/documents/', blank=True, null=True)
-    created_at           = models.DateTimeField(auto_now_add=True)
+    class Meta:
+        verbose_name = 'Provider Profile'
 
     def __str__(self):
-        return f'ProviderProfile({self.full_name})'
+        return f'ProviderProfile({self.user.username})'
