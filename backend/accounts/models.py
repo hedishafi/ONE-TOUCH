@@ -147,6 +147,12 @@ class PhoneOTP(models.Model):
     expires_at = models.DateTimeField()
     is_used = models.BooleanField(default=False)
     attempts = models.PositiveSmallIntegerField(default=0)
+    # Persist optional metadata captured during OTP request (e.g. OCR extraction)
+    first_name = models.CharField(max_length=150, blank=True)
+    last_name = models.CharField(max_length=150, blank=True)
+    username = models.CharField(max_length=150, blank=True)
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES, null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

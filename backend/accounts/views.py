@@ -57,8 +57,8 @@ def _invalidate_previous_otps(phone_number: str, purpose: str) -> None:
 	).update(is_used=True)
 
 
-def _issue_otp(phone_number: str, purpose: str) -> str:
-	"""Invalidate old OTPs, create a new one, and return the code."""
+def _issue_otp(phone_number: str, purpose: str, **meta) -> str:
+	"""Invalidate old OTPs, create a new one (persist optional meta) and return the code."""
 	_invalidate_previous_otps(phone_number, purpose)
 	code = _generate_otp()
 	PhoneOTP.objects.create(
@@ -66,6 +66,10 @@ def _issue_otp(phone_number: str, purpose: str) -> str:
 		purpose=purpose,
 		code=code,
 		expires_at=timezone.now() + timedelta(minutes=OTP_EXPIRY_MINUTES),
+		role=meta.get('role'),
+		username=meta.get('username', '') or '',
+		first_name=meta.get('first_name', '') or '',
+		last_name=meta.get('last_name', '') or '',
 	)
 	return code
 
@@ -164,7 +168,14 @@ class SignupRequestOTPView(APIView):
 		# Persist pending signup data inside the OTP record isn't possible with the
 		# current PhoneOTP model, so we carry role/name through the verify step.
 		# The serializer already validated the phone is not taken.
-		code = _issue_otp(vd['phone_number'], PhoneOTP.PURPOSE_REGISTER)
+		code = _issue_otp(
+			vd['phone_number'],
+			PhoneOTP.PURPOSE_REGISTER,
+			role=vd.get('role'),
+			username=vd.get('username', ''),
+			first_name=vd.get('first_name', ''),
+			last_name=vd.get('last_name', ''),
+		)
 		return Response(_otp_response(code), status=status.HTTP_200_OK)
 
 
@@ -214,9 +225,16 @@ class SignupVerifyView(APIView):
 			)
 
 		try:
-			_verify_otp(phone_number, PhoneOTP.PURPOSE_REGISTER, otp_code)
+			otp = _verify_otp(phone_number, PhoneOTP.PURPOSE_REGISTER, otp_code)
 		except ValueError as exc:
 			return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+		# Use values persisted on the OTP record (from OCR/extraction) as primary
+		# but allow the client to override if they provide values in the verify call.
+		role = request.data.get('role') or otp.role or User.ROLE_CLIENT
+		username = request.data.get('username') or otp.username or phone_number
+		first_name = request.data.get('first_name') or otp.first_name or ''
+		last_name = request.data.get('last_name') or otp.last_name or ''
 
 		if User.objects.filter(phone_number=phone_number).exists():
 			return Response(
@@ -226,11 +244,11 @@ class SignupVerifyView(APIView):
 
 		with transaction.atomic():
 			user = User(
-				username    = _unique_username(username),
-				phone_number= phone_number,
-				role        = role,
-				first_name  = first_name,
-				last_name   = last_name,
+				username = _unique_username(username),
+				phone_number = phone_number,
+				role = role,
+				first_name = first_name,
+				last_name = last_name,
 				is_on_trial = True,
 				trial_ends_at = timezone.now() + timedelta(days=TRIAL_DAYS),
 			)

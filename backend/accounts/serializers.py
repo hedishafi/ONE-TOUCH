@@ -112,6 +112,11 @@ class SignupVerifySerializer(serializers.Serializer):
         max_length=6, min_length=6,
         help_text='6-digit OTP sent to the phone number.',
     )
+    # Optional: client UI may resend these, otherwise values stored on the OTP record are used
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, required=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
 
     def validate_phone_number(self, value: str) -> str:
         return value.strip()
