@@ -1,9 +1,11 @@
 from django.urls import path
 
 from .views import (
+    IdentityDocumentUploadView,
     LoginRequestOTPView,
     LoginVerifyView,
     ProfileView,
+    ProviderProfileView,
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
@@ -11,21 +13,22 @@ from .views import (
 
 # All routes are prefixed with /api/v1/ from core/urls.py
 urlpatterns = [
-    # ── Signup (new users: client or provider) ────────────────────────────────
-    # Step 1: send phone number + role → receive OTP via SMS
+    # Signup
     path('auth/signup/otp/',    SignupRequestOTPView.as_view(), name='signup-otp-request'),
-    # Step 2: send phone number + OTP → account created + JWT tokens returned
     path('auth/signup/verify/', SignupVerifyView.as_view(),     name='signup-otp-verify'),
 
-    # ── Login (existing users: client or provider) ────────────────────────────
-    # Step 1: send phone number → receive OTP via SMS
+    # Login
     path('auth/login/otp/',    LoginRequestOTPView.as_view(), name='login-otp-request'),
-    # Step 2: send phone number + OTP → JWT tokens returned
     path('auth/login/verify/', LoginVerifyView.as_view(),     name='login-otp-verify'),
 
-    # ── Token management ──────────────────────────────────────────────────────
+    # Token management
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
 
-    # ── Authenticated user ────────────────────────────────────────────────────
+    # Authenticated user
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
+
+    # Provider-only: GET/POST/PATCH profile
+    path('provider/profile/', ProviderProfileView.as_view(), name='provider-profile'),
+    # Provider-only: GET list / POST upload identity doc (triggers verification task)
+    path('identity-docs/',    IdentityDocumentUploadView.as_view(), name='identity-docs'),
 ]

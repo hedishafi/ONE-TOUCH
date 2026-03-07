@@ -5,19 +5,24 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import permissions, status
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from rest_framework import permissions, serializers as rest_framework_serializers, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 
-from .models import PhoneOTP
+from .models import IdentityDocument, PhoneOTP, ProviderProfile
+from .permissions import IsProvider
 from .serializers import (
 	AuthTokenSerializer,
+	IdentityDocumentSerializer,
 	LoginOTPRequestSerializer,
 	LoginVerifySerializer,
 	OTPSentSerializer,
+	ProviderProfileSerializer,
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
@@ -380,5 +385,135 @@ class ProfileView(APIView):
 		serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
 		serializer.is_valid(raise_exception=True)
 		serializer.save()
+		return Response(serializer.data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER PROFILE  GET / POST / PATCH /api/v1/provider/profile/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProviderProfileView(APIView):
+	"""Create, retrieve, or partially update the authenticated provider's profile."""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={200: ProviderProfileSerializer},
+		summary='Get my provider profile',
+	)
+	def get(self, request):
+		try:
+			profile = request.user.provider_profile
+		except ProviderProfile.DoesNotExist:
+			return Response({'detail': 'Profile not created yet.'}, status=status.HTTP_404_NOT_FOUND)
+		return Response(ProviderProfileSerializer(profile).data)
+
+	@extend_schema(
+		tags=['Provider'],
+		request=ProviderProfileSerializer,
+		responses={201: ProviderProfileSerializer},
+		summary='Create provider profile',
+		description='Creates the ProviderProfile for the authenticated provider. Only allowed once.',
+	)
+	def post(self, request):
+		if ProviderProfile.objects.filter(user=request.user).exists():
+			return Response({'detail': 'Profile already exists. Use PATCH to update.'}, status=status.HTTP_400_BAD_REQUEST)
+		serializer = ProviderProfileSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		serializer.save(user=request.user)
+		return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+	@extend_schema(
+		tags=['Provider'],
+		request=ProviderProfileSerializer,
+		responses={200: ProviderProfileSerializer},
+		summary='Update provider profile',
+	)
+	def patch(self, request):
+		try:
+			profile = request.user.provider_profile
+		except ProviderProfile.DoesNotExist:
+			return Response({'detail': 'Profile not found. POST to create one first.'}, status=status.HTTP_404_NOT_FOUND)
+		serializer = ProviderProfileSerializer(profile, data=request.data, partial=True)
+		serializer.is_valid(raise_exception=True)
+		serializer.save()
+		return Response(serializer.data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY DOCUMENT UPLOAD  POST /api/v1/identity-docs/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class IdentityDocumentUploadView(APIView):
+	"""
+	Upload an identity document (and optional biometric selfie).
+	Automatically queues the OCR + liveness verification Celery task.
+	Accepts multipart/form-data.
+	"""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes     = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request={
+			'multipart/form-data': {
+				'type': 'object',
+				'properties': {
+					'doc_type': {
+						'type': 'string',
+						'enum': ['passport', 'national_id', 'company_id', 'drivers_license'],
+						'description': 'Type of identity document.',
+					},
+					'document_url': {
+						'type': 'string',
+						'format': 'binary',
+						'description': 'Government-issued ID document (JPEG, PNG or PDF, max 10 MB).',
+					},
+					'biometric_selfie': {
+						'type': 'string',
+						'format': 'binary',
+						'nullable': True,
+						'description': 'Liveness selfie photo (JPEG/PNG, max 5 MB). Optional.',
+					},
+				},
+				'required': ['doc_type', 'document_url'],
+			}
+		},
+		responses={
+			201: IdentityDocumentSerializer,
+			400: OpenApiResponse(description='Validation error'),
+		},
+		summary='Upload identity document',
+		description=(
+			'Upload a government-issued ID document and an optional biometric selfie. '
+			'Triggers automated OCR + liveness verification. '
+			'If the combined confidence score ≥ 0.75 the document is auto-approved; '
+			'otherwise it is flagged for admin review.'
+		),
+	)
+	def post(self, request):
+		serializer = IdentityDocumentSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		doc = serializer.save(user=request.user)
+
+		# Queue automated verification (non-blocking)
+		try:
+			from .tasks import run_verification
+			run_verification.delay(doc.pk)
+		except Exception:	# Celery may not be running in dev
+			pass
+
+		return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={200: IdentityDocumentSerializer(many=True)},
+		summary='List my identity documents',
+	)
+	def get(self, request):
+		docs = IdentityDocument.objects.filter(user=request.user)
+		serializer = IdentityDocumentSerializer(docs, many=True)
 		return Response(serializer.data)
 

@@ -87,10 +87,12 @@ class IdentityDocument(models.Model):
     STATUS_PENDING  = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_REJECTED = 'rejected'
+    STATUS_FLAGGED  = 'flagged'   # auto-scored below threshold; awaits admin review
     STATUS_CHOICES  = [
         (STATUS_PENDING,  'Pending'),
         (STATUS_APPROVED, 'Approved'),
         (STATUS_REJECTED, 'Rejected'),
+        (STATUS_FLAGGED,  'Flagged – Needs Review'),
     ]
 
     user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='identity_documents')
