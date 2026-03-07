@@ -33,6 +33,15 @@ class User(AbstractUser):
     is_on_trial    = models.BooleanField(default=False)
     trial_ends_at  = models.DateTimeField(null=True, blank=True)
 
+    # Biometric verification — providers only (clients do NOT go through biometrics)
+    # biometric_verified is set True by the automated verification task after
+    # liveness check + ID OCR match passes the confidence threshold.
+    biometric_verified = models.BooleanField(default=False)
+    biometric_score    = models.FloatField(
+        null=True, blank=True,
+        help_text='Liveness/face-match confidence score (0.0–1.0). Set by automated check.'
+    )
+
     USERNAME_FIELD  = 'username'
     REQUIRED_FIELDS = ['phone_number']
 
@@ -87,8 +96,28 @@ class IdentityDocument(models.Model):
     user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='identity_documents')
     doc_type      = models.CharField(max_length=20, choices=DOC_CHOICES)
     document_url  = models.FileField(upload_to='identity_documents/')
+    # Biometric selfie uploaded alongside the ID document (provider only)
+    biometric_selfie = models.FileField(
+        upload_to='biometric_selfies/', null=True, blank=True,
+        help_text='Liveness selfie photo submitted by the provider during onboarding.'
+    )
     status        = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    # Admin/staff who reviewed this document
+
+    # ── Automated verification fields ─────────────────────────────────────────
+    # auto_verified = True when OCR + liveness both pass the confidence threshold
+    # without any human intervention.
+    auto_verified   = models.BooleanField(default=False)
+    ocr_confidence  = models.FloatField(
+        null=True, blank=True,
+        help_text='OCR match confidence score (0.0–1.0). Set by automated verification task.'
+    )
+    ocr_extracted   = models.JSONField(
+        null=True, blank=True,
+        help_text='Raw fields extracted by OCR (name, DOB, ID number) for audit purposes.'
+    )
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # Admin/staff who reviewed this document (only used for flagged/manual cases)
     reviewed_by   = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='reviewed_documents'
@@ -116,12 +145,32 @@ class ProviderProfile(models.Model):
     longitude          = models.FloatField(null=True, blank=True)
     is_available       = models.BooleanField(default=True)
     years_of_experience = models.PositiveSmallIntegerField(default=0)
+
+    # Price range set by the provider — used to calculate commission.
+    # Commission = (price_min + price_max) / 2  ×  2%
+    price_min = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Minimum service price in ETB.'
+    )
+    price_max = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Maximum service price in ETB.'
+    )
+
     # Denormalized cache — updated by signals after each Review
     avg_rating         = models.FloatField(default=0.0)
     total_reviews      = models.PositiveIntegerField(default=0)
     total_jobs         = models.PositiveIntegerField(default=0)
     created_at         = models.DateTimeField(auto_now_add=True)
     updated_at         = models.DateTimeField(auto_now=True)
+
+    @property
+    def commission_amount(self):
+        """Calculate the 2% commission based on the average of the price range."""
+        if self.price_min is not None and self.price_max is not None:
+            average = (self.price_min + self.price_max) / 2
+            return round(average * 2 / 100, 2)
+        return None
 
     class Meta:
         verbose_name = 'Provider Profile'
