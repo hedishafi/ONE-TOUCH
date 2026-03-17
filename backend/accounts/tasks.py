@@ -1,66 +1,37 @@
 """
 accounts/tasks.py
 
-Celery tasks for automated identity verification.
+Celery tasks for automated identity and face biometric verification.
 
-Simulated pipeline (replace with real OCR / liveness vendor SDK):
-  1. OCR extraction  → ocr_confidence  (0.0 – 1.0)
-  2. Liveness check  → liveness_score  (0.0 – 1.0)
-  3. Combined score  = (ocr_confidence + liveness_score) / 2
+Verification pipeline:
+  1. OCR extraction        → ocr_confidence, extracted_fields
+  2. Face liveness check   → liveness_score
+  3. Face matching (ID vs selfie) → face_match_score
+  4. Combined scoring      → auto-approve or flag for admin review
 
-Auto-approve threshold: combined ≥ OCR_LIVENESS_THRESHOLD (default 0.75)
-Anything below → status = 'flagged' for admin manual review.
+Auto-approve thresholds:
+  - OCR_MIN_CONFIDENCE: 0.75 (from settings)
+  - FACE_LIVENESS_THRESHOLD: 0.75 (from settings)
+  - FACE_MATCH_THRESHOLD: 0.85 (from settings)
 """
 
 import logging
-import random
-import time
+import os
 
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-# ── tuneable thresholds ────────────────────────────────────────────────────────
-OCR_LIVENESS_THRESHOLD = 0.75   # combined score required for auto-approval
-SIMULATED_DELAY_SEC    = 2      # simulates network/API latency in dev/test
+# ── tuneable thresholds (can be overridden via env vars or settings) ────────
+OCR_MIN_CONFIDENCE = float(os.getenv('OCR_MIN_CONFIDENCE', 0.75))
+FACE_LIVENESS_THRESHOLD = float(os.getenv('FACE_LIVENESS_THRESHOLD', 0.75))
+FACE_MATCH_THRESHOLD = float(os.getenv('FACE_MATCH_THRESHOLD', 0.85))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HELPER – simulate OCR extraction
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _simulate_ocr(document_url) -> tuple[float, dict]:
-    """
-    Replace with real Tesseract / cloud OCR call.
-    Returns (confidence_score, extracted_fields).
-    """
-    time.sleep(SIMULATED_DELAY_SEC)
-    confidence = round(random.uniform(0.60, 0.99), 4)
-    extracted  = {
-        'name':           'Extracted Name',
-        'id_number':      'ETH-' + str(random.randint(100000, 999999)),
-        'date_of_birth':  '1990-01-01',
-        'expiry_date':    '2030-01-01',
-    }
-    return confidence, extracted
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# HELPER – simulate liveness check
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _simulate_liveness(selfie_url) -> float:
-    """
-    Replace with a real face-liveness vendor API call.
-    Returns liveness_score (0.0 – 1.0).
-    """
-    time.sleep(SIMULATED_DELAY_SEC)
-    return round(random.uniform(0.60, 0.99), 4)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# CELERY TASK
+# CELERY TASK — OCR + Liveness Verification
 # ─────────────────────────────────────────────────────────────────────────────
 
 @shared_task(
@@ -71,16 +42,20 @@ def _simulate_liveness(selfie_url) -> float:
 )
 def run_verification(self, identity_doc_id: int) -> dict:
     """
-    Automated OCR + liveness verification for an IdentityDocument.
+    Automated OCR verification for an IdentityDocument.
 
-    Called immediately after a provider uploads their document.
+    Called immediately after a provider uploads their identity document.
+    Extracts OCR fields and sets document status based on confidence.
+
     Sets IdentityDocument.status to:
-      - 'approved'  → if combined score ≥ OCR_LIVENESS_THRESHOLD
-      - 'flagged'   → below threshold; admin reviews manually
+      - 'approved'  → if ocr_confidence ≥ OCR_MIN_CONFIDENCE
+      - 'flagged'   → if ocr_confidence < OCR_MIN_CONFIDENCE; admin reviews manually
 
-    Also updates User.verification_status and biometric fields on approval.
+    Also populates canonical OCR fields (extracted_name, extracted_id_number, etc.)
+    and sets User.verification_status.
     """
-    from accounts.models import IdentityDocument, User  # local import avoids circular
+    from accounts.models import IdentityDocument, User
+    from accounts.ocr_engine import get_ocr_engine
 
     logger.info('run_verification started for IdentityDocument id=%s', identity_doc_id)
 
@@ -96,66 +71,225 @@ def run_verification(self, identity_doc_id: int) -> dict:
         return {'skipped': True, 'status': doc.status}
 
     try:
-        # 1. OCR
-        ocr_confidence, ocr_extracted = _simulate_ocr(doc.document_url.name if doc.document_url else '')
+        # Initialize OCR engine
+        ocr_engine = get_ocr_engine()
+        logger.info('Using OCR engine: %s', ocr_engine.__class__.__name__)
 
-        # 2. Liveness (only run if selfie was uploaded)
-        if doc.biometric_selfie:
-            liveness_score = _simulate_liveness(doc.biometric_selfie.name)
-        else:
-            liveness_score = 0.0   # no selfie → treat liveness as failed
+        # Run OCR on the document
+        if not doc.document_url:
+            logger.error('Document id=%s has no document_url – cannot run OCR', identity_doc_id)
+            doc.status = IdentityDocument.STATUS_FLAGGED
+            doc.save(update_fields=['status'])
+            return {'error': 'no_document_url', 'id': identity_doc_id}
 
-        # 3. Combined score
-        if doc.biometric_selfie:
-            combined = (ocr_confidence + liveness_score) / 2
-        else:
-            combined = ocr_confidence * 0.6  # penalty for missing selfie
+        ocr_result = ocr_engine.extract_text(doc.document_url.path)
+        ocr_confidence = ocr_result.get('confidence', 0.0)
+        ocr_extracted = ocr_result.get('extracted_fields', {})
+        raw_text = ocr_result.get('raw_text', '')
 
         logger.info(
-            'Document id=%s | ocr=%.4f | liveness=%.4f | combined=%.4f',
-            identity_doc_id, ocr_confidence, liveness_score, combined,
+            'OCR completed for Document id=%s | confidence=%.4f | language=%s',
+            identity_doc_id, ocr_confidence, ocr_result.get('language', 'unknown'),
         )
 
-        # 4. Persist OCR results
+        # Populate canonical OCR fields
         doc.ocr_confidence = ocr_confidence
-        doc.ocr_extracted  = ocr_extracted
+        doc.ocr_extracted = ocr_result
+        doc.ocr_language = ocr_result.get('language')
+        doc.extracted_name = ocr_extracted.get('name', '')
+        doc.extracted_id_number = ocr_extracted.get('id_number', '')
+        doc.extracted_dob = ocr_extracted.get('date_of_birth')
+        doc.extracted_expiry = ocr_extracted.get('expiry_date')
+        doc.extracted_nationality = ocr_extracted.get('nationality', '')
 
-        if combined >= OCR_LIVENESS_THRESHOLD:
+        if ocr_confidence >= OCR_MIN_CONFIDENCE:
             # ── AUTO-APPROVE ───────────────────────────────────────────────
             doc.auto_verified = True
-            doc.status        = IdentityDocument.STATUS_APPROVED
-            doc.reviewed_at   = timezone.now()
+            doc.status = IdentityDocument.STATUS_APPROVED
+            doc.reviewed_at = timezone.now()
 
             user = doc.user
-            user.verification_status  = User.STATUS_VERIFIED
-            user.biometric_verified   = bool(doc.biometric_selfie)
-            user.biometric_score      = liveness_score if doc.biometric_selfie else 0.0
-            user.save(update_fields=['verification_status', 'biometric_verified', 'biometric_score'])
+            user.verification_status = User.STATUS_VERIFIED
+            user.save(update_fields=['verification_status'])
 
-            doc.save(update_fields=['ocr_confidence', 'ocr_extracted', 'auto_verified', 'status', 'reviewed_at'])
+            doc.save(update_fields=[
+                'ocr_confidence', 'ocr_extracted', 'ocr_language',
+                'extracted_name', 'extracted_id_number', 'extracted_dob',
+                'extracted_expiry', 'extracted_nationality',
+                'auto_verified', 'status', 'reviewed_at'
+            ])
 
-            logger.info('Document id=%s AUTO-APPROVED (combined=%.4f)', identity_doc_id, combined)
+            logger.info('Document id=%s AUTO-APPROVED (ocr_confidence=%.4f)', identity_doc_id, ocr_confidence)
             return {
-                'result':       'approved',
-                'combined':     combined,
-                'ocr':          ocr_confidence,
-                'liveness':     liveness_score,
+                'result': 'approved',
+                'ocr_confidence': ocr_confidence,
+                'extracted_fields': ocr_extracted,
             }
 
         else:
             # ── FLAG FOR ADMIN ─────────────────────────────────────────────
             doc.auto_verified = False
-            doc.status        = IdentityDocument.STATUS_FLAGGED
-            doc.save(update_fields=['ocr_confidence', 'ocr_extracted', 'auto_verified', 'status'])
+            doc.status = IdentityDocument.STATUS_FLAGGED
+            doc.save(update_fields=[
+                'ocr_confidence', 'ocr_extracted', 'ocr_language',
+                'extracted_name', 'extracted_id_number', 'extracted_dob',
+                'extracted_expiry', 'extracted_nationality',
+                'auto_verified', 'status'
+            ])
 
-            logger.warning('Document id=%s FLAGGED for admin review (combined=%.4f)', identity_doc_id, combined)
+            logger.warning('Document id=%s FLAGGED for admin review (ocr_confidence=%.4f)', identity_doc_id, ocr_confidence)
             return {
-                'result':   'flagged',
-                'combined': combined,
-                'ocr':      ocr_confidence,
-                'liveness': liveness_score,
+                'result': 'flagged',
+                'ocr_confidence': ocr_confidence,
+                'reason': 'OCR confidence below threshold',
             }
 
     except Exception as exc:
         logger.exception('run_verification failed for id=%s: %s', identity_doc_id, exc)
         raise self.retry(exc=exc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CELERY TASK — Face Biometric Verification
+# ─────────────────────────────────────────────────────────────────────────────
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    name='accounts.tasks.run_face_verification',
+)
+def run_face_verification(self, face_verification_id: int) -> dict:
+    """
+    Automated face biometric verification (liveness + face matching).
+
+    Called after a provider submits a selfie for face verification.
+    Compares the selfie against the ID photo and checks liveness.
+
+    Sets FaceBiometricVerification.status to:
+      - 'approved'  → if liveness_score ≥ FACE_LIVENESS_THRESHOLD
+                      AND face_match_score ≥ FACE_MATCH_THRESHOLD
+      - 'flagged'   → if either score is below threshold; admin reviews manually
+
+    Also updates User.biometric_verified and biometric_score on approval.
+    """
+    from accounts.models import FaceBiometricVerification, IdentityDocument, User
+    from accounts.face_verification import get_face_engine
+
+    logger.info('run_face_verification started for FaceBiometricVerification id=%s', face_verification_id)
+
+    try:
+        face_verification = FaceBiometricVerification.objects.select_related(
+            'identity_document', 'identity_document__user'
+        ).get(pk=face_verification_id)
+    except FaceBiometricVerification.DoesNotExist:
+        logger.error('FaceBiometricVerification id=%s not found – aborting task', face_verification_id)
+        return {'error': 'not_found', 'id': face_verification_id}
+
+    # Guard: skip if already reviewed
+    if face_verification.status in (FaceBiometricVerification.STATUS_APPROVED, FaceBiometricVerification.STATUS_REJECTED):
+        logger.info('Face verification id=%s already reviewed (status=%s) – skipping', face_verification_id, face_verification.status)
+        return {'skipped': True, 'status': face_verification.status}
+
+    try:
+        doc = face_verification.identity_document
+
+        # Validate that both images exist
+        if not doc.biometric_selfie:
+            logger.error('IdentityDocument id=%s has no biometric_selfie on file – cannot run face matching', doc.pk)
+            face_verification.status = FaceBiometricVerification.STATUS_FLAGGED
+            face_verification.rejection_reason = 'Original selfie not found.'
+            face_verification.save(update_fields=['status', 'rejection_reason'])
+            return {'error': 'no_original_selfie', 'doc_id': doc.pk}
+
+        if not face_verification.selfie_image:
+            logger.error('FaceBiometricVerification id=%s has no selfie_image – cannot run verification', face_verification_id)
+            face_verification.status = FaceBiometricVerification.STATUS_FLAGGED
+            face_verification.rejection_reason = 'Selfie submission not found.'
+            face_verification.save(update_fields=['status', 'rejection_reason'])
+            return {'error': 'no_submission_selfie', 'face_verification_id': face_verification_id}
+
+        if not doc.document_url:
+            logger.error('IdentityDocument id=%s has no document_url – cannot run face matching', doc.pk)
+            face_verification.status = FaceBiometricVerification.STATUS_FLAGGED
+            face_verification.rejection_reason = 'ID document not found.'
+            face_verification.save(update_fields=['status', 'rejection_reason'])
+            return {'error': 'no_id_document', 'doc_id': doc.pk}
+
+        # Initialize face verification engine
+        face_engine = get_face_engine()
+        logger.info('Using face engine: %s', face_engine.__class__.__name__)
+
+        # 1. Check liveness on the submitted selfie
+        liveness_score = face_engine.check_liveness(face_verification.selfie_image.path)
+        logger.info('Liveness check completed for face_verification id=%s | score=%.4f', face_verification_id, liveness_score)
+
+        # 2. Compare selfie against ID photo
+        face_match_score = face_engine.compare_faces(
+            id_photo_path=doc.document_url.path,
+            selfie_image_path=face_verification.selfie_image.path
+        )
+        logger.info('Face matching completed for face_verification id=%s | score=%.4f', face_verification_id, face_match_score)
+
+        # Update scores
+        face_verification.liveness_score = liveness_score
+        face_verification.face_match_score = face_match_score
+
+        # Determine approval
+        liveness_pass = liveness_score >= FACE_LIVENESS_THRESHOLD
+        face_match_pass = face_match_score >= FACE_MATCH_THRESHOLD
+
+        if liveness_pass and face_match_pass:
+            # ── AUTO-APPROVE ───────────────────────────────────────────────
+            face_verification.auto_verified = True
+            face_verification.status = FaceBiometricVerification.STATUS_APPROVED
+            face_verification.reviewed_at = timezone.now()
+
+            user = doc.user
+            user.biometric_verified = True
+            user.biometric_score = (liveness_score + face_match_score) / 2
+            user.verification_status = User.STATUS_VERIFIED
+            user.save(update_fields=['biometric_verified', 'biometric_score', 'verification_status'])
+
+            face_verification.save(update_fields=[
+                'liveness_score', 'face_match_score', 'auto_verified', 'status', 'reviewed_at'
+            ])
+
+            logger.info(
+                'Face verification id=%s AUTO-APPROVED (liveness=%.4f, face_match=%.4f)',
+                face_verification_id, liveness_score, face_match_score
+            )
+            return {
+                'result': 'approved',
+                'liveness_score': liveness_score,
+                'face_match_score': face_match_score,
+            }
+
+        else:
+            # ── FLAG FOR ADMIN ─────────────────────────────────────────────
+            face_verification.auto_verified = False
+            face_verification.status = FaceBiometricVerification.STATUS_FLAGGED
+            reasons = []
+            if not liveness_pass:
+                reasons.append(f'Liveness score {liveness_score:.4f} < {FACE_LIVENESS_THRESHOLD}')
+            if not face_match_pass:
+                reasons.append(f'Face match score {face_match_score:.4f} < {FACE_MATCH_THRESHOLD}')
+            face_verification.rejection_reason = '; '.join(reasons)
+
+            face_verification.save(update_fields=[
+                'liveness_score', 'face_match_score', 'auto_verified', 'status', 'rejection_reason'
+            ])
+
+            logger.warning(
+                'Face verification id=%s FLAGGED for admin review (liveness=%.4f, face_match=%.4f)',
+                face_verification_id, liveness_score, face_match_score
+            )
+            return {
+                'result': 'flagged',
+                'liveness_score': liveness_score,
+                'face_match_score': face_match_score,
+                'reason': face_verification.rejection_reason,
+            }
+
+    except Exception as exc:
+        logger.exception('run_face_verification failed for id=%s: %s', face_verification_id, exc)

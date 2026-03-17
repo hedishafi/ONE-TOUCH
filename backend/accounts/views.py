@@ -14,10 +14,14 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 
-from .models import IdentityDocument, PhoneOTP, ProviderProfile
+from .models import (
+	IdentityDocument, PhoneOTP, ProviderProfile, FaceBiometricVerification,
+	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+)
 from .permissions import IsProvider
 from .serializers import (
 	AuthTokenSerializer,
+	FaceBiometricVerificationSerializer,
 	IdentityDocumentSerializer,
 	LoginOTPRequestSerializer,
 	LoginVerifySerializer,
@@ -26,6 +30,15 @@ from .serializers import (
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
+	ServiceCategorySerializer,
+	SubServiceSerializer,
+	OnboardingStep1Serializer,
+	OnboardingStep2Serializer,
+	OnboardingStep3OTPRequestSerializer,
+	OnboardingStep3OTPVerifySerializer,
+	OnboardingStep4Serializer,
+	OnboardingStep5Serializer,
+	ClientOnboardingProfileUpdateSerializer,
 )
 
 User = get_user_model()
@@ -86,6 +99,9 @@ def _verify_otp(phone_number: str, purpose: str, otp_code: str):
 	Returns the `PhoneOTP` instance on success.
 	Raises `ValueError` with a human-readable message on failure.
 	"""
+	phone_number = phone_number.strip()
+	otp_code = otp_code.strip()
+	
 	otp = (
 		PhoneOTP.objects
 		.filter(phone_number=phone_number, purpose=purpose, is_used=False)
@@ -517,3 +533,818 @@ class IdentityDocumentUploadView(APIView):
 		serializer = IdentityDocumentSerializer(docs, many=True)
 		return Response(serializer.data)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FACE BIOMETRIC VERIFICATION  POST /api/v1/identity-docs/{id}/verify-face/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FaceVerificationView(APIView):
+	"""
+	Submit a biometric selfie for face verification (liveness + face matching).
+	Automatically runs the face verification engine and returns confidence scores.
+	If scores meet the configured thresholds, the submission is auto-approved.
+	Otherwise, it is flagged for admin review.
+	Accepts multipart/form-data.
+	"""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes     = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request={
+			'multipart/form-data': {
+				'type': 'object',
+				'properties': {
+					'selfie_image': {
+						'type': 'string',
+						'format': 'binary',
+						'description': 'Liveness selfie photo (JPEG/PNG, max 5 MB).',
+					},
+				},
+				'required': ['selfie_image'],
+			}
+		},
+		responses={
+			201: FaceBiometricVerificationSerializer,
+			404: OpenApiResponse(description='Identity document not found'),
+			400: OpenApiResponse(description='Validation error'),
+		},
+		summary='Submit face for biometric verification',
+		description=(
+			'Upload a selfie image for liveness detection and face matching against the ID photo. '
+			'Returns liveness_score + face_match_score. If both scores meet the configured thresholds, '
+			'the document is auto-approved; otherwise it is flagged for admin review.'
+		),
+		parameters=[
+			{
+				'name': 'id',
+				'in': 'path',
+				'required': True,
+				'schema': {'type': 'integer'},
+				'description': 'Identity document ID',
+			}
+		],
+	)
+	def post(self, request, id):
+		# Get the identity document
+		try:
+			doc = IdentityDocument.objects.get(pk=id, user=request.user)
+		except IdentityDocument.DoesNotExist:
+			return Response({'detail': 'Identity document not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+		# Check if a face verification already exists
+		if hasattr(doc, 'face_verification'):
+			return Response(
+				{'detail': 'Face verification already submitted for this document.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+
+		# Parse and validate the selfie image
+		serializer = FaceBiometricVerificationSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+
+		# Create the FaceBiometricVerification record with the selfie
+		face_verification = FaceBiometricVerification.objects.create(
+			identity_document=doc,
+			selfie_image=serializer.validated_data['selfie_image'],
+			liveness_score=0.0,  # Will be populated by the task
+			face_match_score=0.0,  # Will be populated by the task
+		)
+
+		# Queue the face verification task (non-blocking)
+		try:
+			from .tasks import run_face_verification
+			run_face_verification.delay(face_verification.pk)
+		except Exception:  # Celery may not be running in dev
+			pass
+
+		return Response(
+			FaceBiometricVerificationSerializer(face_verification).data,
+			status=status.HTTP_201_CREATED
+		)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER ONBOARDING  (5-step signup flow)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProviderOnboardingStep1View(APIView):
+	"""Step 1: Upload identity document and extract via OCR."""
+	permission_classes = [permissions.AllowAny]
+	parser_classes = [MultiPartParser, FormParser]
+	
+	@extend_schema(
+		request=OnboardingStep1Serializer,
+		responses={201: inline_serializer('Step1Response', {
+			'session_id': rest_framework_serializers.CharField(),
+			'step': rest_framework_serializers.IntegerField(),
+			'extracted_data': rest_framework_serializers.JSONField(),
+			'image_quality': rest_framework_serializers.FloatField(),
+			'quality_warnings': rest_framework_serializers.ListField(),
+			'ocr_confidence': rest_framework_serializers.FloatField(),
+		})}
+	)
+	def post(self, request):
+		"""Upload document and perform OCR extraction."""
+		serializer = OnboardingStep1Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		import uuid
+		from .ocr_engine import get_ocr_engine
+		
+		# Create onboarding session
+		session_id = str(uuid.uuid4())
+		doc_file = serializer.validated_data['document_file']
+		doc_type = serializer.validated_data['document_type']
+		
+		session = ProviderOnboardingSession.objects.create(
+			session_id=session_id,
+			step=1,
+			document_file=doc_file,
+			document_type=doc_type,
+			expires_at=timezone.now() + timedelta(hours=12)
+		)
+		
+		# Perform OCR extraction
+		ocr_engine = get_ocr_engine()
+		ocr_result = ocr_engine.extract_text(doc_file.path, language='auto')
+		
+		# Check document validation
+		validation = ocr_result.get('validation', {})
+		if validation.get('flagged'):
+			# Document is invalid - return detailed error
+			error_details = {
+				'error': 'Document validation failed',
+				'is_expired': validation.get('is_expired', False),
+				'is_non_ethiopian': validation.get('is_non_ethiopian', False),
+				'validation_errors': validation.get('errors', []),
+				'validation_warnings': validation.get('warnings', []),
+			}
+			return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+		
+		# Store extracted data
+		session.extracted_data = ocr_result['extracted_fields']
+		session.ocr_confidence = ocr_result.get('confidence', 0.0)
+		session.image_quality = ocr_result.get('image_quality', 0.0)
+		session.quality_warnings = ocr_result.get('quality_warnings', [])
+		session.save()
+		
+		return Response({
+			'session_id': session_id,
+			'step': 1,
+			'extracted_data': session.extracted_data,
+			'image_quality': session.image_quality,
+			'quality_warnings': session.quality_warnings,
+			'ocr_confidence': session.ocr_confidence,
+		}, status=status.HTTP_201_CREATED)
+
+
+class ProviderOnboardingStep2View(APIView):
+	"""Step 2: Review and confirm extracted OCR data."""
+	permission_classes = [permissions.AllowAny]
+	
+	def post(self, request):
+		"""Confirm OCR-extracted data (user can edit)."""
+		serializer = OnboardingStep2Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		try:
+			session = ProviderOnboardingSession.objects.get(
+				session_id=serializer.validated_data['session_id'],
+				status='in_progress'
+			)
+		except ProviderOnboardingSession.DoesNotExist:
+			return Response({'error': 'Invalid or expired session'}, status=400)
+		
+		if session.is_expired:
+			return Response({'error': 'Session expired'}, status=400)
+		
+		# Store user-confirmed data
+		session.confirmed_data = serializer.validated_data['confirmed_data']
+		session.step = 2
+		session.save()
+		
+		return Response({
+			'session_id': session.session_id,
+			'step': 2,
+			'confirmed_data': session.confirmed_data,
+			'next_step': 3,
+		}, status=status.HTTP_200_OK)
+
+
+class ProviderOnboardingStep3OTPRequestView(APIView):
+	"""Step 3a: Request OTP to extracted or manually-provided phone."""
+	permission_classes = [permissions.AllowAny]
+	
+	def post(self, request):
+		"""Send OTP to phone (extracted or custom)."""
+		serializer = OnboardingStep3OTPRequestSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		try:
+			session = ProviderOnboardingSession.objects.get(
+				session_id=serializer.validated_data['session_id'],
+				status='in_progress'
+			)
+		except:
+			return Response({'error': 'Invalid session'}, status=400)
+		
+		if session.is_expired:
+			return Response({'error': 'Session expired'}, status=400)
+		
+		# Determine phone: use manually provided or extracted
+		phone = serializer.validated_data.get('phone_for_verification')
+		if not phone:
+			phone = session.confirmed_data.get('phone')
+		
+		if not phone:
+			return Response(
+				{'error': 'No phone provided and none extracted from document'},
+				status=400
+			)
+		
+		# Generate and store OTP
+		otp = _generate_otp()
+		session.phone_for_verification = phone
+		session.otp_code = otp
+		session.save()
+		
+		# Send SMS (in production)
+		# send_sms(phone, f"Your OneTouch verification code is: {otp}")
+		
+		return Response({
+			'message': 'OTP sent to phone',
+			'otp': otp,  # DEBUG only
+			'phone': phone,
+		}, status=status.HTTP_200_OK)
+
+
+class ProviderOnboardingStep3OTPVerifyView(APIView):
+	"""Step 3b: Verify OTP code."""
+	permission_classes = [permissions.AllowAny]
+	
+	def post(self, request):
+		"""Verify OTP matches."""
+		serializer = OnboardingStep3OTPVerifySerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		try:
+			session = ProviderOnboardingSession.objects.get(
+				session_id=serializer.validated_data['session_id'],
+				status='in_progress'
+			)
+		except:
+			return Response({'error': 'Invalid session'}, status=400)
+		
+		if session.is_expired:
+			return Response({'error': 'Session expired'}, status=400)
+		
+		# Verify OTP
+		if serializer.validated_data['otp'] != session.otp_code:
+			return Response({'error': 'Invalid OTP'}, status=400)
+		
+		# Mark phone as verified
+		session.phone_verified = True
+		session.step = 3
+		session.save()
+		
+		return Response({
+			'session_id': session.session_id,
+			'step': 3,
+			'phone_verified': True,
+			'next_step': 4,
+		}, status=status.HTTP_200_OK)
+
+
+class ProviderOnboardingStep4View(APIView):
+	"""Step 4: Submit selfie for face biometric verification."""
+	permission_classes = [permissions.AllowAny]
+	parser_classes = [MultiPartParser, FormParser]
+	
+	@extend_schema(
+		request=OnboardingStep4Serializer,
+		responses={201: inline_serializer('Step4Response', {
+			'session_id': rest_framework_serializers.CharField(),
+			'step': rest_framework_serializers.IntegerField(),
+			'liveness_score': rest_framework_serializers.FloatField(),
+			'face_match_score': rest_framework_serializers.FloatField(),
+			'status': rest_framework_serializers.CharField(),
+		})}
+	)
+	def post(self, request):
+		"""Submit selfie for face verification."""
+		serializer = OnboardingStep4Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		try:
+			session = ProviderOnboardingSession.objects.get(
+				session_id=serializer.validated_data['session_id'],
+				status='in_progress'
+			)
+		except:
+			return Response({'error': 'Invalid session'}, status=400)
+		
+		if session.is_expired or not session.phone_verified:
+			return Response({'error': 'Session invalid or phone not verified'}, status=400)
+		
+		# Store selfie
+		session.selfie_file = serializer.validated_data['selfie_image']
+		session.step = 4
+		session.save()
+		
+		# Perform face verification synchronously for now
+		from .face_verification import get_face_engine
+		face_engine = get_face_engine()
+		
+		# Check liveness
+		liveness_result = face_engine.check_liveness(session.selfie_file.path)
+		session.liveness_score = liveness_result.get('liveness_score', 0.0)
+		
+		# Compare faces
+		face_match_result = face_engine.compare_faces(
+			id_photo_path=session.document_file.path,
+			selfie_image_path=session.selfie_file.path
+		)
+		session.face_match_score = face_match_result.get('face_match_score', 0.0)
+		
+		# Determine if auto-approved
+		liveness_threshold = float(settings.FACE_LIVENESS_THRESHOLD)
+		match_threshold = float(settings.FACE_MATCH_THRESHOLD)
+		
+		if session.liveness_score >= liveness_threshold and session.face_match_score >= match_threshold:
+			session.face_verified = True
+			status_val = 'approved'
+		else:
+			status_val = 'flagged'
+		
+		session.save()
+		
+		return Response({
+			'session_id': session.session_id,
+			'step': 4,
+			'liveness_score': session.liveness_score,
+			'face_match_score': session.face_match_score,
+			'status': status_val,
+			'next_step': 5,
+		}, status=status.HTTP_201_CREATED)
+
+
+class ProviderOnboardingStep5View(APIView):
+	"""Step 5: Complete profile setup and create account."""
+	permission_classes = [permissions.AllowAny]
+	
+	@transaction.atomic
+	def post(self, request):
+		"""Complete onboarding: create user, documents, profile."""
+		serializer = OnboardingStep5Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		try:
+			session = ProviderOnboardingSession.objects.get(
+				session_id=serializer.validated_data['session_id'],
+				status='in_progress'
+			)
+		except:
+			return Response({'error': 'Invalid session'}, status=400)
+		
+		if session.is_expired or not session.phone_verified or not session.face_verified:
+			return Response(
+				{'error': 'Session incomplete or failed verification'},
+				status=400
+			)
+		
+		# Store profile info in session
+		session.bio = serializer.validated_data.get('bio', '')
+		session.address = serializer.validated_data['address']
+		session.years_of_experience = serializer.validated_data['years_of_experience']
+		session.price_min = serializer.validated_data['price_min']
+		session.price_max = serializer.validated_data['price_max']
+		session.service_category = ServiceCategory.objects.get(
+			id=serializer.validated_data['service_category_id']
+		)
+		session.service_ids = serializer.validated_data['service_ids']
+		session.step = 5
+		session.save()
+		
+		# 1. Create User
+		phone = session.confirmed_data['phone']
+		username = _unique_username(session.confirmed_data['name'].lower().replace(' ', '_'))
+		
+		user = User.objects.create_user(
+			username=username,
+			phone_number=phone,
+			role='provider',
+			is_active=True,
+			is_on_trial=True,
+			trial_ends_at=timezone.now() + timedelta(days=30),
+			biometric_verified=True,
+		)
+		
+		# 2. Create permanent IdentityDocument
+		identity_doc = IdentityDocument.objects.create(
+			user=user,
+			doc_type=session.document_type,
+			document_url=session.document_file,
+			biometric_selfie=session.selfie_file,
+			status='approved',
+			auto_verified=True,
+			ocr_confidence=session.ocr_confidence,
+			extracted_name=session.confirmed_data.get('name'),
+			extracted_id_number=session.confirmed_data.get('id_number'),
+			extracted_dob=session.confirmed_data.get('dob'),
+			extracted_nationality=session.confirmed_data.get('nationality'),
+		)
+		
+		# 3. Create FaceBiometricVerification
+		FaceBiometricVerification.objects.create(
+			identity_document=identity_doc,
+			selfie_image=session.selfie_file,
+			liveness_score=session.liveness_score,
+			face_match_score=session.face_match_score,
+			status='approved',
+			auto_verified=True,
+		)
+		
+		# 4. Create ProviderProfile
+		provider_profile = ProviderProfile.objects.create(
+			user=user,
+			bio=session.bio,
+			address=session.address,
+			years_of_experience=session.years_of_experience,
+			price_min=session.price_min,
+			price_max=session.price_max,
+			is_available=True,
+			is_online=False,
+		)
+		
+		# 5. Create ProviderService (with categories)
+		provider_service = ProviderService.objects.create(
+			provider=provider_profile,
+			primary_service=session.service_category
+		)
+		# Add sub-services
+		subservices = SubService.objects.filter(id__in=session.service_ids)
+		provider_service.subservices.set(subservices)
+		
+		# 6. Mark session as completed
+		session.status = 'completed'
+		session.completed_at = timezone.now()
+		session.save()
+		
+		# 7. Generate JWT tokens
+		refresh = RefreshToken.from_user(user)
+		
+		return Response({
+			'access': str(refresh.access_token),
+			'refresh': str(refresh),
+			'user': UserProfileSerializer(user).data,
+			'provider_profile': ProviderProfileSerializer(provider_profile).data,
+			'message': 'Welcome! Your account is fully verified. Go online when ready!',
+		}, status=status.HTTP_201_CREATED)
+
+
+class ServiceCategoryListView(APIView):
+	"""List all available service categories."""
+	permission_classes = [permissions.AllowAny]
+	
+	def get(self, request):
+		"""Get all service categories."""
+		categories = ServiceCategory.objects.filter(is_active=True)
+		serializer = ServiceCategorySerializer(categories, many=True)
+		return Response(serializer.data)
+
+
+class SubServiceListView(APIView):
+	"""List sub-services for a category."""
+	permission_classes = [permissions.AllowAny]
+	
+	def get(self, request, category_id):
+		"""Get sub-services for a category."""
+		subservices = SubService.objects.filter(
+			category_id=category_id,
+			is_active=True
+		)
+		serializer = SubServiceSerializer(subservices, many=True)
+		return Response(serializer.data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLIENT ONBOARDING — Unified with Provider (but simpler: no face verification)
+#
+# FLOW:
+#  Step 1: Upload document + OCR (unauthenticated)
+#  Step 2: Confirm OCR data
+#  Step 3: Request OTP + Verify OTP → Create account
+#  Step 4 (optional): Update profile
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ClientOnboardingStep1View(APIView):
+	"""Step 1: Upload identity document and run OCR extraction."""
+	permission_classes = [permissions.AllowAny]
+	parser_classes = [MultiPartParser, FormParser]
+	
+	@extend_schema(
+		request=OnboardingStep1Serializer,  # Reuse provider serializer
+		responses={201: inline_serializer(
+			name='ClientStep1Response',
+			fields={
+				'message': rest_framework_serializers.CharField(),
+				'session_id': rest_framework_serializers.CharField(),
+				'extracted_data': rest_framework_serializers.JSONField(),
+				'image_quality': rest_framework_serializers.FloatField(),
+				'quality_warnings': rest_framework_serializers.ListField(),
+			}
+		)},
+		tags=['Client Onboarding'],
+	)
+	def post(self, request):
+		"""Upload document and run OCR extraction (like provider Step 1)."""
+		from .ocr_engine import get_ocr_engine
+		import uuid
+		
+		serializer = OnboardingStep1Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		document_type = serializer.validated_data['document_type']
+		document_file = serializer.validated_data['document_file']
+		
+		# Create client onboarding session
+		session_id = str(uuid.uuid4())
+		session = ClientOnboardingSession.objects.create(
+			session_id=session_id,
+			document_type=document_type,
+			document_file=document_file,
+			expires_at=timezone.now() + timedelta(hours=6),
+		)
+		
+		# Run OCR
+		try:
+			ocr_engine = get_ocr_engine()
+			ocr_result = ocr_engine.extract_text(document_file.path, language='auto')
+			
+			# Check document validation
+			validation = ocr_result.get('validation', {})
+			if validation.get('flagged'):
+				# Document is invalid - return detailed error
+				error_details = {
+					'error': 'Document validation failed',
+					'is_expired': validation.get('is_expired', False),
+					'is_non_ethiopian': validation.get('is_non_ethiopian', False),
+					'validation_errors': validation.get('errors', []),
+					'validation_warnings': validation.get('warnings', []),
+				}
+				return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+			
+			# Store OCR results
+			session.extracted_data = ocr_result.get('extracted_fields', {})
+			session.ocr_confidence = ocr_result.get('confidence', 0.0)
+			session.image_quality = ocr_result.get('image_quality', 0.0)
+			session.quality_warnings = ocr_result.get('quality_warnings', [])
+			session.save()
+		except Exception as e:
+			return Response(
+				{'error': f'OCR extraction failed: {str(e)}'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		return Response({
+			'message': 'Document uploaded and processed successfully.',
+			'session_id': session_id,
+			'extracted_data': session.extracted_data,
+			'image_quality': session.image_quality,
+			'quality_warnings': session.quality_warnings,
+		}, status=status.HTTP_201_CREATED)
+
+
+class ClientOnboardingStep2View(APIView):
+	"""Step 2: Confirm OCR-extracted data."""
+	permission_classes = [permissions.AllowAny]
+	
+	@extend_schema(
+		request=OnboardingStep2Serializer,  # Reuse provider serializer
+		responses={200: inline_serializer(
+			name='ClientStep2Response',
+			fields={
+				'message': rest_framework_serializers.CharField(),
+				'confirmed_data': rest_framework_serializers.JSONField(),
+			}
+		)},
+		tags=['Client Onboarding'],
+	)
+	def post(self, request):
+		"""Confirm OCR-extracted data (like provider Step 2)."""
+		serializer = OnboardingStep2Serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		session_id = serializer.validated_data['session_id']
+		confirmed_data = serializer.validated_data.get('confirmed_data', {})
+		
+		try:
+			session = ClientOnboardingSession.objects.get(
+				session_id=session_id,
+				status='in_progress',
+			)
+		except ClientOnboardingSession.DoesNotExist:
+			return Response(
+				{'error': 'Invalid or expired session.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if session.is_expired:
+			return Response(
+				{'error': 'Session expired. Please start over.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Store confirmed data
+		session.confirmed_data = confirmed_data
+		session.save()
+		
+		return Response({
+			'message': 'Data confirmed successfully.',
+			'confirmed_data': session.confirmed_data,
+		}, status=status.HTTP_200_OK)
+
+
+class ClientOnboardingStep3OTPRequestView(APIView):
+	"""Step 3: Request OTP for phone verification."""
+	permission_classes = [permissions.AllowAny]
+	
+	@extend_schema(
+		request=OnboardingStep3OTPRequestSerializer,  # Reuse provider serializer
+		responses={200: OTPSentSerializer},
+		tags=['Client Onboarding'],
+	)
+	def post(self, request):
+		"""Request OTP to verify phone (like provider Step 3)."""
+		serializer = OnboardingStep3OTPRequestSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		session_id = serializer.validated_data['session_id']
+		phone_for_verification = serializer.validated_data.get('phone_for_verification')
+		
+		try:
+			session = ClientOnboardingSession.objects.get(
+				session_id=session_id,
+				status='in_progress',
+			)
+		except ClientOnboardingSession.DoesNotExist:
+			return Response(
+				{'error': 'Invalid or expired session.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if session.is_expired:
+			return Response(
+				{'error': 'Session expired. Please start over.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Use extraction phone or override
+		if phone_for_verification:
+			phone_number = phone_for_verification
+		elif session.extracted_data and 'phone' in session.extracted_data:
+			phone_number = session.extracted_data['phone']
+		else:
+			return Response(
+				{'error': 'Phone number not extracted. Please provide phone_for_verification.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Issue OTP
+		otp_code = _issue_otp(
+			phone_number=phone_number,
+			purpose=PhoneOTP.PURPOSE_REGISTER,
+			role=User.ROLE_CLIENT,
+		)
+		
+		# Store phone in session
+		session.phone_for_verification = phone_number
+		session.save()
+		
+		response_data = {
+			'detail': f'OTP sent to {phone_number}',
+		}
+		
+		if settings.DEBUG:
+			response_data['otp_code'] = otp_code
+		
+		return Response(response_data, status=status.HTTP_200_OK)
+
+
+class ClientOnboardingStep3OTPVerifyView(APIView):
+	"""Step 3: Verify OTP and create client account."""
+	permission_classes = [permissions.AllowAny]
+	
+	@extend_schema(
+		request=OnboardingStep3OTPVerifySerializer,  # Reuse provider serializer
+		responses={201: AuthTokenSerializer},
+		tags=['Client Onboarding'],
+	)
+	def post(self, request):
+		"""Verify OTP and create client account (like provider Step 3)."""
+		serializer = OnboardingStep3OTPVerifySerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		session_id = serializer.validated_data['session_id']
+		otp_code = serializer.validated_data['otp_code']
+		
+		try:
+			session = ClientOnboardingSession.objects.get(
+				session_id=session_id,
+				status='in_progress',
+			)
+		except ClientOnboardingSession.DoesNotExist:
+			return Response(
+				{'error': 'Invalid or expired session.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if session.is_expired:
+			return Response(
+				{'error': 'Session expired. Please start over.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if not session.phone_for_verification:
+			return Response(
+				{'error': 'Please complete Step 3 OTP request first.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Verify OTP
+		try:
+			phone_otp_obj = _verify_otp(
+				phone_number=session.phone_for_verification,
+				purpose=PhoneOTP.PURPOSE_REGISTER,
+				otp_code=otp_code,
+			)
+		except ValueError as e:
+			return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+		
+		# Create account (atomic transaction)
+		with transaction.atomic():
+			# Extract name from confirmed data or OCR data
+			confirmed = session.confirmed_data or session.extracted_data or {}
+			first_name = confirmed.get('name', '').split()[0] if confirmed.get('name') else ''
+			last_name = confirmed.get('name', '').split()[1] if confirmed.get('name', '').split().__len__() > 1 else ''
+			
+			# Create User account
+			username = _unique_username(session.phone_for_verification.replace('+', ''))
+			user = User.objects.create_user(
+				username=username,
+				phone_number=session.phone_for_verification,
+				first_name=first_name,
+				last_name=last_name,
+				role=User.ROLE_CLIENT,
+				verification_status=User.STATUS_VERIFIED,
+			)
+			
+			# Mark session as completed
+			session.status = 'completed'
+			session.completed_at = timezone.now()
+			session.phone_verified = True
+			session.save()
+			
+			# Generate JWT tokens
+			refresh = RefreshToken.from_user(user)
+		
+		return Response({
+			'access': str(refresh.access_token),
+			'refresh': str(refresh),
+			'user': UserProfileSerializer(user).data,
+			'message': 'Welcome! Your account is ready. You can now start booking services.',
+		}, status=status.HTTP_201_CREATED)
+
+
+class ClientOnboardingStep4ProfileView(APIView):
+	"""Step 4 (Optional): Update profile with additional information."""
+	permission_classes = [permissions.IsAuthenticated]
+	
+	@extend_schema(
+		request=ClientOnboardingProfileUpdateSerializer,
+		responses={200: UserProfileSerializer},
+		tags=['Client Onboarding'],
+	)
+	def post(self, request):
+		"""Update client profile with confirmed/additional info."""
+		serializer = ClientOnboardingProfileUpdateSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		
+		first_name = serializer.validated_data.get('first_name', '')
+		last_name = serializer.validated_data.get('last_name', '')
+		address = serializer.validated_data.get('address', '')
+		
+		# Update user
+		user = request.user
+		if first_name:
+			user.first_name = first_name
+		if last_name:
+			user.last_name = last_name
+		user.save(update_fields=['first_name', 'last_name'])
+		
+		return Response({
+			'message': 'Profile updated successfully.',
+			'user': UserProfileSerializer(user).data,
+		}, status=status.HTTP_200_OK)

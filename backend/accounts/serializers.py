@@ -3,7 +3,10 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import IdentityDocument, PhoneOTP, ProviderProfile
+from .models import (
+    IdentityDocument, PhoneOTP, ProviderProfile, FaceBiometricVerification,
+    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+)
 
 
 User = get_user_model()
@@ -172,7 +175,13 @@ class LoginVerifySerializer(serializers.Serializer):
 class ProviderProfileSerializer(serializers.ModelSerializer):
     """
     Create or update a provider's public profile.
-    `commission_amount` is computed from price_min/price_max — always read-only.
+    
+    **Online/Offline Mode:**
+    - When `is_online=True`, the provider's location (current_latitude, current_longitude) is active.
+    - When `is_online=False`, location tracking is disabled.
+    - Mobile app sends location updates when going online or periodically while online.
+    
+    **Commission:** Auto-calculated from price_min/price_max — always read-only.
     """
 
     commission_amount = serializers.SerializerMethodField(
@@ -185,8 +194,10 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             'id',
             'bio',
             'address',
-            'latitude',
-            'longitude',
+            'is_online',
+            'current_latitude',
+            'current_longitude',
+            'last_location_update',
             'is_available',
             'years_of_experience',
             'price_min',
@@ -198,7 +209,7 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'avg_rating', 'total_reviews', 'total_jobs', 'commission_amount', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'avg_rating', 'total_reviews', 'total_jobs', 'commission_amount', 'last_location_update', 'created_at', 'updated_at']
 
     def get_commission_amount(self, obj):
         return str(obj.commission_amount) if obj.commission_amount is not None else None
@@ -208,7 +219,30 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
         price_max = data.get('price_max', getattr(self.instance, 'price_max', None))
         if price_min is not None and price_max is not None and price_min > price_max:
             raise serializers.ValidationError({'price_max': 'price_max must be ≥ price_min.'})
+        
+        # Validate location updates: can only send lat/long if is_online=True
+        is_online = data.get('is_online', getattr(self.instance, 'is_online', False))
+        has_lat = data.get('current_latitude') is not None or (self.instance and self.instance.current_latitude is not None)
+        has_lon = data.get('current_longitude') is not None or (self.instance and self.instance.current_longitude is not None)
+        
+        if (has_lat or has_lon) and not is_online:
+            raise serializers.ValidationError(
+                {'current_latitude': 'Cannot update location unless is_online=True.'}
+            )
+        
         return data
+
+    def update(self, instance, validated_data):
+        """
+        Auto-update `last_location_update` timestamp when location fields are modified.
+        """
+        from django.utils import timezone
+        
+        # Check if location is being updated
+        if 'current_latitude' in validated_data or 'current_longitude' in validated_data:
+            validated_data['last_location_update'] = timezone.now()
+        
+        return super().update(instance, validated_data)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -287,3 +321,166 @@ class IdentityDocumentSerializer(serializers.ModelSerializer):
         if value:
             return self._validate_file(value, self.ALLOWED_IMAGE_TYPES, self.MAX_SELFIE_SIZE_MB, 'biometric_selfie')
         return value
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FACE BIOMETRIC VERIFICATION (provider-only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FaceBiometricVerificationSerializer(serializers.ModelSerializer):
+    """
+    Submit a face verification (liveness selfie) for an identity document.
+    Results include liveness_score + face_match_score from the verification engine.
+    """
+
+    @extend_schema_field(OpenApiTypes.BINARY)
+    def get_selfie_image(self, obj):  # pragma: no cover
+        return None
+
+    selfie_image = serializers.FileField(
+        help_text='Liveness selfie photo for face verification (JPEG/PNG, max 5 MB).'
+    )
+
+    class Meta:
+        model = FaceBiometricVerification
+        fields = [
+            'id',
+            'identity_document',
+            'selfie_image',
+            'liveness_score',
+            'face_match_score',
+            'status',
+            'auto_verified',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id',
+            'identity_document',
+            'liveness_score',
+            'face_match_score',
+            'status',
+            'auto_verified',
+            'created_at',
+        ]
+
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+    MAX_SELFIE_SIZE_MB = 5
+
+    def validate_selfie_image(self, value):
+        if value.content_type not in self.ALLOWED_IMAGE_TYPES:
+            raise serializers.ValidationError(
+                f'Unsupported file type "{value.content_type}". Allowed: {", ".join(sorted(self.ALLOWED_IMAGE_TYPES))}'
+            )
+        if value.size > self.MAX_SELFIE_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                f'File too large. Maximum size is {self.MAX_SELFIE_SIZE_MB} MB.'
+            )
+        return value
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER ONBOARDING FLOW  (5-step signup)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ServiceCategorySerializer(serializers.ModelSerializer):
+    """List available service categories for provider to choose from."""
+    class Meta:
+        model = ServiceCategory
+        fields = ['id', 'name', 'slug', 'description', 'icon_url']
+        read_only_fields = ['id']
+
+
+class SubServiceSerializer(serializers.ModelSerializer):
+    """Get sub-services under a category."""
+    class Meta:
+        model = SubService
+        fields = ['id', 'name', 'slug', 'description']
+        read_only_fields = ['id']
+
+
+class OnboardingStep1Serializer(serializers.Serializer):
+    """Step 1: Upload and OCR extract document."""
+    document_type = serializers.ChoiceField(choices=IdentityDocument.DOC_CHOICES)
+    document_file = serializers.FileField(max_length=10485760)  # 10MB
+    
+    def validate_document_file(self, value):
+        ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+        MAX_SIZE_MB = 10
+        
+        if value.content_type not in ALLOWED_TYPES:
+            raise serializers.ValidationError(f'File type not supported. Use JPEG or PNG.')
+        if value.size > MAX_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'File exceeds {MAX_SIZE_MB}MB limit.')
+        return value
+
+
+class OnboardingStep2Serializer(serializers.Serializer):
+    """Step 2: Review and confirm extracted OCR data."""
+    session_id = serializers.CharField(max_length=64)
+    confirmed_data = serializers.JSONField(
+        help_text='User-confirmed OCR data: {name, phone, id_number, dob, nationality}'
+    )
+
+
+class OnboardingStep3OTPRequestSerializer(serializers.Serializer):
+    """Step 3a: Request OTP to extracted/chosen phone."""
+    session_id = serializers.CharField(max_length=64)
+    phone_for_verification = serializers.CharField(
+        max_length=30,
+        required=False,
+        help_text='Leave empty to use extracted phone, or provide custom phone'
+    )
+
+
+class OnboardingStep3OTPVerifySerializer(serializers.Serializer):
+    """Step 3b: Verify OTP code."""
+    session_id = serializers.CharField(max_length=64)
+    otp = serializers.CharField(max_length=6, min_length=6)
+
+
+class OnboardingStep4Serializer(serializers.Serializer):
+    """Step 4: Submit selfie for face verification."""
+    session_id = serializers.CharField(max_length=64)
+    selfie_image = serializers.FileField(max_length=5242880)  # 5MB
+    
+    def validate_selfie_image(self, value):
+        ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+        MAX_SIZE_MB = 5
+        
+        if value.content_type not in ALLOWED_TYPES:
+            raise serializers.ValidationError('File type not supported.')
+        if value.size > MAX_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'File exceeds {MAX_SIZE_MB}MB limit.')
+        return value
+
+
+class OnboardingStep5Serializer(serializers.Serializer):
+    """Step 5: Complete profile and services selection."""
+    session_id = serializers.CharField(max_length=64)
+    bio = serializers.CharField(max_length=1000, required=False)
+    address = serializers.CharField(max_length=255)
+    years_of_experience = serializers.IntegerField(min_value=0, max_value=70)
+    price_min = serializers.DecimalField(max_digits=10, decimal_places=2)
+    price_max = serializers.DecimalField(max_digits=10, decimal_places=2)
+    service_category_id = serializers.IntegerField(help_text='ID of primary service category')
+    service_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text='IDs of selected sub-services (multiple allowed)'
+    )
+    
+    def validate(self, data):
+        if data['price_min'] > data['price_max']:
+            raise serializers.ValidationError('price_min must be ≤ price_max')
+        return data
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLIENT ONBOARDING — Unified with Provider (Step 1: Document Upload)
+# Reuses provider serializers: OnboardingStep1, Step2, Step3...
+# Difference: No face verification (Step 4), no service selection (Step 5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ClientOnboardingProfileUpdateSerializer(serializers.Serializer):
+    """Step 4 (Optional): Update client profile with additional information."""
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    address = serializers.CharField(max_length=255, required=False, allow_blank=True)

@@ -2,7 +2,11 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 
-from .models import IdentityDocument, PhoneOTP, ProviderProfile, User
+from .models import (
+    IdentityDocument, PhoneOTP, ProviderProfile, User, FaceBiometricVerification,
+    ServiceCategory, SubService, ProviderService, ProviderOnboardingSession,
+    ClientOnboardingSession
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,3 +104,94 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     list_filter   = ('purpose', 'is_used', 'role')
     search_fields = ('phone_number',)
     readonly_fields = ('code', 'created_at')
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FACE BIOMETRIC VERIFICATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(FaceBiometricVerification)
+class FaceBiometricVerificationAdmin(admin.ModelAdmin):
+    list_display = ('user_name', 'status', 'auto_verified', 'liveness_score', 'face_match_score', 'created_at')
+    list_filter = ('status', 'auto_verified')
+    search_fields = ('identity_document__user__username', 'identity_document__user__phone_number')
+    readonly_fields = (
+        'liveness_score', 'face_match_score', 'auto_verified',
+        'created_at', 'selfie_preview',
+    )
+
+    def user_name(self, obj):
+        return obj.identity_document.user.username
+    user_name.short_description = 'User'
+
+    def selfie_preview(self, obj):
+        if obj.selfie_image:
+            return format_html('<img src="{}" style="max-height:200px;" />', obj.selfie_image.url)
+        return '—'
+    selfie_preview.short_description = 'Selfie'
+
+    actions = ['approve_verifications', 'reject_verifications']
+
+    def approve_verifications(self, request, queryset):
+        from django.utils import timezone
+        queryset.update(status=FaceBiometricVerification.STATUS_APPROVED, reviewed_by=request.user, reviewed_at=timezone.now())
+        # Also update user biometric verification status
+        for verification in queryset:
+            user = verification.identity_document.user
+            user.biometric_verified = True
+            user.verification_status = User.STATUS_VERIFIED
+            user.save(update_fields=['biometric_verified', 'verification_status'])
+        self.message_user(request, f'{queryset.count()} face verification(s) approved.')
+    approve_verifications.short_description = 'Approve selected verifications'
+
+    def reject_verifications(self, request, queryset):
+        from django.utils import timezone
+        queryset.update(status=FaceBiometricVerification.STATUS_REJECTED, reviewed_by=request.user, reviewed_at=timezone.now())
+        self.message_user(request, f'{queryset.count()} face verification(s) rejected.')
+    reject_verifications.short_description = 'Reject selected verifications'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVICE MANAGEMENT
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(ServiceCategory)
+class ServiceCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'slug')
+    prepopulated_fields = {'slug': ('name',)}
+
+
+@admin.register(SubService)
+class SubServiceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category', 'slug', 'is_active', 'created_at')
+    list_filter = ('category', 'is_active')
+    search_fields = ('name', 'slug')
+    prepopulated_fields = {'slug': ('name',)}
+
+
+@admin.register(ProviderService)
+class ProviderServiceAdmin(admin.ModelAdmin):
+    list_display = ('provider', 'primary_service', 'subservice_count', 'created_at')
+    list_filter = ('primary_service',)
+    search_fields = ('provider__user__username', 'primary_service__name')
+
+    def subservice_count(self, obj):
+        return obj.subservices.count()
+    subservice_count.short_description = 'Subservices'
+
+
+@admin.register(ProviderOnboardingSession)
+class ProviderOnboardingSessionAdmin(admin.ModelAdmin):
+    list_display = ('session_id', 'step', 'status', 'phone_for_verification', 'phone_verified', 'expires_at', 'created_at')
+    list_filter = ('status', 'step', 'phone_verified')
+    search_fields = ('session_id', 'phone_for_verification')
+    readonly_fields = ('session_id', 'created_at', 'expires_at')
+
+
+@admin.register(ClientOnboardingSession)
+class ClientOnboardingSessionAdmin(admin.ModelAdmin):
+    list_display = ('session_id', 'phone_number', 'status', 'phone_verified', 'ocr_confidence', 'expires_at', 'created_at')
+    list_filter = ('status', 'phone_verified')
+    search_fields = ('session_id', 'phone_number')
+    readonly_fields = ('session_id', 'created_at', 'expires_at', 'ocr_confidence', 'image_quality')
