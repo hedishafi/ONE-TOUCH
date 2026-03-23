@@ -737,6 +737,14 @@ class ProviderOnboardingStep3OTPRequestView(APIView):
 	"""Step 3a: Request OTP to extracted or manually-provided phone."""
 	permission_classes = [permissions.AllowAny]
 	
+	@extend_schema(
+		request=OnboardingStep3OTPRequestSerializer,
+		responses={200: inline_serializer('OTPSentResponse', {
+			'detail': rest_framework_serializers.CharField(),
+			'otp_code': rest_framework_serializers.CharField(),  # DEBUG only
+		})},
+		tags=['Provider Onboarding'],
+	)
 	def post(self, request):
 		"""Send OTP to phone (extracted or custom)."""
 		serializer = OnboardingStep3OTPRequestSerializer(data=request.data)
@@ -747,74 +755,152 @@ class ProviderOnboardingStep3OTPRequestView(APIView):
 				session_id=serializer.validated_data['session_id'],
 				status='in_progress'
 			)
-		except:
-			return Response({'error': 'Invalid session'}, status=400)
-		
-		if session.is_expired:
-			return Response({'error': 'Session expired'}, status=400)
-		
-		# Determine phone: use manually provided or extracted
-		phone = serializer.validated_data.get('phone_for_verification')
-		if not phone:
-			phone = session.confirmed_data.get('phone')
-		
-		if not phone:
+		except ProviderOnboardingSession.DoesNotExist:
 			return Response(
-				{'error': 'No phone provided and none extracted from document'},
-				status=400
+				{'error': 'Invalid or expired session.'},
+				status=status.HTTP_400_BAD_REQUEST
 			)
 		
-		# Generate and store OTP
-		otp = _generate_otp()
-		session.phone_for_verification = phone
-		session.otp_code = otp
+		if session.is_expired:
+			return Response(
+				{'error': 'Session expired. Please start over.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Determine phone: use manually provided or confirmed/extracted
+		phone_number = serializer.validated_data.get('phone_for_verification')
+		if not phone_number:
+			confirmed = session.confirmed_data or session.extracted_data or {}
+			phone_number = confirmed.get('phone')
+		
+		if not phone_number:
+			return Response(
+				{'error': 'Phone number not extracted. Please provide phone_for_verification.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Issue OTP
+		otp_code = _issue_otp(
+			phone_number=phone_number,
+			purpose=PhoneOTP.PURPOSE_REGISTER,
+			role=User.ROLE_PROVIDER,
+		)
+		
+		# Store phone in session
+		session.phone_for_verification = phone_number
 		session.save()
 		
-		# Send SMS (in production)
-		# send_sms(phone, f"Your OneTouch verification code is: {otp}")
+		response_data = {
+			'detail': f'OTP sent to {phone_number}',
+		}
 		
-		return Response({
-			'message': 'OTP sent to phone',
-			'otp': otp,  # DEBUG only
-			'phone': phone,
-		}, status=status.HTTP_200_OK)
+		if settings.DEBUG:
+			response_data['otp_code'] = otp_code
+		
+		return Response(response_data, status=status.HTTP_200_OK)
 
 
 class ProviderOnboardingStep3OTPVerifyView(APIView):
-	"""Step 3b: Verify OTP code."""
+	"""Step 3b: Verify OTP and create provider account."""
 	permission_classes = [permissions.AllowAny]
 	
+	@extend_schema(
+		request=OnboardingStep3OTPVerifySerializer,
+		responses={201: AuthTokenSerializer},
+		tags=['Provider Onboarding'],
+	)
 	def post(self, request):
-		"""Verify OTP matches."""
+		"""Verify OTP and create provider account."""
 		serializer = OnboardingStep3OTPVerifySerializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
 		
+		session_id = serializer.validated_data['session_id']
+		otp_code = serializer.validated_data['otp_code']
+		
 		try:
 			session = ProviderOnboardingSession.objects.get(
-				session_id=serializer.validated_data['session_id'],
+				session_id=session_id,
 				status='in_progress'
 			)
-		except:
-			return Response({'error': 'Invalid session'}, status=400)
+		except ProviderOnboardingSession.DoesNotExist:
+			return Response(
+				{'error': 'Invalid or expired session.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
 		
 		if session.is_expired:
-			return Response({'error': 'Session expired'}, status=400)
+			return Response(
+				{'error': 'Session expired. Please start over.'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
 		
 		# Verify OTP
-		if serializer.validated_data['otp'] != session.otp_code:
-			return Response({'error': 'Invalid OTP'}, status=400)
+		try:
+			phone_otp_obj = _verify_otp(
+				phone_number=session.phone_for_verification or session.extracted_data.get('phone'),
+				purpose=PhoneOTP.PURPOSE_REGISTER,
+				otp_code=otp_code,
+			)
+		except ValueError as e:
+			return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 		
-		# Mark phone as verified
-		session.phone_verified = True
-		session.step = 3
-		session.save()
+		# Create account (atomic transaction)
+		with transaction.atomic():
+			# Extract name from confirmed data or OCR data
+			confirmed = session.confirmed_data or session.extracted_data or {}
+			name_str = confirmed.get('name', '')
+			name_parts = name_str.split()
+			first_name = name_parts[0] if name_parts else ''
+			last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+			
+			phone_number = session.phone_for_verification or confirmed.get('phone', '')
+			
+			# Create User account
+			username = _unique_username(phone_number.replace('+', '').replace(' ', ''))
+			user = User.objects.create_user(
+				username=username,
+				phone_number=phone_number,
+				first_name=first_name,
+				last_name=last_name,
+				role=User.ROLE_PROVIDER,
+				verification_status=User.STATUS_PENDING,  # Provider stays pending until face verified
+				is_on_trial=True,
+				trial_ends_at=timezone.now() + timedelta(days=14),
+			)
+			
+			# Create IdentityDocument record
+			IdentityDocument.objects.create(
+				user=user,
+				doc_type=session.document_type,
+				document_url=session.document_file,
+				ocr_confidence=session.ocr_confidence,
+				ocr_extracted=session.extracted_data,
+				extracted_name=confirmed.get('name'),
+				extracted_id_number=confirmed.get('document_number'),
+				extracted_dob=confirmed.get('dob'),
+				extracted_expiry=confirmed.get('expiry_date'),
+				extracted_nationality=confirmed.get('nationality'),
+				status=IdentityDocument.STATUS_PENDING,
+			)
+			
+			# Create ProviderProfile
+			ProviderProfile.objects.create(user=user)
+			
+			# Mark session as completed
+			session.status = 'completed'
+			session.completed_at = timezone.now()
+			session.phone_verified = True
+			session.save()
+			
+			# Generate JWT tokens
+			refresh = RefreshToken.from_user(user)
 		
 		return Response({
-			'session_id': session.session_id,
-			'step': 3,
-			'phone_verified': True,
-			'next_step': 4,
-		}, status=status.HTTP_200_OK)
+			'access': str(refresh.access_token),
+			'refresh': str(refresh),
+			'user': UserProfileSerializer(user).data,
+			'message': 'Welcome! Your account is created. Next, verify your identity with a selfie (Step 4).',
+		}, status=status.HTTP_201_CREATED)
 
 
 class ProviderOnboardingStep4View(APIView):

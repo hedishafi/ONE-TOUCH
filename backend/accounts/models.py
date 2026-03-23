@@ -73,15 +73,13 @@ class User(AbstractUser):
 # IDENTITY DOCUMENT  (one user may upload multiple verification docs)
 # ─────────────────────────────────────────────────────────────────────────────
 class IdentityDocument(models.Model):
-    DOC_PASSPORT   = 'passport'
     DOC_NATIONAL   = 'national_id'
-    DOC_COMPANY    = 'company_id'
     DOC_DRIVER     = 'drivers_license'
+    DOC_KEBELE     = 'kebele_id'
     DOC_CHOICES    = [
-        (DOC_PASSPORT, 'Passport'),
         (DOC_NATIONAL, 'National ID'),
-        (DOC_COMPANY,  'Company ID'),
         (DOC_DRIVER,   "Driver's License"),
+        (DOC_KEBELE,   'Kebele ID'),
     ]
 
     STATUS_PENDING  = 'pending'
@@ -118,14 +116,27 @@ class IdentityDocument(models.Model):
         help_text='Raw fields extracted by OCR (name, DOB, ID number) for audit purposes.'
     )
     # ── Canonical extracted fields (normalized from OCR) ────────────────────────
-    extracted_name     = models.CharField(max_length=255, blank=True, help_text='Name extracted by OCR.')
+    extracted_name     = models.CharField(max_length=255, blank=True, help_text='Full name extracted by OCR.')
     extracted_id_number= models.CharField(
         max_length=128, blank=True, db_index=True,
         help_text='ID number extracted by OCR. Indexed for deduplication.'
     )
     extracted_dob      = models.DateField(null=True, blank=True, help_text='Date of birth from OCR.')
-    extracted_expiry   = models.DateField(null=True, blank=True, help_text='Document expiry date from OCR.')
+    extracted_gender   = models.CharField(
+        max_length=20, blank=True,
+        help_text='Gender extracted by OCR (e.g., "Male", "Female").'
+    )
     extracted_nationality = models.CharField(max_length=100, blank=True, help_text='Nationality from OCR.')
+    extracted_region   = models.CharField(
+        max_length=100, blank=True,
+        help_text='Region or Sub-City extracted by OCR (e.g., "Addis Ababa").'
+    )
+    extracted_wereda   = models.CharField(max_length=100, blank=True, help_text='District (wereda) extracted from OCR.')
+    extracted_kebele   = models.CharField(max_length=100, blank=True, help_text='Sub-district (kebele) extracted from OCR.')
+    extracted_home_address = models.TextField(blank=True, help_text='Home address extracted from OCR.')
+    extracted_issue_date = models.DateField(null=True, blank=True, help_text='Document issue date from OCR.')
+    extracted_expiry   = models.DateField(null=True, blank=True, help_text='Document expiry date from OCR.')
+    extracted_phone    = models.CharField(max_length=30, blank=True, help_text='Phone number extracted from OCR.')
     ocr_language       = models.CharField(
         max_length=10, choices=[('am', 'Amharic'), ('en', 'English'), ('auto', 'Auto-detect')],
         null=True, blank=True,

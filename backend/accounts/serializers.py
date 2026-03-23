@@ -93,12 +93,28 @@ class SignupOTPRequestSerializer(serializers.Serializer):
     )
 
     def validate_phone_number(self, value: str) -> str:
-        return value.strip()
-
-    def validate_phone_number(self, value: str) -> str:
+        """Normalize and validate phone number — MUST be +251 format (Ethiopia)."""
+        import re
         value = value.strip()
+        
+        # Normalize phone to +251 format if it's not already
+        if value.startswith('0'):
+            # 0911222333 → +251911222333
+            value = '+251' + value[1:]
+        elif value.startswith('251'):
+            # 251911222333 → +251911222333
+            value = '+' + value
+        
+        # Validate format
+        if not re.match(r'^\+251\d{9}$', value):
+            raise serializers.ValidationError(
+                'Phone must be in Ethiopian format: +251XXXXXXXXX (9 digits after +251)'
+            )
+        
+        # Check if already registered
         if User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('This phone number is already registered.')
+        
         return value
 
 
@@ -427,8 +443,31 @@ class OnboardingStep3OTPRequestSerializer(serializers.Serializer):
     phone_for_verification = serializers.CharField(
         max_length=30,
         required=False,
-        help_text='Leave empty to use extracted phone, or provide custom phone'
+        allow_blank=True,
+        help_text='Leave empty to use extracted phone, or provide custom phone in +251 format'
     )
+    
+    def validate_phone_for_verification(self, value: str) -> str:
+        """Validate and normalize phone if provided — MUST be +251 format."""
+        if not value:  # Allow empty (will use extracted)
+            return value
+        
+        import re
+        value = value.strip()
+        
+        # Normalize phone to +251 format if it's not already
+        if value.startswith('0'):
+            value = '+251' + value[1:]
+        elif value.startswith('251'):
+            value = '+' + value
+        
+        # Validate format
+        if not re.match(r'^\+251\d{9}$', value):
+            raise serializers.ValidationError(
+                'Phone must be in Ethiopian format: +251XXXXXXXXX (9 digits after +251)'
+            )
+        
+        return value
 
 
 class OnboardingStep3OTPVerifySerializer(serializers.Serializer):
