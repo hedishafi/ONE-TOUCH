@@ -1,0 +1,165 @@
+import api from './api';
+
+// ─── Types ───────────────────────────────────────────────────────────────
+export interface SignupOTPRequest {
+  phone_number?: string;
+  phone?: string;
+  role?: 'client' | 'provider';
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
+
+export interface SignupVerifyRequest {
+  phone_number?: string;
+  phone?: string;
+  otp_code: string;
+  role?: 'client' | 'provider';
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
+
+export interface LoginOTPRequest {
+  phone_number: string;
+}
+
+export interface LoginVerifyRequest {
+  phone_number: string;
+  otp_code: string;
+}
+
+export interface OTPResponse {
+  otp_code?: string; // Only in DEBUG mode
+  expires_in_seconds: number;
+  detail?: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  user: {
+    id: number;
+    username: string;
+    phone_number: string;
+    role: 'client' | 'provider' | 'admin';
+    first_name: string;
+    last_name: string;
+    email?: string;
+    is_on_trial: boolean;
+    trial_ends_at?: string;
+    biometric_verified: boolean;
+  };
+}
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  phone_number: string;
+  role: 'client' | 'provider' | 'admin';
+  first_name: string;
+  last_name: string;
+  email?: string;
+  is_on_trial: boolean;
+  trial_ends_at?: string;
+  biometric_verified: boolean;
+  verification_status?: string;
+}
+
+// ─── Signup ───────────────────────────────────────────────────────────────
+
+/**
+ * Request OTP for signup (supports both phone and phone_number)
+ */
+export const signupRequestOTP = async (payload: { phone: string }): Promise<OTPResponse> => {
+  const normalizedPhone = payload.phone?.trim() || '';
+  const { data } = await api.post<OTPResponse>('/auth/signup/otp/', {
+    phone_number: normalizedPhone,
+    role: 'client',
+  });
+  return data;
+};
+
+/**
+ * Verify signup OTP and create account (simplified client signup)
+ */
+export const signupVerify = async (payload: {
+  phone: string;
+  otp_code: string;
+}): Promise<AuthTokenResponse> => {
+  const normalizedPhone = payload.phone?.trim() || '';
+  const { data } = await api.post<AuthTokenResponse>('/auth/signup/verify/', {
+    phone_number: normalizedPhone,
+    otp_code: payload.otp_code,
+    role: 'client',
+    first_name: 'Client',
+    last_name: 'User',
+    username: `client_${Date.now()}`,
+  });
+
+  // Store tokens and user info
+  localStorage.setItem('access_token', data.access_token);
+  localStorage.setItem('refresh_token', data.refresh_token);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  localStorage.setItem('user_id', String(data.user.id));
+
+  return data;
+};
+
+// ─── Login ───────────────────────────────────────────────────────────────
+
+/**
+ * Request OTP for login
+ */
+export const loginRequestOTP = async (payload: LoginOTPRequest): Promise<OTPResponse> => {
+  const { data } = await api.post<OTPResponse>('/auth/login/otp/', payload);
+  return data;
+};
+
+/**
+ * Verify login OTP and get tokens
+ */
+export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthTokenResponse> => {
+  const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
+
+  // Store tokens and user info
+  localStorage.setItem('access_token', data.access_token);
+  localStorage.setItem('refresh_token', data.refresh_token);
+  localStorage.setItem('user', JSON.stringify(data.user));
+
+  return data;
+};
+
+// ─── Profile ─────────────────────────────────────────────────────────────
+
+/**
+ * Get current user profile
+ */
+export const getProfile = async (): Promise<UserProfile> => {
+  const { data } = await api.get<UserProfile>('/auth/profile/');
+  return data;
+};
+
+/**
+ * Logout (clear local storage)
+ */
+export const logout = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+};
+
+/**
+ * Get stored user from localStorage
+ */
+export const getStoredUser = (): UserProfile | null => {
+  const stored = localStorage.getItem('user');
+  return stored ? JSON.parse(stored) : null;
+};
+
+/**
+ * Check if user has valid tokens
+ */
+export const hasValidTokens = (): boolean => {
+  return !!localStorage.getItem('access_token') && !!localStorage.getItem('refresh_token');
+};

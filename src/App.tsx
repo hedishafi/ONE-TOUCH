@@ -6,7 +6,7 @@ import { ScrollToTop } from './components/ScrollToTop';
 import { Landing } from './pages/Landing';
 import Login from './pages/Login';
 import { Signup } from './pages/Signup';
-import { ClientSignup } from './pages/ClientSignup';
+import ClientSignupSimple from './pages/ClientSignupSimple';
 import { ProviderSignup } from './pages/ProviderSignup';
 import { Services } from './pages/Services';
 import { ServiceSubcategory } from './pages/ServiceSubcategory';
@@ -39,6 +39,7 @@ import {
 
 // Provider pages
 import { ProviderHome } from './pages/ProviderHome';
+import ProviderSignupPhoneChoice from './pages/ProviderSignupPhoneChoice';
 import {
   ActiveJobs,
   Earnings,
@@ -46,6 +47,10 @@ import {
   ProviderWallet,
   ProviderLoyalty,
 } from './pages/ProviderDashboard';
+
+// Provider Onboarding
+import { ProviderOnboardingStep1 } from './pages/ProviderOnboarding/Step1';
+import { ProviderOnboardingStep3OTPVerify } from './pages/ProviderOnboarding/Step3OTPVerify';
 
 // Admin pages
 import {
@@ -81,7 +86,8 @@ function App() {
         <Route path={ROUTES.aiBot} element={<AIHelpBot />} />
         <Route path={ROUTES.login} element={<Login />} />
         <Route path={ROUTES.signup} element={<Signup />} />
-        <Route path={ROUTES.signupClient} element={<ClientSignup />} />
+        <Route path="/signup/client" element={<ClientSignupSimple />} />
+        <Route path={ROUTES.signupClient} element={<ClientSignupSimple />} />
         <Route path={ROUTES.signupProvider} element={<ProviderSignup />} />
 
         {/* ── Registration flows (no auth needed — mid-signup) ──── */}
@@ -89,6 +95,11 @@ function App() {
         <Route path={ROUTES.individualRegister} element={<IndividualClientRegister />} />
         <Route path={ROUTES.businessRegister} element={<BusinessClientRegister />} />
         <Route path={ROUTES.providerRegister} element={<ProviderRegister />} />
+
+        {/* ── Provider Onboarding (no auth needed) ────── */}
+        <Route path="/provider/onboarding/step1" element={<ProviderOnboardingStep1 />} />
+        <Route path="/provider/onboarding/phone-choice" element={<ProviderSignupPhoneChoice />} />
+        <Route path="/provider/onboarding/step3/verify-otp" element={<ProviderOnboardingStep3OTPVerify />} />
 
         {/* ── Client ─────────────────────────────────────────────── */}
         <Route
