@@ -330,6 +330,16 @@ class IdentityDocumentSerializer(serializers.ModelSerializer):
             })
         return file
 
+    def validate_doc_type(self, value):
+        """Validate that only supported document types are accepted."""
+        if value not in IdentityDocument.SUPPORTED_TYPES:
+            raise serializers.ValidationError(
+                f'Unsupported document type: {value}. '
+                f'Allowed types: {", ".join(IdentityDocument.SUPPORTED_TYPES)}. '
+                f'Note: Passport documents are no longer supported.'
+            )
+        return value
+
     def validate_document_url(self, value):
         return self._validate_file(value, self.ALLOWED_DOC_TYPES, self.MAX_DOC_SIZE_MB, 'document_url')
 

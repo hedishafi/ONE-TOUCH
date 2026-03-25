@@ -23,6 +23,7 @@ from .views import (
     ClientOnboardingStep3OTPRequestView,
     ClientOnboardingStep3OTPVerifyView,
     ClientOnboardingStep4ProfileView,
+    OCRTestView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -66,4 +67,7 @@ urlpatterns = [
     # ── Services (Category & SubService) ───────────────────────────────────────
     path('services/categories/', ServiceCategoryListView.as_view(), name='service-categories'),
     path('services/categories/<int:category_id>/subservices/', SubServiceListView.as_view(), name='category-subservices'),
+
+    # ── Testing / Development ──────────────────────────────────────────────────
+    path('test/ocr-extract/', OCRTestView.as_view(), name='ocr-test'),
 ]

@@ -264,14 +264,15 @@ class SignupVerifyView(APIView):
 			)
 
 		with transaction.atomic():
+			# Only providers get a trial period; clients do not
 			user = User(
 				username = _unique_username(username),
 				phone_number = phone_number,
 				role = role,
 				first_name = first_name,
 				last_name = last_name,
-				is_on_trial = True,
-				trial_ends_at = timezone.now() + timedelta(days=TRIAL_DAYS),
+				is_on_trial = (role == User.ROLE_PROVIDER),
+				trial_ends_at = timezone.now() + timedelta(days=TRIAL_DAYS) if role == User.ROLE_PROVIDER else None,
 			)
 			user.set_unusable_password()
 			user.save()
@@ -479,8 +480,8 @@ class IdentityDocumentUploadView(APIView):
 				'properties': {
 					'doc_type': {
 						'type': 'string',
-						'enum': ['passport', 'national_id', 'company_id', 'drivers_license'],
-						'description': 'Type of identity document.',
+						'enum': ['national_id', 'drivers_license', 'kebele_id'],
+						'description': 'Type of identity document. Only national_id, drivers_license, and kebele_id are supported.',
 					},
 					'document_url': {
 						'type': 'string',
@@ -499,11 +500,12 @@ class IdentityDocumentUploadView(APIView):
 		},
 		responses={
 			201: IdentityDocumentSerializer,
-			400: OpenApiResponse(description='Validation error'),
+			400: OpenApiResponse(description='Validation error or unsupported document type'),
 		},
 		summary='Upload identity document',
 		description=(
-			'Upload a government-issued ID document and an optional biometric selfie. '
+			'Upload a government-issued ID document (national ID, driver\'s license, or kebele ID) '
+			'and an optional biometric selfie. Passport documents are not supported. '
 			'Triggers automated OCR + liveness verification. '
 			'If the combined confidence score ≥ 0.75 the document is auto-approved; '
 			'otherwise it is flagged for admin review.'
@@ -512,6 +514,17 @@ class IdentityDocumentUploadView(APIView):
 	def post(self, request):
 		serializer = IdentityDocumentSerializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
+		
+		# Validate document type is supported
+		doc_type = request.data.get('doc_type')
+		if doc_type not in IdentityDocument.SUPPORTED_TYPES:
+			return Response(
+				{
+					'doc_type': f'Unsupported or invalid ID document type. Supported types: {", ".join(IdentityDocument.SUPPORTED_TYPES)}'
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
 		doc = serializer.save(user=request.user)
 
 		# Queue automated verification (non-blocking)
@@ -1434,3 +1447,155 @@ class ClientOnboardingStep4ProfileView(APIView):
 			'message': 'Profile updated successfully.',
 			'user': UserProfileSerializer(user).data,
 		}, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OCR TEST ENDPOINT — For development/testing only
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OCRTestView(APIView):
+	"""
+	Test OCR extraction on identity documents without creating full signup flow.
+	
+	DEVELOPMENT ONLY: Allows testing OCR engine on various document types.
+	
+	Accepts:
+	  - doc_type: one of 'national_id', 'drivers_license', 'kebele_id'
+	  - document: image file (JPEG, PNG, PDF)
+	
+	Returns:
+	  - extracted_fields (standardized)
+	  - confidence score
+	  - validation results
+	"""
+	
+	permission_classes = [permissions.AllowAny]  # Allow unauthenticated for testing
+	parser_classes = [MultiPartParser, FormParser]
+	
+	@extend_schema(
+		tags=['Testing'],
+		request={
+			'multipart/form-data': {
+				'type': 'object',
+				'properties': {
+					'doc_type': {
+						'type': 'string',
+						'enum': ['national_id', 'drivers_license', 'kebele_id'],
+						'description': 'Type of identity document',
+					},
+					'document': {
+						'type': 'string',
+						'format': 'binary',
+						'description': 'Identity document image (JPEG, PNG, or PDF)',
+					},
+				},
+				'required': ['doc_type', 'document'],
+			}
+		},
+		responses={
+			200: OpenApiResponse(description='OCR extraction successful'),
+			400: OpenApiResponse(description='Invalid document type or file format'),
+			500: OpenApiResponse(description='OCR processing error'),
+		},
+		summary='Test OCR extraction (debugging only)',
+		description=(
+			'Test the OCR engine on identity documents without creating a full identity document record. '
+			'Returns extracted fields, confidence score, and validation results. '
+			'ONLY for testing and debugging; do not use in production workflows.'
+		),
+	)
+	def post(self, request):
+		"""Extract OCR data from an uploaded identity document for testing."""
+		import os
+		import tempfile
+		
+		doc_type = request.data.get('doc_type')
+		document = request.data.get('document')
+		
+		# Validate doc_type
+		if not doc_type:
+			return Response(
+				{'error': 'doc_type is required'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if doc_type not in IdentityDocument.SUPPORTED_TYPES:
+			return Response(
+				{
+					'error': f'Unsupported document type: {doc_type}',
+					'supported_types': list(IdentityDocument.SUPPORTED_TYPES)
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		# Validate file
+		if not document:
+			return Response(
+				{'error': 'document file is required'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		if document.content_type not in {'image/jpeg', 'image/png', 'application/pdf', 'image/webp'}:
+			return Response(
+				{
+					'error': f'Unsupported file type: {document.content_type}',
+					'allowed_types': ['image/jpeg', 'image/png', 'application/pdf']
+				},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		try:
+			# Create temporary file for OCR processing
+			with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+				# Write file chunks
+				if hasattr(document, 'chunks'):
+					for chunk in document.chunks():
+						tmp_file.write(chunk)
+				else:
+					tmp_file.write(document.read())
+				
+				tmp_path = tmp_file.name
+			
+			try:
+				# Initialize OCR engine and extract text
+				from .ocr_engine import get_ocr_engine
+				import logging
+				logger = logging.getLogger(__name__)
+				
+				ocr_engine = get_ocr_engine()
+				logger.info(f'Testing OCR with {ocr_engine.__class__.__name__} on {doc_type}')
+				
+				ocr_result = ocr_engine.extract_text(tmp_path, language='auto')
+				
+				# Return standardized results
+				return Response(
+					{
+						'doc_type': doc_type,
+						'ocr_result': {
+							'extracted_fields': ocr_result.get('extracted_fields', {}),
+							'confidence': ocr_result.get('confidence', 0.0),
+							'language': ocr_result.get('language', 'auto'),
+							'raw_text_preview': ocr_result.get('raw_text', '')[:200],  # First 200 chars
+							'warnings': ocr_result.get('warnings', []),
+							'validation': ocr_result.get('validation', {}),
+						}
+					},
+					status=status.HTTP_200_OK
+				)
+				
+			finally:
+				# Clean up temp file
+				if os.path.exists(tmp_path):
+					os.remove(tmp_path)
+		
+		except Exception as e:
+			import logging
+			logger = logging.getLogger(__name__)
+			logger.exception(f'OCR test error: {e}')
+			return Response(
+				{
+					'error': 'OCR processing failed',
+					'detail': str(e)
+				},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR
+			)

@@ -17,6 +17,7 @@ Auto-approve thresholds:
 
 import logging
 import os
+from datetime import datetime
 
 from celery import shared_task
 from django.conf import settings
@@ -92,15 +93,59 @@ def run_verification(self, identity_doc_id: int) -> dict:
             identity_doc_id, ocr_confidence, ocr_result.get('language', 'unknown'),
         )
 
-        # Populate canonical OCR fields
+        # Map standardized OCR fields to model fields
+        # OCR returns: full_name, id_number, date_of_birth, gender, nationality,
+        #              region_sub_city, woreda, issue_date, expiry_date, phone_number
         doc.ocr_confidence = ocr_confidence
         doc.ocr_extracted = ocr_result
         doc.ocr_language = ocr_result.get('language')
-        doc.extracted_name = ocr_extracted.get('name', '')
-        doc.extracted_id_number = ocr_extracted.get('id_number', '')
-        doc.extracted_dob = ocr_extracted.get('date_of_birth')
-        doc.extracted_expiry = ocr_extracted.get('expiry_date')
-        doc.extracted_nationality = ocr_extracted.get('nationality', '')
+        
+        # Map extracted fields using standardized names
+        doc.extracted_name = ocr_extracted.get('full_name') or ''
+        doc.extracted_id_number = ocr_extracted.get('id_number') or ''
+        doc.extracted_gender = ocr_extracted.get('gender') or ''
+        doc.extracted_nationality = ocr_extracted.get('nationality') or ''
+        doc.extracted_region = ocr_extracted.get('region_sub_city') or ''
+        doc.extracted_wereda = ocr_extracted.get('woreda') or ''
+        doc.extracted_phone = ocr_extracted.get('phone_number') or ''
+        
+        # Parse dates if provided
+        if ocr_extracted.get('date_of_birth'):
+            try:
+                dob_str = ocr_extracted['date_of_birth']
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        doc.extracted_dob = datetime.strptime(dob_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            except Exception as e:
+                logger.warning(f'Could not parse DOB: {e}')
+                doc.extracted_dob = None
+        
+        if ocr_extracted.get('issue_date'):
+            try:
+                issue_str = ocr_extracted['issue_date']
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        doc.extracted_issue_date = datetime.strptime(issue_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            except Exception as e:
+                logger.warning(f'Could not parse issue date: {e}')
+                
+        if ocr_extracted.get('expiry_date'):
+            try:
+                expiry_str = ocr_extracted['expiry_date']
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y']:
+                    try:
+                        doc.extracted_expiry = datetime.strptime(expiry_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            except Exception as e:
+                logger.warning(f'Could not parse expiry date: {e}')
 
         if ocr_confidence >= OCR_MIN_CONFIDENCE:
             # ── AUTO-APPROVE ───────────────────────────────────────────────
@@ -114,8 +159,9 @@ def run_verification(self, identity_doc_id: int) -> dict:
 
             doc.save(update_fields=[
                 'ocr_confidence', 'ocr_extracted', 'ocr_language',
-                'extracted_name', 'extracted_id_number', 'extracted_dob',
-                'extracted_expiry', 'extracted_nationality',
+                'extracted_name', 'extracted_id_number', 'extracted_dob', 'extracted_gender',
+                'extracted_expiry', 'extracted_issue_date', 'extracted_nationality', 'extracted_phone',
+                'extracted_region', 'extracted_wereda',
                 'auto_verified', 'status', 'reviewed_at'
             ])
 
@@ -132,8 +178,9 @@ def run_verification(self, identity_doc_id: int) -> dict:
             doc.status = IdentityDocument.STATUS_FLAGGED
             doc.save(update_fields=[
                 'ocr_confidence', 'ocr_extracted', 'ocr_language',
-                'extracted_name', 'extracted_id_number', 'extracted_dob',
-                'extracted_expiry', 'extracted_nationality',
+                'extracted_name', 'extracted_id_number', 'extracted_dob', 'extracted_gender',
+                'extracted_expiry', 'extracted_issue_date', 'extracted_nationality', 'extracted_phone',
+                'extracted_region', 'extracted_wereda',
                 'auto_verified', 'status'
             ])
 

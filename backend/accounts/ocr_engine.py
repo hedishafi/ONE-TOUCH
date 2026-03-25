@@ -114,10 +114,10 @@ class OCREngine(ABC):
     @staticmethod
     def validate_document(extracted_fields: Dict[str, Any], strict: bool = True) -> Dict[str, Any]:
         """
-        Validate extracted document data.
+        Validate extracted document data against standardized fields.
         
         Args:
-            extracted_fields: Dictionary of extracted fields {name, document_number, dob, expiry_date, nationality, phone}
+            extracted_fields: Dictionary of extracted standardized fields
             strict: If True, enforce all validations; if False, only warn
             
         Returns:
@@ -127,7 +127,7 @@ class OCREngine(ABC):
                 'is_non_ethiopian': bool,
                 'warnings': [str],
                 'errors': [str],  # only if strict=True
-                'flagged': bool,   # True if any validation fail
+                'flagged': bool,   # True if any validation fails
             }
         """
         validation = {
@@ -139,8 +139,8 @@ class OCREngine(ABC):
             'flagged': False,
         }
         
-        # 1. Check critical fields
-        required_fields = ['name', 'document_number']
+        # 1. Check critical fields (full_name and id_number must be present)
+        required_fields = ['full_name', 'id_number']
         missing_fields = [f for f in required_fields if not extracted_fields.get(f)]
         if missing_fields:
             msg = f'Missing critical fields: {", ".join(missing_fields)}'
@@ -307,52 +307,175 @@ class TesseractOCR(OCREngine):
         
         return img
 
-    def _parse_fields(self, raw_text: str) -> Dict[str, Any]:
-        """Extract structured fields from OCR text."""
-        # Simple regex-based parsing (can be improved with NLP)
+    def _parse_fields(self, raw_text: str) -> Dict[str, any]:
+        """
+        Extract standardized fields from OCR text for all document types.
+        
+        Returns a unified structure that works for National ID, Driver's License, and Kebele ID:
+        {
+            'full_name': str or None,
+            'id_number': str or None,
+            'date_of_birth': str or None,         # DD/MM/YYYY format
+            'gender': str or None,                # 'Male', 'Female', or None
+            'nationality': str or None,           # 'Ethiopian', etc.
+            'region_sub_city': str or None,       # e.g., 'Addis Ababa'
+            'woreda': str or None,                # e.g., 'Bole'
+            'issue_date': str or None,            # DD/MM/YYYY format
+            'expiry_date': str or None,           # DD/MM/YYYY format
+            'phone_number': str or None,          # e.g., '+251911234567'
+        }
+        
+        Fields are set to None (not empty string) if not found.
+        This standardizes output across national_id, drivers_license, kebele_id.
+        """
         import re
 
+        # Initialize all fields to None
         fields = {
-            'name': None,
-            'document_number': None,
-            'dob': None,
-            'expiry_date': None,
+            'full_name': None,
+            'id_number': None,
+            'date_of_birth': None,
+            'gender': None,
             'nationality': None,
-            'phone': None,
+            'region_sub_city': None,
+            'woreda': None,
+            'issue_date': None,
+            'expiry_date': None,
+            'phone_number': None,
         }
 
-        # Look for dates (DD/MM/YYYY or YYYY-MM-DD)
-        dates = re.findall(r'(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})', raw_text)
+        # ── Extract dates (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY format)
+        # Capture up to 3 dates - typically DOB, Issue date, Expiry date
+        date_pattern = r'(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})'
+        dates = re.findall(date_pattern, raw_text)
+        
         if len(dates) >= 1:
-            fields['dob'] = dates[0]
+            # Normalize to DD/MM/YYYY if it's YYYY-MM-DD
+            fields['date_of_birth'] = self._normalize_date(dates[0])
         if len(dates) >= 2:
-            fields['expiry_date'] = dates[1]
+            fields['issue_date'] = self._normalize_date(dates[1])
+        if len(dates) >= 3:
+            fields['expiry_date'] = self._normalize_date(dates[2])
 
-        # Look for ID-like numbers (consecutive alphanumeric, 6+ chars)
-        id_numbers = re.findall(r'[A-Za-z]{1,3}[-]?[\d]{6,}', raw_text)
-        if id_numbers:
-            fields['document_number'] = id_numbers[0]
+        # ── Extract ID number patterns (document-type specific)
+        # Support multiple document formats:
+        # National ID: ETH-NIDA-XXXXXXXX-AA
+        # Driver's License: DL-XXXXXXXX or DL XXXXXXXX
+        # Kebele ID: KID-XXXXXX
+        id_patterns = [
+            r'ETH-NIDA-[\d]{8}-[A-Z]{2}',           # National ID
+            r'(?:DL|DLS?)[-\s]?[\w]{8,10}',         # Driver's License
+            r'KID[-\s]?[\d]{6}',                    # Kebele ID
+            r'[A-Z]{2,3}[-\s]?[\d]{6,10}',          # Generic pattern
+        ]
+        
+        for pattern in id_patterns:
+            matches = re.findall(pattern, raw_text, re.IGNORECASE)
+            if matches:
+                fields['id_number'] = matches[0].replace(' ', '-')
+                break
 
-        # Look for phone numbers (+251 or 0 followed by digits)
+        # ── Extract phone number (+251 format or 0251 or 09XX)
         phone_patterns = [
-            r'\+251\d{9}',           # +251911222333
-            r'0\d{9}',               # 0911222333
-            r'251\d{9}',             # 251911222333
+            r'\+251\d{9}',           # +251911234567
+            r'(?:^|\W)251\d{9}',     # 251911234567
+            r'0\d{9}',               # 0911234567
         ]
         for pattern in phone_patterns:
             phones = re.findall(pattern, raw_text)
             if phones:
-                fields['phone'] = '+251' + phones[0][-9:] if phones[0] != '+251' else phones[0]
+                phone = phones[0].lstrip('+')
+                # Normalize to +251 format
+                if phone.startswith('251'):
+                    fields['phone_number'] = '+' + phone
+                elif phone.startswith('0'):
+                    fields['phone_number'] = '+251' + phone[1:]
+                else:
+                    fields['phone_number'] = '+251' + phone
                 break
 
-        # Look for a name (first line or lines with mostly letters)
+        # ── Extract gender (Male, Female, M, F, ወ/ሴ in Amharic)
+        gender_patterns = [
+            (r'\b(?:Male|M|ወ)\b', 'Male'),
+            (r'\b(?:Female|F|ሴ)\b', 'Female'),
+        ]
+        for pattern, gender in gender_patterns:
+            if re.search(pattern, raw_text, re.IGNORECASE):
+                fields['gender'] = gender
+                break
+
+        # ── Extract nationality (Ethiopian, Ethiopia, Ethiopian citizen, etc.)
+        nationality_patterns = [
+            r'(?:Ethiopian|Ethiopia|Ethiop)',
+        ]
+        for pattern in nationality_patterns:
+            if re.search(pattern, raw_text, re.IGNORECASE):
+                fields['nationality'] = 'Ethiopian'
+                break
+
+        # ── Extract location (Region/Sub-City and Woreda)
+        # Common Ethiopian regions: Addis Ababa, Oromia, Amhara, SNNPR, etc.
+        regions = [
+            'Addis Ababa', 'Oromia', 'Amhara', 'SNNPR', 'Tigray', 'Somali', 
+            'Afar', 'Benishangul-Gumuz', 'Gambela', 'Harari', 'Dire Dawa'
+        ]
+        for region in regions:
+            if re.search(re.escape(region), raw_text, re.IGNORECASE):
+                fields['region_sub_city'] = region
+                break
+
+        # For Woreda (district), look for common ones in Addis Ababa or other regions
+        woredas = [
+            'Bole', 'Kirkos', 'Lideta', 'Kolfe', 'Yeka', 'Arada', 'Nifas Silk-Lafto',
+            'Gulele', 'Akaki Kality', 'Addis Ketema',
+        ]
+        for woreda in woredas:
+            if re.search(re.escape(woreda), raw_text, re.IGNORECASE):
+                fields['woreda'] = woreda
+                break
+
+        # ── Extract full name (longest sequence of letters + spaces in first few lines)
         lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
-        for line in lines[:3]:  # check first 3 lines
-            if len(line) > 3 and all(c.isalpha() or c.isspace() for c in line):
-                fields['name'] = line
-                break
+        for line in lines[:5]:  # Check first 5 lines
+            # Name should be 5+ characters, mostly letters (allow spaces, hyphens)
+            if len(line) >= 5:
+                # Count alphabetic characters
+                alpha_count = sum(1 for c in line if c.isalpha())
+                if alpha_count / max(len(line), 1) > 0.7:  # 70%+ alphabetic
+                    fields['full_name'] = line
+                    break
 
-        return fields
+        # ── Ensure all None values are preserved (not converted to empty strings)
+        return {k: (v.strip() if isinstance(v, str) else v) for k, v in fields.items()}
+
+    @staticmethod
+    def _normalize_date(date_str: str) -> str:
+        """
+        Normalize date to DD/MM/YYYY format.
+        
+        Handles inputs like:
+        - DD/MM/YYYY → DD/MM/YYYY (no change)
+        - YYYY-MM-DD → DD/MM/YYYY
+        - DD-MM-YYYY → DD/MM/YYYY
+        """
+        import re
+        
+        date_str = date_str.strip()
+        
+        # Try YYYY-MM-DD or YYYY/MM/DD first
+        match = re.match(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})', date_str)
+        if match:
+            year, month, day = match.groups()
+            return f'{int(day):02d}/{int(month):02d}/{year}'
+        
+        # Try DD/MM/YYYY or DD-MM-YYYY (already normalized or needs slash conversion)
+        match = re.match(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
+        if match:
+            day, month, year = match.groups()
+            return f'{int(day):02d}/{int(month):02d}/{year}'
+        
+        # If can't parse, return as-is
+        return date_str
 
     def _detect_language(self, text: str) -> str:
         """Simple language detection: check for Amharic script."""
@@ -400,7 +523,18 @@ class GoogleVisionOCR(OCREngine):
 
             if not response.text_annotations:
                 return {
-                    'extracted_fields': {},
+                    'extracted_fields': {
+                        'full_name': None,
+                        'id_number': None,
+                        'date_of_birth': None,
+                        'gender': None,
+                        'nationality': None,
+                        'region_sub_city': None,
+                        'woreda': None,
+                        'issue_date': None,
+                        'expiry_date': None,
+                        'phone_number': None,
+                    },
                     'raw_text': '',
                     'confidence': 0.0,
                     'language': 'auto',
@@ -410,7 +544,7 @@ class GoogleVisionOCR(OCREngine):
             # Full text
             raw_text = response.text_annotations[0].description
 
-            # Extract fields (similar to Tesseract)
+            # Extract fields using standardized method
             extracted_fields = self._parse_fields(raw_text)
 
             # Google provides per-text-block confidence
@@ -437,7 +571,18 @@ class GoogleVisionOCR(OCREngine):
         except Exception as exc:
             logger.exception('Google Vision OCR error: %s', exc)
             return {
-                'extracted_fields': {},
+                'extracted_fields': {
+                    'full_name': None,
+                    'id_number': None,
+                    'date_of_birth': None,
+                    'gender': None,
+                    'nationality': None,
+                    'region_sub_city': None,
+                    'woreda': None,
+                    'issue_date': None,
+                    'expiry_date': None,
+                    'phone_number': None,
+                },
                 'raw_text': '',
                 'confidence': 0.0,
                 'language': 'auto',

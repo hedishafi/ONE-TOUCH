@@ -81,6 +81,9 @@ class IdentityDocument(models.Model):
         (DOC_DRIVER,   "Driver's License"),
         (DOC_KEBELE,   'Kebele ID'),
     ]
+    
+    # Supported document types whitelist
+    SUPPORTED_TYPES = {DOC_NATIONAL, DOC_DRIVER, DOC_KEBELE}
 
     STATUS_PENDING  = 'pending'
     STATUS_APPROVED = 'approved'
