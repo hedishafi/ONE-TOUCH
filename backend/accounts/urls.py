@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ClientProfileView,
     FaceVerificationView,
     IdentityDocumentUploadView,
     LoginRequestOTPView,
@@ -44,6 +45,8 @@ urlpatterns = [
 
     # Provider-only: GET/POST/PATCH profile
     path('provider/profile/', ProviderProfileView.as_view(), name='provider-profile'),
+    # Client-only: GET/PATCH profile
+    path('client/profile/', ClientProfileView.as_view(), name='client-profile'),
     # Provider-only: GET list / POST upload identity doc (triggers verification task)
     path('identity-docs/',    IdentityDocumentUploadView.as_view(), name='identity-docs'),
     # Provider-only: POST face verification for an identity doc

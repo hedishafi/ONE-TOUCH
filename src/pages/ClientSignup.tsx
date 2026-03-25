@@ -16,13 +16,12 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { signupVerify } from '../services/authService';
 import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
-import { storage, STORAGE_KEYS } from '../utils/storage';
-import type { User, ClientProfile } from '../types';
+import type { IdentityResult } from './signup/shared';
 import {
   Shell, Card, CardHeader,
   StepIdentity,
-  type IdentityResult,
 } from './signup/shared';
 
 // ─── Countdown hook ────────────────────────────────────────────────────────────
@@ -56,45 +55,12 @@ function StepPhoneOTP({
   const [attempts, setAttempts] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const { seconds, begin }      = useCountdown(60);
-  const { loginByUserId }       = useAuthStore();
+  const navigate = useNavigate();
 
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;
 
   useEffect(() => { begin(); }, []); // start countdown on mount
-
-  const createClientAccount = () => {
-    const userId = `client-${Date.now()}`;
-    const placeholderEmail = `client_${userId}@onetouch.local`;
-
-    // Persist user
-    const users = storage.get<User[]>(STORAGE_KEYS.users, []);
-    const newUser: User = {
-      id: userId,
-      email: placeholderEmail,
-      phone,
-      role: 'client',
-      createdAt: new Date().toISOString(),
-      verificationStatus: 'verified',
-    };
-    users.push(newUser);
-    storage.set(STORAGE_KEYS.users, users);
-
-    // Persist client profile (all data from ID)
-    const profiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
-    profiles.push({
-      userId,
-      clientType: 'individual',
-      fullName: idResult.extracted.fullName ?? 'User',
-      idNumber: idResult.extracted.idNumber ?? idResult.extracted.passportNumber ?? idResult.extracted.licenseNumber ?? '',
-      loyaltyTier: 'bronze',
-      walletBalance: 0,
-      totalBookings: 0,
-    });
-    storage.set(STORAGE_KEYS.clientProfiles, profiles);
-
-    return userId;
-  };
 
   const handleOtpChange = (val: string) => {
     setOtp(val);
@@ -102,7 +68,7 @@ function StepPhoneOTP({
     if (val.length === 6) verify(val);
   };
 
-  const verify = (code: string) => {
+  const verify = async (code: string) => {
     if (attempts >= MAX_ATTEMPTS) {
       setError('Too many attempts. Please request a new code.');
       return;
@@ -115,16 +81,25 @@ function StepPhoneOTP({
     }
 
     setVerifying(true);
-    setTimeout(() => {
-      const userId = createClientAccount();
-      const result = loginByUserId(userId);
-      setVerifying(false);
-      if (!result.success) {
-        setError(result.error ?? 'Sign in failed after verification.');
-        return;
+    try {
+      // Call backend API to verify OTP and create account
+      const response = await signupVerify({
+        phone,
+        otp_code: code,
+      });
+      
+      if (response && response.user) {
+        setVerifying(false);
+        onSuccess();
+      } else {
+        setVerifying(false);
+        setError('Failed to create account. Please try again.');
       }
-      onSuccess();
-    }, 600);
+    } catch (err: any) {
+      setVerifying(false);
+      const errorMessage = err?.response?.data?.detail || 'Failed to verify OTP. Please try again.';
+      setError(errorMessage);
+    }
   };
 
   const handleResend = () => {

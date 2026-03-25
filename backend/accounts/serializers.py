@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import (
-    IdentityDocument, PhoneOTP, ProviderProfile, FaceBiometricVerification,
+    IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
     ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
 )
 
@@ -40,6 +40,42 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_on_trial',
             'trial_ends_at',
             'date_joined',
+        ]
+
+
+class ClientProfileSerializer(serializers.ModelSerializer):
+    """Read/update client profile data and wallet info."""
+    user_id = serializers.CharField(source='user.id', read_only=True)
+    phone_number = serializers.CharField(source='user.phone_number', read_only=True)
+
+    class Meta:
+        model = ClientProfile
+        fields = [
+            'user_id',
+            'phone_number',
+            'client_type',
+            'full_name',
+            'business_name',
+            'tax_id',
+            'business_address',
+            'selfie_url',
+            'id_document_url',
+            'loyalty_tier',
+            'wallet_balance',
+            'total_bookings',
+            'total_spent',
+            'avg_rating',
+            'created_at',
+        ]
+        read_only_fields = [
+            'user_id',
+            'phone_number',
+            'loyalty_tier',
+            'wallet_balance',
+            'total_bookings',
+            'total_spent',
+            'avg_rating',
+            'created_at',
         ]
 
 

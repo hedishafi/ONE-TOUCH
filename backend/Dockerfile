@@ -13,10 +13,18 @@ ENV PATH="/home/appuser/.local/bin:${PATH}"
 # postgresql-client  → needed for pg_isready in entrypoint.sh
 # gettext            → needed for Django's makemessages / i18n
 # curl               → useful for health checks
+# tesseract-ocr      → OCR engine for document text extraction
+# libsm6, libxext6   → Required for OpenCV (cv2) image processing
+# libxrender-dev     → Required for OpenCV rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client \
         gettext \
         curl \
+        tesseract-ocr \
+        libtesseract-dev \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Non-root user ────────────────────────────────────────────────────────────

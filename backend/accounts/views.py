@@ -15,12 +15,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 
 from .models import (
-	IdentityDocument, PhoneOTP, ProviderProfile, FaceBiometricVerification,
+	IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
 	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
 )
-from .permissions import IsProvider
+from .permissions import IsProvider, IsClient
 from .serializers import (
 	AuthTokenSerializer,
+	ClientProfileSerializer,
 	FaceBiometricVerificationSerializer,
 	IdentityDocumentSerializer,
 	LoginOTPRequestSerializer,
@@ -277,6 +278,16 @@ class SignupVerifyView(APIView):
 			user.set_unusable_password()
 			user.save()
 
+			# Auto-create client profile for clients
+			if role == User.ROLE_CLIENT:
+				ClientProfile.objects.create(
+					user=user,
+					client_type=ClientProfile.CLIENT_TYPE_INDIVIDUAL,
+					full_name=f'{first_name} {last_name}'.strip() or user.username,
+					loyalty_tier=ClientProfile.LOYALTY_BRONZE,
+					wallet_balance=0.00,
+				)
+
 		return Response(_build_token_response(user), status=status.HTTP_201_CREATED)
 
 
@@ -453,6 +464,46 @@ class ProviderProfileView(APIView):
 		except ProviderProfile.DoesNotExist:
 			return Response({'detail': 'Profile not found. POST to create one first.'}, status=status.HTTP_404_NOT_FOUND)
 		serializer = ProviderProfileSerializer(profile, data=request.data, partial=True)
+		serializer.is_valid(raise_exception=True)
+		serializer.save()
+		return Response(serializer.data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLIENT PROFILE  GET / PATCH /api/v1/client/profile/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ClientProfileView(APIView):
+	"""Retrieve or partially update the authenticated client's profile."""
+
+	permission_classes = [permissions.IsAuthenticated, IsClient]
+
+	@extend_schema(
+		tags=['Client'],
+		responses={200: ClientProfileSerializer},
+		summary='Get my client profile',
+		description='Requires client role. Returns wallet balance, loyalty tier, and booking stats.',
+	)
+	def get(self, request):
+		try:
+			profile = request.user.client_profile
+		except ClientProfile.DoesNotExist:
+			return Response({'detail': 'Client profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+		return Response(ClientProfileSerializer(profile).data)
+
+	@extend_schema(
+		tags=['Client'],
+		request=ClientProfileSerializer,
+		responses={200: ClientProfileSerializer},
+		summary='Update my client profile',
+		description='Allows updating profile information. Wallet and stats are read-only.',
+	)
+	def patch(self, request):
+		try:
+			profile = request.user.client_profile
+		except ClientProfile.DoesNotExist:
+			return Response({'detail': 'Client profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+		serializer = ClientProfileSerializer(profile, data=request.data, partial=True)
 		serializer.is_valid(raise_exception=True)
 		serializer.save()
 		return Response(serializer.data)

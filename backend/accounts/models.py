@@ -217,6 +217,73 @@ class ProviderProfile(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CLIENT PROFILE  (for client dashboard and account data)
+# ─────────────────────────────────────────────────────────────────────────────
+class ClientProfile(models.Model):
+    """
+    Stores client-specific data: wallet, loyalty tier, booking history.
+    Auto-created when a client account is created.
+    """
+    LOYALTY_BRONZE = 'bronze'
+    LOYALTY_SILVER = 'silver'
+    LOYALTY_GOLD = 'gold'
+    LOYALTY_PLATINUM = 'platinum'
+    LOYALTY_CHOICES = [
+        (LOYALTY_BRONZE, 'Bronze'),
+        (LOYALTY_SILVER, 'Silver'),
+        (LOYALTY_GOLD, 'Gold'),
+        (LOYALTY_PLATINUM, 'Platinum'),
+    ]
+
+    CLIENT_TYPE_INDIVIDUAL = 'individual'
+    CLIENT_TYPE_BUSINESS = 'business'
+    CLIENT_TYPE_CHOICES = [
+        (CLIENT_TYPE_INDIVIDUAL, 'Individual'),
+        (CLIENT_TYPE_BUSINESS, 'Business'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
+    client_type = models.CharField(
+        max_length=20, choices=CLIENT_TYPE_CHOICES, default=CLIENT_TYPE_INDIVIDUAL,
+        help_text='Individual or Business client'
+    )
+    full_name = models.CharField(max_length=255, blank=True)
+
+    # Business-specific fields
+    business_name = models.CharField(max_length=255, blank=True)
+    tax_id = models.CharField(max_length=50, blank=True)
+    business_address = models.CharField(max_length=500, blank=True)
+
+    # Document uploads
+    selfie_url = models.URLField(max_length=500, blank=True)
+    id_document_url = models.URLField(max_length=500, blank=True)
+
+    # Loyalty / rewards
+    loyalty_tier = models.CharField(
+        max_length=20, choices=LOYALTY_CHOICES, default=LOYALTY_BRONZE,
+        help_text='Client loyalty tier for reward tracking'
+    )
+
+    # Wallet
+    wallet_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Statistics
+    total_bookings = models.PositiveIntegerField(default=0)
+    total_spent = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    avg_rating = models.FloatField(default=0.0, help_text='Average rating given to providers')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Client Profile'
+        verbose_name_plural = 'Client Profiles'
+
+    def __str__(self):
+        return f'ClientProfile({self.user.phone_number}, {self.loyalty_tier})'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PHONE OTP  (for phone-only auth: register/login verification)
 # ─────────────────────────────────────────────────────────────────────────────
 class PhoneOTP(models.Model):
