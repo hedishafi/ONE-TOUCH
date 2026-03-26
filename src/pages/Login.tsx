@@ -1,28 +1,28 @@
 /**
- * Login.tsx — Role-aware authentication
+ * Login.tsx — Functional phone OTP authentication (zero demo code)
  *
- * All users:       enter phone number → role detected automatically
- * Clients:         phone → OTP → dashboard  (passwordless, frictionless)
- * Providers/Admin: phone → password → dashboard  (+ forgot-password via OTP reset)
+ * Users enter phone number → receive OTP via SMS → verify → authenticated
+ * Role-based redirect to appropriate dashboard
  */
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Button, Center, Container, Paper, Stack, Text, TextInput,
-  PasswordInput, PinInput, Progress, Alert, Anchor, Group, ThemeIcon, Badge,
+  PinInput, Alert, Anchor, Group, ThemeIcon,
 } from '@mantine/core';
 import {
-  IconPhone, IconLock, IconArrowRight, IconChevronLeft,
-  IconShieldCheck, IconAlertCircle, IconKey, IconDeviceMobile,
-  IconMessageCircle, IconUser,
+  IconPhone, IconArrowRight, IconChevronLeft,
+  IconShieldCheck, IconAlertCircle, IconMessageCircle,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
-import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
+import * as authService from '../services/authService';
+import { ROUTES } from '../utils/constants';
+import { storage, STORAGE_KEYS } from '../utils/storage';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Screen = 'phone' | 'client-otp' | 'password' | 'forgot-phone' | 'forgot-otp';
+type Screen = 'phone' | 'otp';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function useCountdown(start: number) {
@@ -40,218 +40,163 @@ function useCountdown(start: number) {
   return { seconds, begin };
 }
 
-function getStrength(pw: string) {
-  if (!pw) return { value: 0, label: '', color: 'gray' };
-  if (pw.length < 6) return { value: 20, label: 'Too short', color: 'red' };
-  if (pw.length < 8) return { value: 50, label: 'Weak', color: 'orange' };
-  if (/[A-Z]/.test(pw) && /[0-9]/.test(pw)) return { value: 100, label: 'Strong', color: 'teal' };
-  return { value: 75, label: 'Fair', color: 'yellow' };
-}
-
-const normPhone = (p: string) => p.replace(/[\s\-()]/g, '');
-
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const navigate = useNavigate();
-  const { loginByPhone, loginByPhoneOTP, lookupPhoneRole, resetPassword } = useAuthStore();
-  const navy = COLORS.navyBlue;
-  const teal = COLORS.tealBlue;
-
-  const [screen, setScreen]           = useState<Screen>('phone');
-  const [detectedRole, setDetectedRole] = useState<'client' | 'provider' | 'admin' | null>(null);
+  const [screen, setScreen] = useState<Screen>('phone');
 
   // ── Phone entry ────────────────────────────────────────────────────────────
-  const [phone, setPhone]             = useState('');
-  const [phoneError, setPhoneError]   = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [phoneLoading, setPhoneLoading] = useState(false);
 
-  // ── Client OTP ─────────────────────────────────────────────────────────────
-  const [clientOtp, setClientOtp]         = useState('');
-  const [clientOtpError, setClientOtpError] = useState('');
-  const [clientAttempts, setClientAttempts] = useState(0);
-  const [otpVerifying, setOtpVerifying]   = useState(false);
-  const { seconds: otpSeconds, begin: beginOtp } = useCountdown(60);
+  // ── OTP verification ───────────────────────────────────────────────────────
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpAttempts, setOtpAttempts] = useState(0);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [demoOtp, setDemoOtp] = useState('');
+  const { seconds: otpSeconds, begin: beginOtpTimer } = useCountdown(60);
 
-  // ── Password (provider / admin) ────────────────────────────────────────────
-  const [password, setPassword]         = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordLoading, setPasswordLoading] = useState(false);
+  const colors = { navy: '#1A365D', teal: '#16A085' };
 
-  // ── Forgot-password ────────────────────────────────────────────────────────
-  const [forgotPhone, setForgotPhone]     = useState('');
-  const [forgotPhoneError, setForgotPhoneError] = useState('');
-  const [sendingCode, setSendingCode]     = useState(false);
-  const [resetOtp, setResetOtp]           = useState('');
-  const [resetOtpError, setResetOtpError] = useState('');
-  const [newPw, setNewPw]                 = useState('');
-  const [confirmPw, setConfirmPw]         = useState('');
-  const [resetError, setResetError]       = useState('');
-  const [resetting, setResetting]         = useState(false);
-  const { seconds: resetSeconds, begin: beginReset } = useCountdown(60);
-  const strength = getStrength(newPw);
+  // ─── Validate phone number (Ethiopian standard) ───────────────────────────
+  const validatePhone = (phoneInput: string) => {
+    const regex = /^(\+251|0|251)\d{9}$/;
+    return regex.test(phoneInput.replace(/[\s\-()]/g, ''));
+  };
 
-  // ── Shared helpers ─────────────────────────────────────────────────────────
-  const goAfterLogin = () => {
+  // ─── Step 1: Request OTP ──────────────────────────────────────────────────
+  const handlePhoneSubmit = async () => {
+    setPhoneError('');
+    if (!phone.trim()) {
+      setPhoneError('Please enter your phone number.');
+      return;
+    }
+    if (!validatePhone(phone)) {
+      setPhoneError('Please enter a valid phone number (e.g., 0900000000 or +251900000000).');
+      return;
+    }
+
+    setPhoneLoading(true);
+    try {
+      const response = await authService.loginRequestOTP({ phone_number: phone });
+      setPhoneLoading(false);
+      
+      // Display actual OTP code from backend (for development/debugging)
+      if (response.otp_code) {
+        setDemoOtp(response.otp_code);
+      }
+
+      // Reset OTP fields and show OTP screen
+      setOtp('');
+      setOtpError('');
+      setOtpAttempts(0);
+      beginOtpTimer();
+      setScreen('otp');
+
+      notifications.show({
+        title: '📱 Verification Code Sent',
+        message: `A 6-digit code was sent to ${phone}`,
+        color: 'teal',
+        autoClose: 5000,
+      });
+    } catch (error: any) {
+      setPhoneLoading(false);
+      setPhoneError(error?.message || 'Failed to request OTP. Please try again.');
+    }
+  };
+
+  // ─── Step 2: Verify OTP ───────────────────────────────────────────────────
+  const handleOtpVerify = async (code: string) => {
+    if (code.length !== 6) return;
+
+    if (otpAttempts >= 5) {
+      setOtpError('Too many invalid attempts. Please request a new code.');
+      return;
+    }
+
+    setOtpVerifying(true);
+    setOtpError('');
+
+    try {
+      const response = await authService.loginVerify({
+        phone_number: phone,
+        otp_code: code,
+      });
+
+      // Update authStore with user data
+      storage.set(STORAGE_KEYS.currentUser, response.user);
+      useAuthStore.setState({
+        currentUser: response.user,
+        isAuthenticated: true,
+      });
+
+      setOtpVerifying(false);
+      handleSuccess();
+    } catch (error: any) {
+      setOtpVerifying(false);
+      const remaining = 5 - otpAttempts - 1;
+      setOtpAttempts(prev => prev + 1);
+      
+      if (remaining > 0) {
+        setOtpError(`Invalid code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
+      } else {
+        setOtpError('No attempts remaining. Please request a new code.');
+      }
+    }
+  };
+
+  // ─── Resend OTP ──────────────────────────────────────────────────────────
+  const handleResend = async () => {
+    if (otpSeconds > 0) return;
+
+    try {
+      const response = await authService.loginRequestOTP({ phone_number: phone });
+
+      // Display actual OTP code from backend
+      if (response.otp_code) {
+        setDemoOtp(response.otp_code);
+      }
+
+      // Reset countdown and attempts
+      setOtp('');
+      setOtpError('');
+      setOtpAttempts(0);
+      beginOtpTimer();
+
+      notifications.show({
+        title: '📱 New Code Sent',
+        message: `A new 6-digit code was sent to ${phone}`,
+        color: 'teal',
+        autoClose: 5000,
+      });
+    } catch (error: any) {
+      setOtpError(error?.message || 'Failed to resend code. Please try again.');
+    }
+  };
+
+  // ─── Handle successful login ──────────────────────────────────────────────
+  const handleSuccess = () => {
     const { currentUser } = useAuthStore.getState();
-    notifications.show({ title: 'Welcome back!', message: 'Signed in successfully.', color: 'teal' });
-    if (currentUser?.role === 'client')   navigate(ROUTES.clientDashboard, { replace: true });
+    notifications.show({
+      title: 'Welcome back!',
+      message: 'Signed in successfully.',
+      color: 'teal',
+    });
+    
+    if (currentUser?.role === 'client') navigate(ROUTES.clientDashboard, { replace: true });
     else if (currentUser?.role === 'provider') navigate(ROUTES.providerDashboard, { replace: true });
     else navigate(ROUTES.adminDashboard, { replace: true });
   };
 
-  // ── One-click demo login ──────────────────────────────────────────────────
-  function quickLogin(userId: string) {
-    const { loginByUserId } = useAuthStore.getState();
-    const result = loginByUserId(userId);
-    if (result.success) {
-      goAfterLogin();
-    }
-  }
-
-  // ── Screen: phone → continue ───────────────────────────────────────────────
-  function handleContinue() {
-    setPhoneError('');
-    if (!phone.trim()) { setPhoneError('Please enter your phone number.'); return; }
-    setPhoneLoading(true);
-    setTimeout(() => {
-      let role = lookupPhoneRole(normPhone(phone));
-      // If phone not found → treat as demo client so the flow always works
-      if (!role) {
-        role = 'client';
-        setPhone('+1-555-0101'); // align with demo account for OTP verify step
-      }
-      setPhoneLoading(false);
-      setDetectedRole(role);
-      if (role === 'client') {
-        setClientOtp('');
-        setClientOtpError('');
-        setClientAttempts(0);
-        beginOtp();
-        // Simulate SMS being sent — show demo OTP clearly
-        notifications.show({
-          title: '📱 Verification Code Sent',
-          message: `A 6-digit code was sent to ${phone}.\n\n🔑 Demo code: ${MOCK_OTP}`,
-          color: 'teal',
-          autoClose: 12000,
-        });
-        setScreen('client-otp');
-      } else {
-        setPassword('');
-        setPasswordError('');
-        notifications.show({
-          title: '🔒 Enter your password',
-          message: `Welcome back! Demo password: demo123`,
-          color: 'blue',
-          autoClose: 8000,
-        });
-        setScreen('password');
-      }
-    }, 500);
-  }
-
-  // ── Screen: client-otp ────────────────────────────────────────────────────
-  const MAX_OTP_ATTEMPTS = 5;
-
-  function handleClientOtpChange(val: string) {
-    setClientOtp(val);
-    setClientOtpError('');
-    if (val.length === 6) verifyClientOtp(val);
-  }
-
-  function verifyClientOtp(code: string) {
-    if (clientAttempts >= MAX_OTP_ATTEMPTS) {
-      setClientOtpError('Too many incorrect attempts. Please request a new code.');
-      return;
-    }
-    if (code !== MOCK_OTP) {
-      const remaining = MAX_OTP_ATTEMPTS - clientAttempts - 1;
-      setClientAttempts(a => a + 1);
-      setClientOtpError(
-        remaining > 0
-          ? `Incorrect code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`
-          : 'No attempts remaining. Please resend.'
-      );
-      return;
-    }
-    setOtpVerifying(true);
-    setTimeout(() => {
-      const result = loginByPhoneOTP(normPhone(phone));
-      setOtpVerifying(false);
-      if (!result.success) { setClientOtpError(result.error ?? 'Sign in failed.'); return; }
-      goAfterLogin();
-    }, 500);
-  }
-
-  function handleResendClientOtp() {
-    if (otpSeconds > 0 || clientAttempts >= MAX_OTP_ATTEMPTS) return;
-    setClientOtp('');
-    setClientOtpError('');
-    setClientAttempts(0);
-    beginOtp();
-    notifications.show({
-      title: '📱 New Code Sent',
-      message: `A new 6-digit code was sent to ${phone}.\n\n🔑 Demo code: ${MOCK_OTP}`,
-      color: 'teal',
-      autoClose: 12000,
-    });
-  }
-
-  // ── Screen: password ──────────────────────────────────────────────────────
-  function handlePasswordLogin() {
-    setPasswordError('');
-    if (!password) { setPasswordError('Please enter your password.'); return; }
-    setPasswordLoading(true);
-    setTimeout(() => {
-      const result = loginByPhone(normPhone(phone), password);
-      setPasswordLoading(false);
-      if (!result.success) { setPasswordError(result.error ?? 'Sign in failed.'); return; }
-      goAfterLogin();
-    }, 500);
-  }
-
-  // ── Screen: forgot-phone ──────────────────────────────────────────────────
-  function handleSendResetCode() {
-    setForgotPhoneError('');
-    if (!forgotPhone.trim()) { setForgotPhoneError('Please enter your phone number.'); return; }
-    setSendingCode(true);
-    setTimeout(() => {
-      setSendingCode(false);
-      setResetOtp('');
-      setResetOtpError('');
-      setNewPw('');
-      setConfirmPw('');
-      setResetError('');
-      beginReset();
-      setScreen('forgot-otp');
-    }, 800);
-  }
-
-  // ── Screen: forgot-otp ────────────────────────────────────────────────────
-  function handleReset() {
-    setResetError('');
-    if (resetOtp.length < 6) { setResetError('Please enter the 6-digit code.'); return; }
-    if (resetOtp !== MOCK_OTP) { setResetOtpError(`Incorrect code. Demo code: ${MOCK_OTP}`); return; }
-    if (newPw.length < 6) { setResetError('Password must be at least 6 characters.'); return; }
-    if (newPw !== confirmPw) { setResetError('Passwords do not match.'); return; }
-    setResetting(true);
-    setTimeout(() => {
-      const result = resetPassword(normPhone(forgotPhone), newPw);
-      setResetting(false);
-      if (!result.success) { setResetError(result.error ?? 'Reset failed.'); return; }
-      notifications.show({ title: 'Password updated!', message: 'You can now sign in with your new password.', color: 'teal' });
-      setPhone(forgotPhone);
-      setPassword('');
-      setScreen('password');
-    }, 700);
-  }
-
-  // ── Shared layout ─────────────────────────────────────────────────────────
+  // ─── Layout components ───────────────────────────────────────────────────
   const header = (
     <Center mb="xl">
       <Box style={{ textAlign: 'center' }}>
         <Box style={{
           width: 56, height: 56, borderRadius: '50%',
-          background: `linear-gradient(135deg, ${navy}, ${teal})`,
+          background: `linear-gradient(135deg, ${colors.navy}, ${colors.teal})`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px',
         }}>
           <IconShieldCheck size={28} color="#fff" />
@@ -296,48 +241,8 @@ export default function Login() {
     <>
       <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>Sign In</Text>
       <Text size="sm" mb="md" style={{ color: 'var(--ot-text-sub)' }}>
-        Enter your phone number or use a demo account below.
+        Enter your phone number to receive a verification code.
       </Text>
-
-      {/* ── Quick demo login buttons ── */}
-      <Stack gap="xs" mb="lg">
-        <Text size="xs" fw={700} tt="uppercase" style={{ color: 'var(--ot-text-muted)', letterSpacing: '0.05em' }}>Quick Demo Access</Text>
-        <Button
-          fullWidth
-          variant="light"
-          color="teal"
-          size="md"
-          leftSection={<IconUser size={16} />}
-          onClick={() => quickLogin('client-001')}
-        >
-          Login as Client
-        </Button>
-        <Button
-          fullWidth
-          variant="light"
-          color="blue"
-          size="md"
-          leftSection={<IconUser size={16} />}
-          onClick={() => quickLogin('provider-001')}
-        >
-          Login as Provider
-        </Button>
-        <Button
-          fullWidth
-          variant="light"
-          color="gray"
-          size="sm"
-          leftSection={<IconShieldCheck size={14} />}
-        >
-          Login as Admin
-        </Button>
-      </Stack>
-
-      <Group gap="xs" mb="lg" align="center">
-        <Box style={{ flex: 1, height: 1, background: 'var(--ot-border)' }} />
-        <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>OR enter phone manually</Text>
-        <Box style={{ flex: 1, height: 1, background: 'var(--ot-border)' }} />
-      </Group>
 
       {phoneError && (
         <Alert icon={<IconAlertCircle size={16} />} color="orange" mb="md" radius="md">{phoneError}</Alert>
@@ -346,21 +251,21 @@ export default function Login() {
       <Stack gap="md">
         <TextInput
           label="Phone Number"
-          placeholder="+251 9XX XXX XXX"
+          placeholder="+251 900 000 000 or 0900000000"
           value={phone}
           onChange={e => { setPhone(e.target.value); setPhoneError(''); }}
           leftSection={<IconPhone size={16} />}
           styles={inputStyles}
-          onKeyDown={e => e.key === 'Enter' && handleContinue()}
+          onKeyDown={e => e.key === 'Enter' && handlePhoneSubmit()}
           size="md"
           autoFocus
         />
         <Button
           fullWidth size="md"
           loading={phoneLoading}
-          onClick={handleContinue}
+          onClick={handlePhoneSubmit}
           rightSection={<IconArrowRight size={16} />}
-          style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
+          style={{ background: `linear-gradient(135deg, ${colors.navy}, ${colors.teal})`, border: 'none' }}
         >
           Continue
         </Button>
@@ -368,34 +273,15 @@ export default function Login() {
 
       <Text ta="center" size="sm" mt="xl" style={{ color: 'var(--ot-text-sub)' }}>
         Don't have an account?{' '}
-        <Anchor onClick={() => navigate(ROUTES.signup)} style={{ color: teal, cursor: 'pointer' }}>
+        <Anchor onClick={() => navigate(ROUTES.signup)} style={{ color: colors.teal, cursor: 'pointer' }}>
           Create one
         </Anchor>
       </Text>
-
-      <Box mt="lg" p={12} style={{ borderRadius: 10, background: 'var(--ot-bg-row)', border: '1px solid var(--ot-border)' }}>
-        <Text size="xs" c="var(--ot-text-muted)" fw={600} mb={6}>Phone number OTP demo credentials</Text>
-        <Stack gap={4}>
-          <Group gap="xs" wrap="nowrap">
-            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>Client:</Text>
-            <Text size="xs" fw={700} style={{ color: teal, cursor: 'pointer' }}
-              onClick={() => setPhone('+1-555-0101')}>+1-555-0101</Text>
-            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>→ OTP: <strong>{MOCK_OTP}</strong></Text>
-          </Group>
-          <Group gap="xs" wrap="nowrap">
-            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>Provider:</Text>
-            <Text size="xs" fw={700} style={{ color: teal, cursor: 'pointer' }}
-              onClick={() => setPhone('+1-555-0201')}>+1-555-0201</Text>
-            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>→ pw: <strong>demo123</strong></Text>
-          </Group>
-          <Text size="xs" c="dimmed" mt={4}>💡 Any unrecognized phone will log you in as a demo client with OTP <strong>{MOCK_OTP}</strong></Text>
-        </Stack>
-      </Box>
     </>
   ));
 
-  // ── CLIENT OTP ─────────────────────────────────────────────────────────────
-  if (screen === 'client-otp') return wrap(card(
+  // ── OTP VERIFICATION ──────────────────────────────────────────────────────
+  return wrap(card(
     <>
       <Group mb="md" gap={12}>
         <ThemeIcon variant="light" color="teal" size={44} radius="xl">
@@ -409,12 +295,14 @@ export default function Login() {
         </Box>
       </Group>
 
-      <Badge color="teal" variant="light" size="sm" mb="lg" leftSection={<IconShieldCheck size={11} />}>
-        Demo code: {MOCK_OTP}
-      </Badge>
+      {demoOtp && (
+        <Alert icon={<IconShieldCheck size={16} />} color="blue" mb="md" radius="md" style={{ fontSize: '16px', fontWeight: 600 }}>
+          Demo code: <strong>{demoOtp}</strong>
+        </Alert>
+      )}
 
-      {clientOtpError && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">{clientOtpError}</Alert>
+      {otpError && (
+        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">{otpError}</Alert>
       )}
 
       <Stack gap="xl">
@@ -427,244 +315,41 @@ export default function Login() {
               length={6}
               type="number"
               size="lg"
-              value={clientOtp}
-              onChange={handleClientOtpChange}
-              disabled={clientAttempts >= MAX_OTP_ATTEMPTS || otpVerifying}
+              value={otp}
+              onChange={(val) => {
+                setOtp(val);
+                setOtpError('');
+                if (val.length === 6) {
+                  handleOtpVerify(val);
+                }
+              }}
+              disabled={otpAttempts >= 5 || otpVerifying}
               autoFocus
             />
           </Center>
         </Box>
 
         {otpVerifying && (
-          <Text size="sm" c="var(--ot-text-sub)" ta="center">Signing you in…</Text>
+          <Text size="sm" c="var(--ot-text-sub)" ta="center">Verifying…</Text>
         )}
 
         <Group justify="space-between">
           <Anchor
             size="sm"
             onClick={() => setScreen('phone')}
-            style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ color: colors.teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <IconChevronLeft size={14} /> Change number
           </Anchor>
           <Anchor
             size="sm"
-            onClick={handleResendClientOtp}
+            onClick={handleResend}
             style={{
-              color: otpSeconds > 0 || clientAttempts >= MAX_OTP_ATTEMPTS ? 'var(--ot-text-muted)' : teal,
-              cursor: otpSeconds > 0 || clientAttempts >= MAX_OTP_ATTEMPTS ? 'default' : 'pointer',
+              color: otpSeconds > 0 || otpAttempts >= 5 ? 'var(--ot-text-muted)' : colors.teal,
+              cursor: otpSeconds > 0 || otpAttempts >= 5 ? 'default' : 'pointer',
             }}
           >
             {otpSeconds > 0 ? `Resend in ${otpSeconds}s` : 'Resend code'}
-          </Anchor>
-        </Group>
-      </Stack>
-    </>
-  ));
-
-  // ── PASSWORD (PROVIDER / ADMIN) ────────────────────────────────────────────
-  if (screen === 'password') return wrap(card(
-    <>
-      <Group mb="lg" gap={12}>
-        <ThemeIcon variant="light" color="blue" size={44} radius="xl">
-          <IconUser size={22} />
-        </ThemeIcon>
-        <Box>
-          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Enter Password</Text>
-          <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
-            {detectedRole === 'admin' ? 'Admin' : 'Provider'} account · {phone}
-          </Text>
-        </Box>
-      </Group>
-
-      {passwordError && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">{passwordError}</Alert>
-      )}
-
-      <Stack gap="md">
-        <PasswordInput
-          label="Password"
-          placeholder="Your password"
-          value={password}
-          onChange={e => { setPassword(e.target.value); setPasswordError(''); }}
-          leftSection={<IconLock size={16} />}
-          styles={inputStyles}
-          onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
-          size="md"
-          autoFocus
-        />
-
-        <Group justify="space-between">
-          <Anchor
-            size="sm"
-            onClick={() => setScreen('phone')}
-            style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <IconChevronLeft size={14} /> Back
-          </Anchor>
-          <Anchor
-            size="sm"
-            onClick={() => { setForgotPhone(phone); setForgotPhoneError(''); setScreen('forgot-phone'); }}
-            style={{ color: teal, cursor: 'pointer' }}
-          >
-            Forgot password?
-          </Anchor>
-        </Group>
-
-        <Button
-          fullWidth size="md"
-          loading={passwordLoading}
-          onClick={handlePasswordLogin}
-          rightSection={<IconArrowRight size={16} />}
-          style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
-        >
-          Sign In
-        </Button>
-      </Stack>
-    </>
-  ));
-
-  // ── FORGOT PASSWORD — ENTER PHONE ─────────────────────────────────────────
-  if (screen === 'forgot-phone') return wrap(card(
-    <>
-      <Group mb="lg" gap={12}>
-        <ThemeIcon variant="light" color="teal" size={44} radius="xl">
-          <IconDeviceMobile size={22} />
-        </ThemeIcon>
-        <Box>
-          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Reset Password</Text>
-          <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
-            We'll send a verification code to your registered number.
-          </Text>
-        </Box>
-      </Group>
-
-      {forgotPhoneError && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">{forgotPhoneError}</Alert>
-      )}
-
-      <Stack gap="md">
-        <TextInput
-          label="Phone Number"
-          placeholder="+251 9XX XXX XXX"
-          value={forgotPhone}
-          onChange={e => setForgotPhone(e.target.value)}
-          leftSection={<IconPhone size={16} />}
-          styles={inputStyles}
-          onKeyDown={e => e.key === 'Enter' && handleSendResetCode()}
-          size="md"
-        />
-        <Button
-          fullWidth size="md"
-          loading={sendingCode}
-          onClick={handleSendResetCode}
-          rightSection={<IconArrowRight size={16} />}
-          style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
-        >
-          Send Code
-        </Button>
-        <Anchor
-          size="sm"
-          onClick={() => setScreen('password')}
-          style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-        >
-          <IconChevronLeft size={14} /> Back to sign in
-        </Anchor>
-      </Stack>
-    </>
-  ));
-
-  // ── FORGOT PASSWORD — OTP + NEW PASSWORD ──────────────────────────────────
-  return wrap(card(
-    <>
-      <Group mb="lg" gap={12}>
-        <ThemeIcon variant="light" color="teal" size={44} radius="xl">
-          <IconKey size={22} />
-        </ThemeIcon>
-        <Box>
-          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Verify & Reset</Text>
-          <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
-            Code sent to <strong>{forgotPhone}</strong>
-          </Text>
-        </Box>
-      </Group>
-
-      <Alert icon={<IconShieldCheck size={14} />} color="teal" mb="md" radius="md" variant="light">
-        Demo verification code: <strong>{MOCK_OTP}</strong>
-      </Alert>
-
-      {(resetOtpError || resetError) && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" radius="md">
-          {resetOtpError || resetError}
-        </Alert>
-      )}
-
-      <Stack gap="md">
-        <Box>
-          <Text size="sm" fw={500} mb={8} style={{ color: 'var(--ot-text-body)' }}>Verification Code</Text>
-          <Center>
-            <PinInput
-              length={6}
-              type="number"
-              value={resetOtp}
-              onChange={v => { setResetOtp(v); setResetOtpError(''); }}
-              size="md"
-            />
-          </Center>
-        </Box>
-
-        <PasswordInput
-          label="New Password"
-          placeholder="At least 6 characters"
-          value={newPw}
-          onChange={e => { setNewPw(e.target.value); setResetError(''); }}
-          leftSection={<IconLock size={16} />}
-          styles={inputStyles}
-          size="md"
-        />
-        {newPw.length > 0 && (
-          <Box>
-            <Progress value={strength.value} color={strength.color} size="xs" radius="xl" mb={4} />
-            <Text size="xs" style={{ color: 'var(--ot-text-muted)' }}>{strength.label}</Text>
-          </Box>
-        )}
-        <PasswordInput
-          label="Confirm Password"
-          placeholder="Repeat your new password"
-          value={confirmPw}
-          onChange={e => { setConfirmPw(e.target.value); setResetError(''); }}
-          leftSection={<IconLock size={16} />}
-          styles={inputStyles}
-          size="md"
-        />
-
-        <Button
-          fullWidth size="md"
-          loading={resetting}
-          onClick={handleReset}
-          rightSection={<IconArrowRight size={16} />}
-          style={{ background: `linear-gradient(135deg, ${navy}, ${teal})`, border: 'none' }}
-        >
-          Reset Password
-        </Button>
-
-        <Group justify="space-between">
-          <Anchor
-            size="sm"
-            onClick={() => { if (resetSeconds === 0) handleSendResetCode(); }}
-            style={{
-              color: resetSeconds > 0 ? 'var(--ot-text-muted)' : teal,
-              cursor: resetSeconds > 0 ? 'default' : 'pointer',
-            }}
-          >
-            {resetSeconds > 0 ? `Resend in ${resetSeconds}s` : 'Resend code'}
-          </Anchor>
-          <Anchor
-            size="sm"
-            onClick={() => setScreen('forgot-phone')}
-            style={{ color: teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <IconChevronLeft size={14} /> Change number
           </Anchor>
         </Group>
       </Stack>
