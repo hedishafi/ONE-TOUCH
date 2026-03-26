@@ -22,11 +22,13 @@ from .permissions import IsProvider, IsClient
 from .serializers import (
 	AuthTokenSerializer,
 	ClientProfileSerializer,
+	ClientMinimalUserSerializer,
 	FaceBiometricVerificationSerializer,
 	IdentityDocumentSerializer,
 	LoginOTPRequestSerializer,
 	LoginVerifySerializer,
 	OTPSentSerializer,
+	ProviderFullUserSerializer,
 	ProviderProfileSerializer,
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
@@ -67,8 +69,39 @@ def _unique_username(base: str) -> str:
 	return candidate
 
 
+def _normalize_phone_number(phone_number: str) -> str:
+	"""
+	Normalize phone numbers to E.164 format (+251XXXXXXXXX).
+	Handles:
+	  - +251XXXXXXXXX → +251XXXXXXXXX (already normalized)
+	  - 0XXXXXXXXX   → +251XXXXXXXXX (Ethiopian local format)
+	  - 251XXXXXXXXX → +251XXXXXXXXX (no leading +)
+	"""
+	phone_number = phone_number.strip().replace(' ', '').replace('-', '')
+	
+	# If already in +251 format, return as-is
+	if phone_number.startswith('+251'):
+		return phone_number
+	
+	# If starts with 0 (local Ethiopian format), replace with +251
+	if phone_number.startswith('0') and len(phone_number) == 10:
+		return '+251' + phone_number[1:]
+	
+	# If it's 251 without +, add the +
+	if phone_number.startswith('251') and len(phone_number) == 12:
+		return '+' + phone_number
+	
+	# If it's already a 9-digit number, assume it's the part after country code
+	if len(phone_number) == 9 and phone_number.isdigit():
+		return '+251' + phone_number
+	
+	# Return as-is if format unclear (let validation catch it later)
+	return phone_number
+
+
 def _invalidate_previous_otps(phone_number: str, purpose: str) -> None:
 	"""Mark any unused OTPs for this phone+purpose as used before issuing a new one."""
+	phone_number = _normalize_phone_number(phone_number)
 	PhoneOTP.objects.filter(
 		phone_number=phone_number,
 		purpose=purpose,
@@ -78,6 +111,7 @@ def _invalidate_previous_otps(phone_number: str, purpose: str) -> None:
 
 def _issue_otp(phone_number: str, purpose: str, **meta) -> str:
 	"""Invalidate old OTPs, create a new one (persist optional meta) and return the code."""
+	phone_number = _normalize_phone_number(phone_number)
 	_invalidate_previous_otps(phone_number, purpose)
 	code = _generate_otp()
 	PhoneOTP.objects.create(
@@ -100,7 +134,7 @@ def _verify_otp(phone_number: str, purpose: str, otp_code: str):
 	Returns the `PhoneOTP` instance on success.
 	Raises `ValueError` with a human-readable message on failure.
 	"""
-	phone_number = phone_number.strip()
+	phone_number = _normalize_phone_number(phone_number)
 	otp_code = otp_code.strip()
 	
 	otp = (
@@ -134,16 +168,28 @@ def _verify_otp(phone_number: str, purpose: str, otp_code: str):
 
 
 def _build_token_response(user) -> dict:
-	"""Build JWT access + refresh tokens with custom claims, plus user profile."""
+	"""
+	Build JWT access + refresh tokens with custom claims, plus user profile.
+	
+	Clients receive minimal user data (id, phone_number, role).
+	Providers receive full user data (id, phone_number, role, verification_status, is_on_trial, trial_ends_at).
+	"""
 	refresh = RefreshToken.for_user(user)
 	access  = refresh.access_token
 	# Embed role and phone into the token so the frontend doesn't need an extra call
 	access['role']         = user.role
 	access['phone_number'] = user.phone_number
+	
+	# Use minimal serializer for clients, full serializer for providers
+	if user.role == User.ROLE_CLIENT:
+		user_data = ClientMinimalUserSerializer(user).data
+	else:
+		user_data = ProviderFullUserSerializer(user).data
+	
 	return {
 		'access':  str(access),
 		'refresh': str(refresh),
-		'user':    UserProfileSerializer(user).data,
+		'user':    user_data,
 	}
 
 
@@ -171,15 +217,28 @@ class SignupRequestOTPView(APIView):
 
 	@extend_schema(
 		tags=['Signup'],
-		request=SignupOTPRequestSerializer,
+		request=inline_serializer(
+			'SignupOTPRequest',
+			{
+				'phone_number': rest_framework_serializers.CharField(
+					max_length=30,
+					help_text='Phone number (e.g., +251911234567 or 0911234567)',
+				),
+				'role': rest_framework_serializers.ChoiceField(
+					choices=['client', 'provider'],
+					default='client',
+					help_text='Account type: "client" or "provider"',
+				),
+			}
+		),
 		responses={
 			200: OTPSentSerializer,
 			400: OpenApiResponse(description='Phone already registered or invalid input.'),
 		},
 		summary='Signup — request OTP',
 		description=(
-			'Validates the phone number (must not already exist), stores account details, '
-			'and sends a 6-digit OTP. In DEBUG the OTP is returned in the response.'
+			'Validates the phone number (must not already exist) and sends a 6-digit OTP. '
+			'In DEBUG mode the OTP is returned in the response.'
 		),
 	)
 	def post(self, request):
@@ -217,9 +276,26 @@ class SignupVerifyView(APIView):
 
 	@extend_schema(
 		tags=['Signup'],
-		request=SignupVerifySerializer,
+		request=inline_serializer(
+			'SignupVerifyRequest',
+			{
+				'phone_number': rest_framework_serializers.CharField(
+					max_length=30,
+					help_text='Same phone number from signup/otp request',
+				),
+				'otp_code': rest_framework_serializers.CharField(
+					max_length=6, min_length=6,
+					help_text='6-digit OTP code sent to your phone',
+				),
+				'role': rest_framework_serializers.ChoiceField(
+					choices=['client', 'provider'],
+					required=False,
+					help_text='Optional: "client" or "provider"',
+				),
+			}
+		),
 		responses={
-			200: AuthTokenSerializer,
+			201: AuthTokenSerializer,
 			400: OpenApiResponse(description='Invalid / expired OTP or phone already taken.'),
 		},
 		summary='Signup — verify OTP & create account',
@@ -229,7 +305,7 @@ class SignupVerifyView(APIView):
 		serializer.is_valid(raise_exception=True)
 		vd = serializer.validated_data
 
-		phone_number = vd['phone_number']
+		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
 		# We need the original signup payload (role, name) — the client must resend it
@@ -352,7 +428,7 @@ class LoginVerifyView(APIView):
 		serializer.is_valid(raise_exception=True)
 		vd = serializer.validated_data
 
-		phone_number = vd['phone_number']
+		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
 		try:

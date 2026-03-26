@@ -43,8 +43,43 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+class ClientMinimalUserSerializer(serializers.ModelSerializer):
+    """Minimal user response for clients (auth only)."""
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'phone_number',
+            'role',
+        ]
+        read_only_fields = ['id', 'role']
+
+
+class ProviderFullUserSerializer(serializers.ModelSerializer):
+    """Full user response for service providers (includes trial info)."""
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'phone_number',
+            'role',
+            'verification_status',
+            'is_on_trial',
+            'trial_ends_at',
+        ]
+        read_only_fields = [
+            'id',
+            'role',
+            'verification_status',
+            'is_on_trial',
+            'trial_ends_at',
+        ]
+
+
 class ClientProfileSerializer(serializers.ModelSerializer):
-    """Read/update client profile data and wallet info."""
+    """Read/update client profile data - only essential fields."""
     user_id = serializers.CharField(source='user.id', read_only=True)
     phone_number = serializers.CharField(source='user.phone_number', read_only=True)
 
@@ -53,29 +88,13 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         fields = [
             'user_id',
             'phone_number',
-            'client_type',
             'full_name',
-            'business_name',
-            'tax_id',
-            'business_address',
-            'selfie_url',
-            'id_document_url',
-            'loyalty_tier',
             'wallet_balance',
-            'total_bookings',
-            'total_spent',
-            'avg_rating',
-            'created_at',
         ]
         read_only_fields = [
             'user_id',
             'phone_number',
-            'loyalty_tier',
             'wallet_balance',
-            'total_bookings',
-            'total_spent',
-            'avg_rating',
-            'created_at',
         ]
 
 
@@ -103,8 +122,15 @@ class SignupOTPRequestSerializer(serializers.Serializer):
     """
     Request an OTP to begin phone-based signup.
 
+    MINIMAL request body (client signup):
+    {
+        "phone_number": "+251911234567",
+        "role": "client"
+    }
+
     Both clients and service providers use the same endpoint;
     the 'role' field distinguishes which account type to create.
+    All fields except phone_number are OPTIONAL.
     """
 
     SIGNUP_ROLE_CHOICES = [
@@ -114,12 +140,13 @@ class SignupOTPRequestSerializer(serializers.Serializer):
 
     phone_number = serializers.CharField(
         max_length=30,
-        help_text='Phone number in international format, e.g. +251911234567',
+        help_text='Phone number in international format, e.g. +251911234567 (required)',
     )
     role = serializers.ChoiceField(
         choices=SIGNUP_ROLE_CHOICES,
         default=User.ROLE_CLIENT,
-        help_text='Account type: "client" or "provider"',
+        required=False,
+        help_text='Account type: "client" (default) or "provider" (optional)',
     )
     first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     last_name  = serializers.CharField(max_length=150, required=False, allow_blank=True)
@@ -160,20 +187,32 @@ class SignupOTPRequestSerializer(serializers.Serializer):
 
 class SignupVerifySerializer(serializers.Serializer):
     """
-    Verify the OTP received during signup, create the user account,
-    and return JWT access + refresh tokens.
+    Verify the OTP received during signup and create the user account.
+
+    MINIMAL request body (client signup verify):
+    {
+        "phone_number": "+251911234567",
+        "otp_code": "123456",
+        "role": "client"
+    }
+
+    Returns JWT access + refresh tokens on success (201).
+    NOTE: role, first_name, last_name, username are all OPTIONAL.
     """
 
-    phone_number = serializers.CharField(max_length=30)
-    otp_code     = serializers.CharField(
+    phone_number = serializers.CharField(
+        max_length=30,
+        help_text='Same phone number used in signup/otp request (required)',
+    )
+    otp_code = serializers.CharField(
         max_length=6, min_length=6,
-        help_text='6-digit OTP sent to the phone number.',
+        help_text='6-digit OTP sent to the phone number (required)',
     )
     # Optional: client UI may resend these, otherwise values stored on the OTP record are used
-    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, required=False)
-    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
-    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
-    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, required=False, help_text='Optional')
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text='Optional')
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text='Optional')
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True, help_text='Optional')
 
     def validate_phone_number(self, value: str) -> str:
         return value.strip()
@@ -195,7 +234,8 @@ class LoginOTPRequestSerializer(serializers.Serializer):
     )
 
     def validate_phone_number(self, value: str) -> str:
-        value = value.strip()
+        from .views import _normalize_phone_number
+        value = _normalize_phone_number(value)
         if not User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('No account found for this phone number.')
         return value
@@ -217,7 +257,8 @@ class LoginVerifySerializer(serializers.Serializer):
     )
 
     def validate_phone_number(self, value: str) -> str:
-        return value.strip()
+        from .views import _normalize_phone_number
+        return _normalize_phone_number(value)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

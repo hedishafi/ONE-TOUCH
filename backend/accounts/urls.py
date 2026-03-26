@@ -6,6 +6,7 @@ from .views import (
     IdentityDocumentUploadView,
     LoginRequestOTPView,
     LoginVerifyView,
+    LogoutView,
     ProfileView,
     ProviderProfileView,
     SignupRequestOTPView,
@@ -39,6 +40,7 @@ urlpatterns = [
 
     # Token management
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+    path('auth/logout/',        LogoutView.as_view(),        name='logout'),
 
     # Authenticated user
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
