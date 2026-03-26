@@ -501,18 +501,39 @@ class SubServiceSerializer(serializers.ModelSerializer):
 
 
 class OnboardingStep1Serializer(serializers.Serializer):
-    """Step 1: Upload and OCR extract document."""
-    document_type = serializers.ChoiceField(choices=IdentityDocument.DOC_CHOICES)
-    document_file = serializers.FileField(max_length=10485760)  # 10MB
-    
-    def validate_document_file(self, value):
+    """Step 1: Upload front/back document images and OCR extract."""
+    document_type = serializers.ChoiceField(
+        choices=['national_id', 'drivers_license', 'kebele_id']
+    )
+    front_image = serializers.FileField(
+        max_length=10485760,
+        required=True,
+        use_url=False,
+    )
+    back_image = serializers.FileField(
+        max_length=10485760,
+        required=True,
+        use_url=False,
+    )
+
+    def validate_front_image(self, value):
         ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
         MAX_SIZE_MB = 10
-        
+
         if value.content_type not in ALLOWED_TYPES:
-            raise serializers.ValidationError(f'File type not supported. Use JPEG or PNG.')
+            raise serializers.ValidationError('Front image type not supported. Use JPEG, PNG, or WEBP.')
         if value.size > MAX_SIZE_MB * 1024 * 1024:
-            raise serializers.ValidationError(f'File exceeds {MAX_SIZE_MB}MB limit.')
+            raise serializers.ValidationError(f'Front image exceeds {MAX_SIZE_MB}MB limit.')
+        return value
+
+    def validate_back_image(self, value):
+        ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+        MAX_SIZE_MB = 10
+
+        if value.content_type not in ALLOWED_TYPES:
+            raise serializers.ValidationError('Back image type not supported. Use JPEG, PNG, or WEBP.')
+        if value.size > MAX_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'Back image exceeds {MAX_SIZE_MB}MB limit.')
         return value
 
 

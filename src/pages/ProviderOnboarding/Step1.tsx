@@ -23,32 +23,43 @@ export const ProviderOnboardingStep1: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [docType, setDocType] = useState<'national_id' | 'drivers_license' | 'kebele_id'>('national_id');
-  const [file, setFile] = useState<File | null>(null);
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const validateFile = (selectedFile: File): boolean => {
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return false;
+    }
+
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Please upload an image file (JPG, PNG, etc.)');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleFrontImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      // Validate file size (max 5MB)
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
+    if (selectedFile && validateFile(selectedFile)) {
+      setFrontImage(selectedFile);
+      setError(null);
+    }
+  };
 
-      // Validate file type
-      if (!selectedFile.type.startsWith('image/')) {
-        setError('Please upload an image file (JPG, PNG, etc.)');
-        return;
-      }
-
-      setFile(selectedFile);
+  const handleBackImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile && validateFile(selectedFile)) {
+      setBackImage(selectedFile);
       setError(null);
     }
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a file to upload');
+    if (!frontImage || !backImage) {
+      setError('Please upload both front and back images');
       return;
     }
 
@@ -57,8 +68,9 @@ export const ProviderOnboardingStep1: React.FC = () => {
       setError(null);
 
       const response = await providerService.uploadDocument({
-        doc_type: docType,
-        document_file: file,
+        document_type: docType,
+        front_image: frontImage,
+        back_image: backImage,
       });
 
       notifications.show({
@@ -68,7 +80,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
       });
 
       // Extract phone from OCR results
-      const extractedPhone = response.extracted_data?.phone;
+      const extractedPhone = response.extracted_data?.phone_number;
       
       // Move to phone choice screen
       navigate('/provider/onboarding/phone-choice', {
@@ -85,7 +97,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
       // Handle validation errors from OCR
       if (errorData?.error === 'Document validation failed') {
-        errorMessage = '❌ Document Validation Failed';
+        errorMessage = errorData.user_message || '❌ Document Validation Failed';
         
         // Build detailed error list
         if (errorData.is_expired) {
@@ -104,9 +116,10 @@ export const ProviderOnboardingStep1: React.FC = () => {
         // Generic error handling
         errorMessage =
           err.response?.data?.detail ||
-          err.response?.data?.document_file?.[0] ||
+          err.response?.data?.front_image?.[0] ||
+          err.response?.data?.back_image?.[0] ||
           err.response?.data?.error ||
-          'Failed to upload document';
+          'Failed to upload documents';
       }
 
       const fullMessage = errorList.length > 0 
@@ -203,41 +216,73 @@ export const ProviderOnboardingStep1: React.FC = () => {
           {/* File Upload */}
           <div>
             <Text fw={500} mb="md">
-              Upload Document Photo
+              Upload Document Photos (Front & Back)
             </Text>
-            <div
-              style={{
-                border: '2px dashed #ccc',
-                borderRadius: '8px',
-                padding: '40px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                backgroundColor: '#f9f9f9',
-              }}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                id="file-input"
-                disabled={loading}
-              />
-              <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
-                <Center mb="md">
-                  <IconCloudUpload size={48} color="#0066cc" />
-                </Center>
-                <Text fw={500}>Click to upload or drag and drop</Text>
-                <Text color="dimmed" size="sm">
-                  PNG, JPG up to 5MB
-                </Text>
-                {file && (
-                  <Text color="green" size="sm" mt="md" fw={500}>
-                    ✓ {file.name}
-                  </Text>
-                )}
-              </label>
-            </div>
+            <Stack gap="md">
+              <div
+                style={{
+                  border: '2px dashed #ccc',
+                  borderRadius: '8px',
+                  padding: '30px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: '#f9f9f9',
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFrontImageChange}
+                  style={{ display: 'none' }}
+                  id="front-image-input"
+                  disabled={loading}
+                />
+                <label htmlFor="front-image-input" style={{ cursor: 'pointer' }}>
+                  <Center mb="md">
+                    <IconCloudUpload size={40} color="#0066cc" />
+                  </Center>
+                  <Text fw={500}>Upload Front Image</Text>
+                  <Text color="dimmed" size="sm">PNG, JPG up to 10MB</Text>
+                  {frontImage && (
+                    <Text color="green" size="sm" mt="md" fw={500}>
+                      ✓ {frontImage.name}
+                    </Text>
+                  )}
+                </label>
+              </div>
+
+              <div
+                style={{
+                  border: '2px dashed #ccc',
+                  borderRadius: '8px',
+                  padding: '30px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: '#f9f9f9',
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBackImageChange}
+                  style={{ display: 'none' }}
+                  id="back-image-input"
+                  disabled={loading}
+                />
+                <label htmlFor="back-image-input" style={{ cursor: 'pointer' }}>
+                  <Center mb="md">
+                    <IconCloudUpload size={40} color="#0066cc" />
+                  </Center>
+                  <Text fw={500}>Upload Back Image</Text>
+                  <Text color="dimmed" size="sm">PNG, JPG up to 10MB</Text>
+                  {backImage && (
+                    <Text color="green" size="sm" mt="md" fw={500}>
+                      ✓ {backImage.name}
+                    </Text>
+                  )}
+                </label>
+              </div>
+            </Stack>
           </div>
 
           {/* Upload Button */}
@@ -251,7 +296,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
             </Button>
             <Button
               onClick={handleUpload}
-              disabled={!file || loading}
+              disabled={!frontImage || !backImage || loading}
               loading={loading}
             >
               {loading ? 'Uploading...' : 'Upload & Continue'}

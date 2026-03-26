@@ -3,26 +3,25 @@ import api from './api';
 // ─── Types ───────────────────────────────────────────────────────────────
 
 export interface OnboardingStep1Request {
-  doc_type: 'national_id' | 'drivers_license' | 'kebele_id';
-  document_file: File;
+  document_type: 'national_id' | 'drivers_license' | 'kebele_id';
+  front_image: File;
+  back_image: File;
 }
 
 export interface OnboardingStep1Response {
   session_id: string;
   step: number;
   extracted_data: {
-    name?: string;
-    document_number?: string;
-    dob?: string;
+    full_name?: string | null;
+    id_number?: string | null;
+    date_of_birth?: string | null;
     gender?: string;
-    nationality?: string;
-    region?: string;
-    wereda?: string;
-    kebele?: string;
-    home_address?: string;
-    issue_date?: string;
-    expiry_date?: string;
-    phone?: string;
+    nationality?: string | null;
+    region_sub_city?: string | null;
+    woreda?: string | null;
+    issue_date?: string | null;
+    expiry_date?: string | null;
+    phone_number?: string | null;
   };
   image_quality: number;
   quality_warnings: string[];
@@ -84,8 +83,9 @@ export interface OnboardingStep5Response {
 
 export const uploadDocument = async (payload: OnboardingStep1Request): Promise<OnboardingStep1Response> => {
   const formData = new FormData();
-  formData.append('document_type', payload.doc_type);
-  formData.append('document_file', payload.document_file);
+  formData.append('document_type', payload.document_type);
+  formData.append('front_image', payload.front_image);
+  formData.append('back_image', payload.back_image);
 
   const { data } = await api.post<OnboardingStep1Response>(
     '/provider/onboarding/step1/',

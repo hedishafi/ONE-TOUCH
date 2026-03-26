@@ -116,6 +116,7 @@ SPECTACULAR_SETTINGS = {
     'TITLE':   'OneTouch API',
     'VERSION': 'v1',
     'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 # ─── CORS ────────────────────────────────────────────────────────────────────

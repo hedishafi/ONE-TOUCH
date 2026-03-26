@@ -1,4 +1,6 @@
 import random
+import os
+import tempfile
 from datetime import timedelta
 
 from django.conf import settings
@@ -6,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -844,24 +846,46 @@ class FaceVerificationView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ProviderOnboardingStep1View(APIView):
-	"""Step 1: Upload identity document and extract via OCR."""
+	"""Step 1: Upload identity document images and extract via OCR."""
 	permission_classes = [permissions.AllowAny]
 	parser_classes = [MultiPartParser, FormParser]
 	
 	@extend_schema(
-		request=OnboardingStep1Serializer,
+		request=OpenApiRequest(
+			request=OnboardingStep1Serializer,
+			encoding={
+				'front_image': {'contentType': 'image/*'},
+				'back_image': {'contentType': 'image/*'},
+			},
+		),
 		responses={201: inline_serializer('Step1Response', {
 			'session_id': rest_framework_serializers.CharField(),
 			'step': rest_framework_serializers.IntegerField(),
-			'extracted_data': rest_framework_serializers.JSONField(),
+			'extracted_data': inline_serializer('Step1ExtractedData', {
+				'full_name': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'id_number': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'date_of_birth': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'gender': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'nationality': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'region_sub_city': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'woreda': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'issue_date': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'expiry_date': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'phone_number': rest_framework_serializers.CharField(allow_null=True, required=False),
+			}),
 			'image_quality': rest_framework_serializers.FloatField(),
 			'quality_warnings': rest_framework_serializers.ListField(),
 			'ocr_confidence': rest_framework_serializers.FloatField(),
 		})}
 	)
 	def post(self, request):
-		"""Upload document and perform OCR extraction."""
-		serializer = OnboardingStep1Serializer(data=request.data)
+		"""Upload front/back document images and perform OCR extraction."""
+		payload = {
+			'document_type': request.data.get('document_type'),
+			'front_image': request.FILES.get('front_image'),
+			'back_image': request.FILES.get('back_image'),
+		}
+		serializer = OnboardingStep1Serializer(data=payload)
 		serializer.is_valid(raise_exception=True)
 		
 		import uuid
@@ -869,39 +893,119 @@ class ProviderOnboardingStep1View(APIView):
 		
 		# Create onboarding session
 		session_id = str(uuid.uuid4())
-		doc_file = serializer.validated_data['document_file']
+		front_image = serializer.validated_data['front_image']
+		back_image = serializer.validated_data['back_image']
 		doc_type = serializer.validated_data['document_type']
 		
 		session = ProviderOnboardingSession.objects.create(
 			session_id=session_id,
 			step=1,
-			document_file=doc_file,
+			front_image=front_image,
+			back_image=back_image,
 			document_type=doc_type,
 			expires_at=timezone.now() + timedelta(hours=12)
 		)
 		
-		# Perform OCR extraction
+		# Perform OCR extraction (front from persisted file path)
 		ocr_engine = get_ocr_engine()
-		ocr_result = ocr_engine.extract_text(doc_file.path, language='auto')
+		ocr_result_front = ocr_engine.extract_text(session.front_image.path, language='auto')
+
+		# OCR extraction (back from temporary file path)
+		back_tmp_path = None
+		try:
+			with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as back_tmp:
+				for chunk in back_image.chunks():
+					back_tmp.write(chunk)
+				back_tmp_path = back_tmp.name
+			ocr_result_back = ocr_engine.extract_text(back_tmp_path, language='auto')
+		finally:
+			if back_tmp_path and os.path.exists(back_tmp_path):
+				os.remove(back_tmp_path)
 		
 		# Check document validation
-		validation = ocr_result.get('validation', {})
-		if validation.get('flagged'):
-			# Document is invalid - return detailed error
-			error_details = {
-				'error': 'Document validation failed',
-				'is_expired': validation.get('is_expired', False),
-				'is_non_ethiopian': validation.get('is_non_ethiopian', False),
-				'validation_errors': validation.get('errors', []),
-				'validation_warnings': validation.get('warnings', []),
-			}
-			return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+		validation_front = ocr_result_front.get('validation', {})
+		validation_back = ocr_result_back.get('validation', {}) if ocr_result_back else {}
+		if validation_front.get('flagged') or validation_back.get('flagged'):
+			is_expired = validation_front.get('is_expired', False) or validation_back.get('is_expired', False)
+			is_non_ethiopian = validation_front.get('is_non_ethiopian', False) or validation_back.get('is_non_ethiopian', False)
+			validation_errors = list(dict.fromkeys(
+				(validation_front.get('errors', []) + validation_back.get('errors', []))
+			))
+			validation_warnings = list(dict.fromkeys(
+				(validation_front.get('warnings', []) + validation_back.get('warnings', []))
+			))
+			non_critical_errors = [
+				error for error in validation_errors
+				if not error.lower().startswith('missing critical fields')
+			]
+			has_hard_failure = is_expired or is_non_ethiopian or len(non_critical_errors) > 0
+
+			if is_non_ethiopian:
+				user_message = 'Please upload a valid Ethiopian government-issued ID (front and back).'
+			elif is_expired:
+				user_message = 'Your ID appears expired. Please upload a valid, non-expired ID.'
+			elif non_critical_errors:
+				user_message = 'We could not validate this document. Please upload a clearer image of your ID (front and back).'
+			else:
+				user_message = 'Some details were not auto-detected. You can continue and review/edit extracted data in the next step.'
+
+			if has_hard_failure:
+				# Document is invalid - return detailed error
+				error_details = {
+					'error': 'Document validation failed',
+					'user_message': user_message,
+					'is_expired': is_expired,
+					'is_non_ethiopian': is_non_ethiopian,
+					'validation_errors': validation_errors,
+					'validation_warnings': validation_warnings,
+				}
+				return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+
+			# Non-blocking case: keep missing-field feedback as warnings and continue.
+			ocr_result_front['quality_warnings'] = list(dict.fromkeys(
+				(ocr_result_front.get('quality_warnings', []) or []) + validation_errors + validation_warnings
+			))
 		
-		# Store extracted data
-		session.extracted_data = ocr_result['extracted_fields']
-		session.ocr_confidence = ocr_result.get('confidence', 0.0)
-		session.image_quality = ocr_result.get('image_quality', 0.0)
-		session.quality_warnings = ocr_result.get('quality_warnings', [])
+		# Merge extracted fields (prefer front, fill missing from back)
+		front_fields = ocr_result_front.get('extracted_fields', {}) or {}
+		back_fields = ocr_result_back.get('extracted_fields', {}) or {}
+		merged_fields = front_fields.copy()
+		for key, value in back_fields.items():
+			if merged_fields.get(key) in (None, '') and value not in (None, ''):
+				merged_fields[key] = value
+
+		def normalize_value(value):
+			if value in ('', 'N/A', 'UNKNOWN', 'unknown'):
+				return None
+			return value
+
+		# Store extracted data in the required structured format
+		normalized_data = {
+			'full_name': normalize_value(merged_fields.get('full_name') or merged_fields.get('name')),
+			'id_number': normalize_value(merged_fields.get('id_number') or merged_fields.get('document_number')),
+			'date_of_birth': normalize_value(merged_fields.get('date_of_birth') or merged_fields.get('dob')),
+			'gender': normalize_value(merged_fields.get('gender') or merged_fields.get('sex')),
+			'nationality': normalize_value(merged_fields.get('nationality')),
+			'region_sub_city': normalize_value(merged_fields.get('region_sub_city') or merged_fields.get('region')),
+			'woreda': normalize_value(merged_fields.get('woreda') or merged_fields.get('wereda') or merged_fields.get('district')),
+			'issue_date': normalize_value(merged_fields.get('issue_date')),
+			'expiry_date': normalize_value(merged_fields.get('expiry_date')),
+			'phone_number': normalize_value(merged_fields.get('phone_number') or merged_fields.get('phone')),
+		}
+
+		session.extracted_data = normalized_data
+		session.ocr_confidence = max(
+			ocr_result_front.get('confidence', 0.0),
+			ocr_result_back.get('confidence', 0.0) if ocr_result_back else 0.0,
+		)
+		session.image_quality = max(
+			ocr_result_front.get('image_quality', 0.0),
+			ocr_result_back.get('image_quality', 0.0) if ocr_result_back else 0.0,
+		)
+		session.quality_warnings = list(set(
+			(ocr_result_front.get('quality_warnings', []) or []) +
+			(ocr_result_back.get('quality_warnings', []) or [])
+		))
 		session.save()
 		
 		return Response({
@@ -1086,7 +1190,7 @@ class ProviderOnboardingStep3OTPVerifyView(APIView):
 			IdentityDocument.objects.create(
 				user=user,
 				doc_type=session.document_type,
-				document_url=session.document_file,
+				document_url=session.front_image,
 				ocr_confidence=session.ocr_confidence,
 				ocr_extracted=session.extracted_data,
 				extracted_name=confirmed.get('name'),
@@ -1163,7 +1267,7 @@ class ProviderOnboardingStep4View(APIView):
 		
 		# Compare faces
 		face_match_result = face_engine.compare_faces(
-			id_photo_path=session.document_file.path,
+			id_photo_path=session.front_image.path,
 			selfie_image_path=session.selfie_file.path
 		)
 		session.face_match_score = face_match_result.get('face_match_score', 0.0)
@@ -1245,7 +1349,7 @@ class ProviderOnboardingStep5View(APIView):
 		identity_doc = IdentityDocument.objects.create(
 			user=user,
 			doc_type=session.document_type,
-			document_url=session.document_file,
+			document_url=session.front_image,
 			biometric_selfie=session.selfie_file,
 			status='approved',
 			auto_verified=True,
@@ -1386,15 +1490,41 @@ class ClientOnboardingStep1View(APIView):
 			# Check document validation
 			validation = ocr_result.get('validation', {})
 			if validation.get('flagged'):
-				# Document is invalid - return detailed error
-				error_details = {
-					'error': 'Document validation failed',
-					'is_expired': validation.get('is_expired', False),
-					'is_non_ethiopian': validation.get('is_non_ethiopian', False),
-					'validation_errors': validation.get('errors', []),
-					'validation_warnings': validation.get('warnings', []),
-				}
-				return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+				is_expired = validation.get('is_expired', False)
+				is_non_ethiopian = validation.get('is_non_ethiopian', False)
+				validation_errors = list(dict.fromkeys(validation.get('errors', [])))
+				validation_warnings = list(dict.fromkeys(validation.get('warnings', [])))
+				non_critical_errors = [
+					error for error in validation_errors
+					if not error.lower().startswith('missing critical fields')
+				]
+				has_hard_failure = is_expired or is_non_ethiopian or len(non_critical_errors) > 0
+
+				if is_non_ethiopian:
+					user_message = 'Please upload a valid Ethiopian government-issued ID.'
+				elif is_expired:
+					user_message = 'Your ID appears expired. Please upload a valid, non-expired ID.'
+				elif non_critical_errors:
+					user_message = 'We could not validate this document. Please upload a clearer image of your ID.'
+				else:
+					user_message = 'Some details were not auto-detected. You can continue and review/edit extracted data in the next step.'
+
+				if has_hard_failure:
+					# Document is invalid - return detailed error
+					error_details = {
+						'error': 'Document validation failed',
+						'user_message': user_message,
+						'is_expired': is_expired,
+						'is_non_ethiopian': is_non_ethiopian,
+						'validation_errors': validation_errors,
+						'validation_warnings': validation_warnings,
+					}
+					return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+
+				# Non-blocking case: keep missing-field feedback as warnings and continue.
+				ocr_result['quality_warnings'] = list(dict.fromkeys(
+					(ocr_result.get('quality_warnings', []) or []) + validation_errors + validation_warnings
+				))
 			
 			# Store OCR results
 			session.extracted_data = ocr_result.get('extracted_fields', {})

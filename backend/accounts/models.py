@@ -442,7 +442,8 @@ class ProviderOnboardingSession(models.Model):
     status            = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_IN_PROGRESS)
 
     # ── Step 1: Document Upload ───────────────────────────────────────────────
-    document_file     = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
+    front_image       = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
+    back_image        = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
     document_type     = models.CharField(
         max_length=20,
         choices=IdentityDocument.DOC_CHOICES,
