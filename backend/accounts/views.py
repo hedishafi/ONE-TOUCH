@@ -110,11 +110,19 @@ def _invalidate_previous_otps(phone_number: str, purpose: str) -> None:
 
 
 def _issue_otp(phone_number: str, purpose: str, **meta) -> str:
-	"""Invalidate old OTPs, create a new one (persist optional meta) and return the code."""
+	"""
+	Invalidate old OTPs, create a new one (persist optional meta), send SMS, and return the code.
+	
+	If SMS fails, deletes the OTP and raises ValueError.
+	"""
+	from .sms_service import send_otp_sms
+	
 	phone_number = _normalize_phone_number(phone_number)
 	_invalidate_previous_otps(phone_number, purpose)
 	code = _generate_otp()
-	PhoneOTP.objects.create(
+	
+	# Create OTP record
+	otp = PhoneOTP.objects.create(
 		phone_number=phone_number,
 		purpose=purpose,
 		code=code,
@@ -124,6 +132,13 @@ def _issue_otp(phone_number: str, purpose: str, **meta) -> str:
 		first_name=meta.get('first_name', '') or '',
 		last_name=meta.get('last_name', '') or '',
 	)
+	
+	# Send SMS
+	sms_sent = send_otp_sms(phone_number, code)
+	if not sms_sent:
+		otp.delete()  # Delete OTP if SMS failed
+		raise ValueError('Failed to send OTP. Please try again.')
+	
 	return code
 
 
@@ -462,6 +477,37 @@ class TokenRefreshView(BaseTokenRefreshView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# LOGOUT  POST /api/v1/auth/logout/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class LogoutView(APIView):
+	"""
+	Logout endpoint. 
+	For JWT, the client should simply delete the access token from their device.
+	This endpoint acknowledges the logout request.
+	"""
+
+	permission_classes = [permissions.IsAuthenticated]
+
+	@extend_schema(
+		tags=['Auth'],
+		request=inline_serializer('LogoutRequest', {}),
+		responses={
+			200: inline_serializer('LogoutResponse', {
+				'detail': rest_framework_serializers.CharField(),
+			}),
+		},
+		summary='Logout',
+		description='Logout endpoint. For JWT, the client should delete the access token from their device.',
+	)
+	def post(self, request):
+		return Response(
+			{'detail': 'Successfully logged out. Please delete the access token from your device.'},
+			status=status.HTTP_200_OK
+		)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PROFILE  GET / PATCH /api/v1/auth/profile/
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -556,9 +602,19 @@ class ClientProfileView(APIView):
 
 	@extend_schema(
 		tags=['Client'],
-		responses={200: ClientProfileSerializer},
+		responses={
+			200: inline_serializer(
+				'ClientProfileDetail',
+				{
+					'user_id': rest_framework_serializers.IntegerField(),
+					'phone_number': rest_framework_serializers.CharField(),
+					'full_name': rest_framework_serializers.CharField(),
+					'wallet_balance': rest_framework_serializers.DecimalField(max_digits=12, decimal_places=2),
+				}
+			)
+		},
 		summary='Get my client profile',
-		description='Requires client role. Returns wallet balance, loyalty tier, and booking stats.',
+		description='Returns: user_id, phone_number, full_name, wallet_balance.',
 	)
 	def get(self, request):
 		try:
@@ -569,10 +625,25 @@ class ClientProfileView(APIView):
 
 	@extend_schema(
 		tags=['Client'],
-		request=ClientProfileSerializer,
-		responses={200: ClientProfileSerializer},
+		request=inline_serializer(
+			'ClientProfileUpdate',
+			{
+				'full_name': rest_framework_serializers.CharField(required=False),
+			}
+		),
+		responses={
+			200: inline_serializer(
+				'ClientProfileDetail',
+				{
+					'user_id': rest_framework_serializers.IntegerField(),
+					'phone_number': rest_framework_serializers.CharField(),
+					'full_name': rest_framework_serializers.CharField(),
+					'wallet_balance': rest_framework_serializers.DecimalField(max_digits=12, decimal_places=2),
+				}
+			)
+		},
 		summary='Update my client profile',
-		description='Allows updating profile information. Wallet and stats are read-only.',
+		description='Update full_name only. wallet_balance is read-only.',
 	)
 	def patch(self, request):
 		try:
