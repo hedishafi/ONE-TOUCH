@@ -210,7 +210,10 @@ def _build_token_response(user) -> dict:
 
 def _otp_response(code: str) -> dict:
 	"""Build the OTP-sent response. Code is only included in DEBUG mode."""
-	payload = {'detail': 'OTP sent successfully.'}
+	payload = {
+		'detail': 'OTP sent successfully.',
+		'expires_in_seconds': OTP_EXPIRY_MINUTES * 60,
+	}
 	if settings.DEBUG:
 		payload['otp_code'] = code   # ← remove / replace with real SMS in production
 	return payload

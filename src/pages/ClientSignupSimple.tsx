@@ -133,9 +133,10 @@ interface Step2Props {
   onSuccess: () => void;
   loading: boolean;
   error: string | null;
+  demoOtp?: string | null;
 }
 
-const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loading, error }) => {
+const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loading, error, demoOtp }) => {
   const [otp, setOtp] = useState('');
   const [seconds, setSeconds] = useState(0);
   const [verifying, setVerifying] = useState(false);
@@ -247,6 +248,14 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
           </Alert>
         )}
 
+        {demoOtp && (
+          <Alert icon={<IconAlertCircle size={16} />} color="blue" title="Demo Mode">
+            For testing: <strong>OTP Code: {demoOtp}</strong>
+            <br />
+            <Text size="xs" mt={6}>This appears because SMS is in mock mode. In production, you'll receive the code via SMS.</Text>
+          </Alert>
+        )}
+
         <Stack gap="lg">
           <Center py="lg">
             <PinInput
@@ -299,6 +308,7 @@ export const ClientSignupSimple: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
 
   const handlePhoneSubmit = async (phoneInput: string) => {
     try {
@@ -306,14 +316,19 @@ export const ClientSignupSimple: React.FC = () => {
       setError(null);
 
       // Request OTP from backend
-      await authService.signupRequestOTP({ phone: phoneInput });
+      const response = await authService.signupRequestOTP({ phone: phoneInput });
 
       setPhone(phoneInput);
       setStep(2);
+      
+      // Show actual OTP code from backend response (in DEBUG mode)
+      if (response.otp_code) {
+        setDemoOtp(response.otp_code);
+      }
 
       notifications.show({
         title: 'OTP Sent',
-        message: `Check your phone for the code`,
+        message: `Check the blue box below for the code`,
         color: 'blue',
       });
     } catch (err: any) {
@@ -370,9 +385,11 @@ export const ClientSignupSimple: React.FC = () => {
         {step === 2 && (
           <Step2OTPVerify
             phone={phone}
+            demoOtp={demoOtp}
             onBack={() => {
               setStep(1);
               setError(null);
+              setDemoOtp(null);
             }}
             onSuccess={handleSuccess}
             loading={loading}
