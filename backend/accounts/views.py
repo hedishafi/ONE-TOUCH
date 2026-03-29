@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -18,8 +19,10 @@ from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshV
 
 from .models import (
 	IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+	ProviderManualVerification,
 )
+from .ocr_engine import get_ocr_engine
 from .permissions import IsProvider, IsClient
 from .serializers import (
 	AuthTokenSerializer,
@@ -44,6 +47,8 @@ from .serializers import (
 	OnboardingStep4Serializer,
 	OnboardingStep5Serializer,
 	ClientOnboardingProfileUpdateSerializer,
+	ProviderManualVerificationUploadSerializer,
+	ProviderManualVerificationStatusSerializer,
 )
 
 User = get_user_model()
@@ -219,6 +224,53 @@ def _otp_response(code: str) -> dict:
 	if settings.DEBUG:
 		payload['otp_code'] = code   # ← remove / replace with real SMS in production
 	return payload
+
+class OCREngineDebugView(APIView):
+	"""Simple debug endpoint to report which OCR engine is active.
+
+	This is meant for development/testing so you can confirm whether
+	Google Vision or Tesseract is being used in the running container.
+	"""
+
+	permission_classes = [permissions.AllowAny]
+
+	@extend_schema(
+		methods=['GET'],
+		operation_id='ocr_engine_debug',
+		responses={
+			200: inline_serializer(
+				'OCREngineDebugResponse',
+				{
+					'engine_env': rest_framework_serializers.CharField(),
+					'credentials_env': rest_framework_serializers.CharField(allow_blank=True),
+					'resolved_engine_class': rest_framework_serializers.CharField(),
+					'credentials_file_exists': rest_framework_serializers.BooleanField(),
+				},
+			),
+		},
+		summary='Debug — show active OCR engine',
+		description=(
+			'Returns which OCR engine implementation is currently active in this '
+			'container (Tesseract vs Google Vision), along with the raw OCR-related '
+			'environment variables and whether the credentials file exists.'
+		),
+	)
+	def get(self, request):
+		engine_env = os.getenv('OCR_ENGINE') or ''
+		creds_env = os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or ''
+		engine = get_ocr_engine()
+		resolved_class = engine.__class__.__name__
+		credentials_file_exists = bool(creds_env and os.path.isfile(creds_env))
+
+		return Response(
+			{
+				'engine_env': engine_env,
+				'credentials_env': creds_env,
+				'resolved_engine_class': resolved_class,
+				'credentials_file_exists': credentials_file_exists,
+			},
+			status=status.HTTP_200_OK,
+		)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -839,6 +891,82 @@ class FaceVerificationView(APIView):
 			FaceBiometricVerificationSerializer(face_verification).data,
 			status=status.HTTP_201_CREATED
 		)
+
+
+class ProviderManualVerificationUploadView(APIView):
+	"""Provider-only endpoint to upload ID front, ID back, and selfie for manual review."""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request=OpenApiRequest(
+			request=ProviderManualVerificationUploadSerializer,
+			encoding={
+				'id_front_image': {'contentType': 'image/*'},
+				'id_back_image': {'contentType': 'image/*'},
+				'selfie_image': {'contentType': 'image/*'},
+			},
+		),
+		responses={
+			201: ProviderManualVerificationStatusSerializer,
+			400: OpenApiResponse(description='Validation error'),
+		},
+		summary='Upload provider verification package (manual review)',
+		description=(
+			'Uploads ID front, ID back, and selfie for service providers only. '
+			'Creates a manual verification record with pending status for admin review.'
+		),
+	)
+	def post(self, request):
+		serializer = ProviderManualVerificationUploadSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+
+		verification = serializer.save(
+			provider=request.user,
+			status=ProviderManualVerification.STATUS_PENDING,
+			rejection_reason='',
+			reviewed_by=None,
+			reviewed_at=None,
+		)
+
+		request.user.verification_status = User.STATUS_PENDING
+		request.user.save(update_fields=['verification_status'])
+
+		return Response(
+			ProviderManualVerificationStatusSerializer(verification).data,
+			status=status.HTTP_201_CREATED,
+		)
+
+
+class ProviderManualVerificationStatusView(APIView):
+	"""Provider-only endpoint to fetch latest manual verification status."""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={
+			200: ProviderManualVerificationStatusSerializer,
+			404: OpenApiResponse(description='No manual verification submission found'),
+		},
+		summary='Get provider manual verification status',
+	)
+	def get(self, request):
+		verification = (
+			ProviderManualVerification.objects
+			.filter(provider=request.user)
+			.order_by('-submitted_at')
+			.first()
+		)
+		if not verification:
+			return Response(
+				{'detail': 'No manual verification submission found.'},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		return Response(ProviderManualVerificationStatusSerializer(verification).data)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

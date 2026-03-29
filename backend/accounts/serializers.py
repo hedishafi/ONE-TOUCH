@@ -5,7 +5,8 @@ from rest_framework import serializers
 
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+    ProviderManualVerification,
 )
 
 
@@ -478,6 +479,54 @@ class FaceBiometricVerificationSerializer(serializers.ModelSerializer):
                 f'File too large. Maximum size is {self.MAX_SELFIE_SIZE_MB} MB.'
             )
         return value
+
+
+class ProviderManualVerificationUploadSerializer(serializers.ModelSerializer):
+    """Upload provider manual verification package (ID front, ID back, selfie)."""
+
+    class Meta:
+        model = ProviderManualVerification
+        fields = ['id', 'id_front_image', 'id_back_image', 'selfie_image', 'status', 'submitted_at']
+        read_only_fields = ['id', 'status', 'submitted_at']
+
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+    MAX_IMAGE_SIZE_MB = 10
+
+    def _validate_image(self, value, field_name: str):
+        if value.content_type not in self.ALLOWED_IMAGE_TYPES:
+            raise serializers.ValidationError(
+                {field_name: f'Unsupported file type "{value.content_type}". Allowed: {", ".join(sorted(self.ALLOWED_IMAGE_TYPES))}'}
+            )
+        if value.size > self.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                {field_name: f'File too large. Maximum size is {self.MAX_IMAGE_SIZE_MB} MB.'}
+            )
+        return value
+
+    def validate_id_front_image(self, value):
+        return self._validate_image(value, 'id_front_image')
+
+    def validate_id_back_image(self, value):
+        return self._validate_image(value, 'id_back_image')
+
+    def validate_selfie_image(self, value):
+        return self._validate_image(value, 'selfie_image')
+
+
+class ProviderManualVerificationStatusSerializer(serializers.ModelSerializer):
+    """Read-only status payload for provider manual verification."""
+
+    class Meta:
+        model = ProviderManualVerification
+        fields = [
+            'id',
+            'status',
+            'rejection_reason',
+            'reviewed_at',
+            'submitted_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
 
 
 # ─────────────────────────────────────────────────────────────────────────────

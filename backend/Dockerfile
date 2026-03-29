@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gettext \
         curl \
         tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-amh \
         libtesseract-dev \
         libsm6 \
         libxext6 \

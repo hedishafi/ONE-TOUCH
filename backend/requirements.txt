@@ -22,6 +22,7 @@ Pillow>=10.0,<11.0
 pytesseract>=0.3.10,<1.0     # Python wrapper for Tesseract OCR
 opencv-python>=4.8,<5.0      # Computer Vision library for image processing
 numpy>=1.24,<2.0             # Numerical computing for image analysis
+google-cloud-vision>=3.7,<4.0  # Optional: higher-accuracy OCR engine
 # ─── Static file serving (Gunicorn-compatible) ───────────────────────────────
 whitenoise>=6.6,<7.0
 

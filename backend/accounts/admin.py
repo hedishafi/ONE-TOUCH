@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, User, FaceBiometricVerification,
     ServiceCategory, SubService, ProviderService, ProviderOnboardingSession,
+    ProviderManualVerification,
     ClientOnboardingSession
 )
 
@@ -195,3 +196,137 @@ class ClientOnboardingSessionAdmin(admin.ModelAdmin):
     list_filter = ('status', 'phone_verified')
     search_fields = ('session_id', 'phone_number')
     readonly_fields = ('session_id', 'created_at', 'expires_at', 'ocr_confidence', 'image_quality')
+
+
+@admin.register(ProviderManualVerification)
+class ProviderManualVerificationAdmin(admin.ModelAdmin):
+    list_display = ('provider', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at')
+    list_filter = ('status', 'submitted_at')
+    search_fields = ('provider__username', 'provider__phone_number')
+    readonly_fields = (
+        'submitted_at',
+        'updated_at',
+        'id_front_preview',
+        'id_back_preview',
+        'selfie_preview',
+    )
+    fields = (
+        'provider',
+        'status',
+        'rejection_reason',
+        'reviewed_by',
+        'reviewed_at',
+        'id_front_image',
+        'id_front_preview',
+        'id_back_image',
+        'id_back_preview',
+        'selfie_image',
+        'selfie_preview',
+        'submitted_at',
+        'updated_at',
+    )
+    actions = ['approve_selected', 'reject_selected']
+
+    def id_front_preview(self, obj):
+        if obj.id_front_image:
+            return format_html('<img src="{}" style="max-height:160px;" />', obj.id_front_image.url)
+        return '—'
+
+    def id_back_preview(self, obj):
+        if obj.id_back_image:
+            return format_html('<img src="{}" style="max-height:160px;" />', obj.id_back_image.url)
+        return '—'
+
+    def selfie_preview(self, obj):
+        if obj.selfie_image:
+            return format_html('<img src="{}" style="max-height:160px;" />', obj.selfie_image.url)
+        return '—'
+
+    def _notify_provider(self, verification, approved: bool):
+        if not verification.provider.email:
+            return
+
+        from django.conf import settings
+        from django.core.mail import send_mail
+
+        subject = 'Provider verification approved' if approved else 'Provider verification rejected'
+        message = (
+            'Your service provider verification has been approved. You can now continue using provider features.'
+            if approved
+            else f'Your service provider verification was rejected. Reason: {verification.rejection_reason or "Not provided."}'
+        )
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@onetouch.local'),
+                recipient_list=[verification.provider.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    def approve_selected(self, request, queryset):
+        from django.utils import timezone
+
+        for verification in queryset.select_related('provider'):
+            verification.status = ProviderManualVerification.STATUS_APPROVED
+            verification.reviewed_by = request.user
+            verification.reviewed_at = timezone.now()
+            verification.rejection_reason = ''
+            verification.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'rejection_reason', 'updated_at'])
+
+            provider = verification.provider
+            provider.verification_status = User.STATUS_VERIFIED
+            provider.save(update_fields=['verification_status'])
+
+            self._notify_provider(verification, approved=True)
+
+        self.message_user(request, f'{queryset.count()} provider manual verification(s) approved.')
+
+    approve_selected.short_description = 'Approve selected provider verifications'
+
+    def reject_selected(self, request, queryset):
+        from django.utils import timezone
+
+        for verification in queryset.select_related('provider'):
+            verification.status = ProviderManualVerification.STATUS_REJECTED
+            verification.reviewed_by = request.user
+            verification.reviewed_at = timezone.now()
+            verification.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
+
+            provider = verification.provider
+            provider.verification_status = User.STATUS_REJECTED
+            provider.save(update_fields=['verification_status'])
+
+            self._notify_provider(verification, approved=False)
+
+        self.message_user(request, f'{queryset.count()} provider manual verification(s) rejected.')
+
+    reject_selected.short_description = 'Reject selected provider verifications'
+
+    def save_model(self, request, obj, form, change):
+        from django.utils import timezone
+
+        prev_status = None
+        if change:
+            prev_status = ProviderManualVerification.objects.filter(pk=obj.pk).values_list('status', flat=True).first()
+
+        if obj.status in (ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED):
+            if not obj.reviewed_by:
+                obj.reviewed_by = request.user
+            if not obj.reviewed_at:
+                obj.reviewed_at = timezone.now()
+
+        super().save_model(request, obj, form, change)
+
+        if obj.status == ProviderManualVerification.STATUS_APPROVED:
+            obj.provider.verification_status = User.STATUS_VERIFIED
+            obj.provider.save(update_fields=['verification_status'])
+        elif obj.status == ProviderManualVerification.STATUS_REJECTED:
+            obj.provider.verification_status = User.STATUS_REJECTED
+            obj.provider.save(update_fields=['verification_status'])
+
+        if prev_status != obj.status and obj.status in (ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED):
+            self._notify_provider(obj, approved=(obj.status == ProviderManualVerification.STATUS_APPROVED))

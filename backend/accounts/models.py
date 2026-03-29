@@ -361,6 +361,52 @@ class FaceBiometricVerification(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER MANUAL VERIFICATION (provider-only manual review by admin)
+# ─────────────────────────────────────────────────────────────────────────────
+class ProviderManualVerification(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    provider = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='manual_verifications',
+        help_text='Service provider who submitted this verification package.',
+    )
+    id_front_image = models.FileField(upload_to='provider_verification/id_front/')
+    id_back_image = models.FileField(upload_to='provider_verification/id_back/')
+    selfie_image = models.FileField(upload_to='provider_verification/selfie/')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    rejection_reason = models.TextField(blank=True)
+
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_manual_verifications',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        verbose_name = 'Provider Manual Verification'
+        verbose_name_plural = 'Provider Manual Verifications'
+
+    def __str__(self):
+        return f'{self.provider.username} — Manual verification ({self.status})'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SERVICE CATEGORIES & SUB-SERVICES
 # ─────────────────────────────────────────────────────────────────────────────
 class ServiceCategory(models.Model):
