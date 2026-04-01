@@ -80,11 +80,11 @@ const extractTokens = (data: AuthTokenResponse) => {
 /**
  * Request OTP for signup (supports both phone and phone_number)
  */
-export const signupRequestOTP = async (payload: { phone: string }): Promise<OTPResponse> => {
+export const signupRequestOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
   const { data } = await api.post<OTPResponse>('/auth/signup/otp/', {
     phone_number: normalizedPhone,
-    role: 'client',
+    role: payload.role ?? 'client',
   });
   return data;
 };
@@ -95,15 +95,20 @@ export const signupRequestOTP = async (payload: { phone: string }): Promise<OTPR
 export const signupVerify = async (payload: {
   phone: string;
   otp_code: string;
+  role?: 'client' | 'provider';
+  first_name?: string;
+  last_name?: string;
+  username?: string;
 }): Promise<AuthTokenResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
+  const role = payload.role ?? 'client';
   const { data } = await api.post<AuthTokenResponse>('/auth/signup/verify/', {
     phone_number: normalizedPhone,
     otp_code: payload.otp_code,
-    role: 'client',
-    first_name: 'Client',
-    last_name: 'User',
-    username: `client_${Date.now()}`,
+    role,
+    first_name: payload.first_name ?? (role === 'provider' ? 'Provider' : 'Client'),
+    last_name: payload.last_name ?? 'User',
+    username: payload.username ?? `${role}_${Date.now()}`,
   });
 
   const { accessToken, refreshToken } = extractTokens(data);
@@ -153,11 +158,11 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
 /**
  * Resend signup OTP (same behavior as requesting OTP).
  */
-export const signupResendOTP = async (payload: { phone: string }): Promise<OTPResponse> => {
+export const signupResendOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
   const { data } = await api.post<OTPResponse>('/auth/signup/resend-otp/', {
     phone_number: normalizedPhone,
-    role: 'client',
+    role: payload.role ?? 'client',
   });
   return data;
 };

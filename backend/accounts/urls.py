@@ -7,6 +7,7 @@ from .views import (
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
+    ProviderProfileSetupView,
     ProviderManualVerificationUploadView,
 )
 
@@ -27,5 +28,6 @@ urlpatterns = [
     path('auth/logout/',        LogoutView.as_view(),        name='logout'),
 
     # ── Provider Identity Verification (manual admin review) ──────────────────
+    path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
 ]

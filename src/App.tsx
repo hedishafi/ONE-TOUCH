@@ -7,7 +7,8 @@ import { Landing } from './pages/Landing';
 import Login from './pages/Login';
 import { Signup } from './pages/Signup';
 import ClientSignupSimple from './pages/ClientSignupSimple';
-import { ProviderSignup } from './pages/ProviderSignup';
+import ProviderSignupSimple from './pages/ProviderSignupSimple';
+import ProviderProfileSetup from './pages/ProviderProfileSetup';
 import { Services } from './pages/Services';
 import { ServiceSubcategory } from './pages/ServiceSubcategory';
 import { HowItWorks } from './pages/HowItWorks';
@@ -88,7 +89,8 @@ function App() {
         <Route path={ROUTES.signup} element={<Signup />} />
         <Route path="/signup/client" element={<ClientSignupSimple />} />
         <Route path={ROUTES.signupClient} element={<ClientSignupSimple />} />
-        <Route path={ROUTES.signupProvider} element={<ProviderSignup />} />
+        <Route path={ROUTES.signupProvider} element={<ProviderSignupSimple />} />
+        <Route path="/provider/profile-setup" element={<ProviderProfileSetup />} />
 
         {/* ── Registration flows (no auth needed — mid-signup) ──── */}
         <Route path={ROUTES.clientTypeSelect} element={<ClientTypeSelect />} />

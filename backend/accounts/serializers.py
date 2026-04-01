@@ -286,6 +286,7 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
         model  = ProviderProfile
         fields = [
             'id',
+            'profile_picture',
             'bio',
             'address',
             'is_online',
@@ -337,6 +338,44 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             validated_data['last_location_update'] = timezone.now()
         
         return super().update(instance, validated_data)
+
+
+class ProviderProfileSetupSerializer(serializers.Serializer):
+    """Authenticated provider profile setup payload (pre-identity-upload stage)."""
+
+    full_name = serializers.CharField(max_length=255)
+    service_category = serializers.CharField(max_length=100)
+    sub_services = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        allow_empty=False,
+    )
+    price_min = serializers.IntegerField(min_value=0)
+    price_max = serializers.IntegerField(min_value=0)
+    bio = serializers.CharField(required=False, allow_blank=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+
+    def validate_full_name(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('full_name is required.')
+        return value
+
+    def validate_service_category(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('service_category is required.')
+        return value
+
+    def validate_sub_services(self, value):
+        cleaned = [item.strip() for item in value if str(item).strip()]
+        if not cleaned:
+            raise serializers.ValidationError('At least one sub service is required.')
+        return cleaned
+
+    def validate(self, attrs):
+        if attrs['price_min'] > attrs['price_max']:
+            raise serializers.ValidationError({'price_max': 'price_max must be greater than or equal to price_min.'})
+        return attrs
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
@@ -35,6 +36,7 @@ from .serializers import (
 	OTPSentSerializer,
 	ProviderFullUserSerializer,
 	ProviderProfileSerializer,
+	ProviderProfileSetupSerializer,
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
@@ -1449,6 +1451,126 @@ class SubServiceListView(APIView):
 		)
 		serializer = SubServiceSerializer(subservices, many=True)
 		return Response(serializer.data)
+
+
+class ProviderProfileSetupView(APIView):
+	"""Create/update authenticated provider profile and offered services."""
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request=ProviderProfileSetupSerializer,
+		responses={
+			200: inline_serializer(
+				'ProviderProfileSetupResponse',
+				{
+					'user_id': rest_framework_serializers.IntegerField(),
+					'phone_number': rest_framework_serializers.CharField(),
+					'full_name': rest_framework_serializers.CharField(),
+					'service_category': rest_framework_serializers.CharField(),
+					'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
+					'price_min': rest_framework_serializers.IntegerField(),
+					'price_max': rest_framework_serializers.IntegerField(),
+					'bio': rest_framework_serializers.CharField(allow_blank=True),
+					'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
+					'profile_completed': rest_framework_serializers.BooleanField(),
+					'message': rest_framework_serializers.CharField(),
+				},
+			),
+			400: OpenApiResponse(description='Validation error.'),
+			401: OpenApiResponse(description='Authentication required.'),
+			403: OpenApiResponse(description='Only service providers can perform this action.'),
+		},
+		summary='Provider profile setup',
+		description='Create or update the authenticated service provider profile before identity upload.',
+	)
+
+	@transaction.atomic
+	def post(self, request):
+		serializer = ProviderProfileSetupSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		vd = serializer.validated_data
+
+		def _ensure_unique_slug(model_cls, base_name: str) -> str:
+			base_slug = slugify(base_name) or 'item'
+			slug = base_slug
+			counter = 1
+			while model_cls.objects.filter(slug=slug).exists():
+				slug = f'{base_slug}-{counter}'
+				counter += 1
+			return slug
+
+		full_name = vd['full_name']
+		category_name = vd['service_category']
+		sub_service_names = vd['sub_services']
+
+		# Keep user name in sync with provider profile setup.
+		name_parts = full_name.split()
+		request.user.first_name = name_parts[0] if name_parts else ''
+		request.user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+		request.user.save(update_fields=['first_name', 'last_name'])
+
+		provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
+		provider_profile.bio = vd.get('bio', '')
+		provider_profile.price_min = vd['price_min']
+		provider_profile.price_max = vd['price_max']
+		if vd.get('profile_picture') is not None:
+			provider_profile.profile_picture = vd['profile_picture']
+		provider_profile.profile_completed = True
+		provider_profile.save()
+
+		service_category = ServiceCategory.objects.filter(name__iexact=category_name).first()
+		if not service_category:
+			service_category = ServiceCategory.objects.create(
+				name=category_name,
+				slug=_ensure_unique_slug(ServiceCategory, category_name),
+				is_active=True,
+			)
+
+		sub_service_objects = []
+		for sub_name in sub_service_names:
+			sub_service = SubService.objects.filter(
+				category=service_category,
+				name__iexact=sub_name,
+			).first()
+			if not sub_service:
+				sub_service = SubService.objects.create(
+					category=service_category,
+					name=sub_name,
+					slug=_ensure_unique_slug(SubService, sub_name),
+					is_active=True,
+				)
+			sub_service_objects.append(sub_service)
+
+		provider_service, _ = ProviderService.objects.get_or_create(provider=provider_profile)
+		provider_service.primary_service = service_category
+		provider_service.save()
+		provider_service.subservices.set(sub_service_objects)
+
+		profile_picture_url = ''
+		if provider_profile.profile_picture:
+			try:
+				profile_picture_url = request.build_absolute_uri(provider_profile.profile_picture.url)
+			except Exception:
+				profile_picture_url = provider_profile.profile_picture.url
+
+		return Response(
+			{
+				'user_id': request.user.id,
+				'phone_number': request.user.phone_number,
+				'full_name': full_name,
+				'service_category': service_category.name,
+				'sub_services': [item.name for item in sub_service_objects],
+				'price_min': vd['price_min'],
+				'price_max': vd['price_max'],
+				'bio': provider_profile.bio,
+				'profile_picture': profile_picture_url,
+				'profile_completed': provider_profile.profile_completed,
+				'message': 'Profile setup completed successfully. Proceed to identity upload.',
+			},
+			status=status.HTTP_200_OK,
+		)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

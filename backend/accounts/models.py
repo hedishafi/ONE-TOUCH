@@ -169,6 +169,8 @@ class IdentityDocument(models.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class ProviderProfile(models.Model):
     user               = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
+    profile_completed  = models.BooleanField(default=False)
+    profile_picture    = models.ImageField(upload_to='provider/profile_pictures/', null=True, blank=True)
     bio                = models.TextField(blank=True)
     address            = models.CharField(max_length=255, blank=True, help_text='Service area description (e.g., "Addis Ababa")')
     
