@@ -380,28 +380,31 @@ class SignupVerifyView(APIView):
 		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
-		# We need the original signup payload (role, name) — the client must resend it
-		# on the verify call so the account can be created.  Add those fields here so
-		# Swagger/clients know what to send.
-		role       = request.data.get('role', User.ROLE_CLIENT)
+		requested_role = request.data.get('role')
 		first_name = request.data.get('first_name', '')
 		last_name  = request.data.get('last_name', '')
 		username   = request.data.get('username') or phone_number
 
-		if role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
-			return Response(
-				{'role': 'Must be "client" or "provider".'},
-				status=status.HTTP_400_BAD_REQUEST,
-			)
+		if requested_role and requested_role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
+			return Response({'role': 'Must be "client" or "provider".'}, status=status.HTTP_400_BAD_REQUEST)
 
 		try:
 			otp = _verify_otp(phone_number, PhoneOTP.PURPOSE_REGISTER, otp_code)
 		except ValueError as exc:
 			return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-		# Use values persisted on the OTP record (from OCR/extraction) as primary
-		# but allow the client to override if they provide values in the verify call.
-		role = request.data.get('role') or otp.role or User.ROLE_CLIENT
+		# IMPORTANT: role from OTP request is the source of truth for shared signup flow.
+		# This prevents provider OTPs from being verified as client (or vice versa).
+		if otp.role and requested_role and requested_role != otp.role:
+			return Response(
+				{'detail': 'Role mismatch. Please verify using the same role selected when requesting OTP.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		role = otp.role or requested_role or User.ROLE_CLIENT
+		if role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
+			return Response({'detail': 'Invalid role for signup verification.'}, status=status.HTTP_400_BAD_REQUEST)
+
 		username = request.data.get('username') or otp.username or phone_number
 		first_name = request.data.get('first_name') or otp.first_name or ''
 		last_name = request.data.get('last_name') or otp.last_name or ''
@@ -562,90 +565,6 @@ class LogoutView(APIView):
 			{'detail': 'Successfully logged out. Please delete the access token from your device.'},
 			status=status.HTTP_200_OK
 		)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PROFILE  GET / PATCH /api/v1/auth/profile/
-# ─────────────────────────────────────────────────────────────────────────────
-
-class ProfileView(APIView):
-	"""Read or update the currently authenticated user's profile."""
-
-	permission_classes = [permissions.IsAuthenticated]
-
-	@extend_schema(
-		tags=['Auth'],
-		responses={200: UserProfileSerializer},
-		summary='Get my profile',
-	)
-	def get(self, request):
-		return Response(UserProfileSerializer(request.user).data)
-
-	@extend_schema(
-		tags=['Auth'],
-		request=UserProfileSerializer,
-		responses={200: UserProfileSerializer},
-		summary='Update my profile',
-		description='Supports partial updates (PATCH). `role` and `verification_status` are read-only.',
-	)
-	def patch(self, request):
-		serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
-		serializer.is_valid(raise_exception=True)
-		serializer.save()
-		return Response(serializer.data)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PROVIDER PROFILE  GET / POST / PATCH /api/v1/provider/profile/
-# ─────────────────────────────────────────────────────────────────────────────
-
-class ProviderProfileView(APIView):
-	"""Create, retrieve, or partially update the authenticated provider's profile."""
-
-	permission_classes = [permissions.IsAuthenticated, IsProvider]
-
-	@extend_schema(
-		tags=['Provider'],
-		responses={200: ProviderProfileSerializer},
-		summary='Get my provider profile',
-	)
-	def get(self, request):
-		try:
-			profile = request.user.provider_profile
-		except ProviderProfile.DoesNotExist:
-			return Response({'detail': 'Profile not created yet.'}, status=status.HTTP_404_NOT_FOUND)
-		return Response(ProviderProfileSerializer(profile).data)
-
-	@extend_schema(
-		tags=['Provider'],
-		request=ProviderProfileSerializer,
-		responses={201: ProviderProfileSerializer},
-		summary='Create provider profile',
-		description='Creates the ProviderProfile for the authenticated provider. Only allowed once.',
-	)
-	def post(self, request):
-		if ProviderProfile.objects.filter(user=request.user).exists():
-			return Response({'detail': 'Profile already exists. Use PATCH to update.'}, status=status.HTTP_400_BAD_REQUEST)
-		serializer = ProviderProfileSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
-		serializer.save(user=request.user)
-		return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-	@extend_schema(
-		tags=['Provider'],
-		request=ProviderProfileSerializer,
-		responses={200: ProviderProfileSerializer},
-		summary='Update provider profile',
-	)
-	def patch(self, request):
-		try:
-			profile = request.user.provider_profile
-		except ProviderProfile.DoesNotExist:
-			return Response({'detail': 'Profile not found. POST to create one first.'}, status=status.HTTP_404_NOT_FOUND)
-		serializer = ProviderProfileSerializer(profile, data=request.data, partial=True)
-		serializer.is_valid(raise_exception=True)
-		serializer.save()
-		return Response(serializer.data)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -937,101 +856,6 @@ class ProviderManualVerificationUploadView(APIView):
 		return Response(
 			ProviderManualVerificationStatusSerializer(verification).data,
 			status=status.HTTP_201_CREATED,
-		)
-
-
-class ProviderManualVerificationStatusView(APIView):
-	"""Provider-only endpoint to fetch latest manual verification status."""
-
-	permission_classes = [permissions.IsAuthenticated, IsProvider]
-
-	@extend_schema(
-		tags=['Provider'],
-		responses={
-			200: ProviderManualVerificationStatusSerializer,
-			404: OpenApiResponse(description='No manual verification submission found'),
-		},
-		summary='Get provider manual verification status',
-	)
-	def get(self, request):
-		verification = (
-			ProviderManualVerification.objects
-			.filter(provider=request.user)
-			.order_by('-submitted_at')
-			.first()
-		)
-		if not verification:
-			return Response(
-				{'detail': 'No manual verification submission found.'},
-				status=status.HTTP_404_NOT_FOUND,
-			)
-
-		return Response(ProviderManualVerificationStatusSerializer(verification).data)
-
-
-class ProviderVerificationOverviewView(APIView):
-	"""Provider dashboard verification/trial summary endpoint."""
-
-	permission_classes = [permissions.IsAuthenticated, IsProvider]
-
-	@extend_schema(
-		tags=['Provider'],
-		responses={
-			200: inline_serializer(
-				'ProviderVerificationOverviewResponse',
-				{
-					'verification_status': rest_framework_serializers.CharField(),
-					'manual_verification_status': rest_framework_serializers.CharField(allow_null=True),
-					'dashboard_status': rest_framework_serializers.CharField(),
-					'trial_jobs_limit': rest_framework_serializers.IntegerField(),
-					'trial_jobs_used': rest_framework_serializers.IntegerField(),
-					'trial_jobs_remaining': rest_framework_serializers.IntegerField(),
-					'can_accept_work': rest_framework_serializers.BooleanField(),
-				},
-			),
-		},
-		summary='Provider verification and trial overview',
-		description='Returns provider verification state and trial-job allowance for dashboard gating.',
-	)
-	def get(self, request):
-		trial_jobs_limit = 3
-		try:
-			provider_profile = request.user.provider_profile
-			trial_jobs_used = int(provider_profile.total_jobs or 0)
-		except ProviderProfile.DoesNotExist:
-			trial_jobs_used = 0
-
-		trial_jobs_remaining = max(0, trial_jobs_limit - trial_jobs_used)
-
-		latest_manual = (
-			ProviderManualVerification.objects
-			.filter(provider=request.user)
-			.order_by('-submitted_at')
-			.first()
-		)
-		manual_status = latest_manual.status if latest_manual else None
-
-		if request.user.verification_status == User.STATUS_VERIFIED:
-			dashboard_status = 'approved'
-			can_accept_work = True
-		elif request.user.verification_status == User.STATUS_REJECTED:
-			dashboard_status = 'rejected'
-			can_accept_work = False
-		else:
-			dashboard_status = 'under_review'
-			can_accept_work = trial_jobs_remaining > 0
-
-		return Response(
-			{
-				'verification_status': request.user.verification_status,
-				'manual_verification_status': manual_status,
-				'dashboard_status': dashboard_status,
-				'trial_jobs_limit': trial_jobs_limit,
-				'trial_jobs_used': trial_jobs_used,
-				'trial_jobs_remaining': trial_jobs_remaining,
-				'can_accept_work': can_accept_work,
-			},
-			status=status.HTTP_200_OK,
 		)
 
 
