@@ -79,6 +79,18 @@ export interface OnboardingStep5Response {
   status: string;
 }
 
+export interface ProviderManualVerificationUploadRequest {
+  id_front_image: File;
+  id_back_image: File;
+  selfie_image: File;
+}
+
+export interface ProviderManualVerificationUploadResponse {
+  id: number;
+  status: string;
+  submitted_at: string;
+}
+
 // ─── Step 1: Upload Document ──────────────────────────────────────────────
 
 export const uploadDocument = async (payload: OnboardingStep1Request): Promise<OnboardingStep1Response> => {
@@ -155,5 +167,24 @@ export const completeProfile = async (payload: OnboardingStep5Request): Promise<
     '/provider/onboarding/step5/',
     payload
   );
+  return data;
+};
+
+export const uploadProviderManualVerification = async (
+  payload: ProviderManualVerificationUploadRequest
+): Promise<ProviderManualVerificationUploadResponse> => {
+  const formData = new FormData();
+  formData.append('id_front_image', payload.id_front_image);
+  formData.append('id_back_image', payload.id_back_image);
+  formData.append('selfie_image', payload.selfie_image);
+
+  const { data } = await api.post<ProviderManualVerificationUploadResponse>(
+    '/provider/manual-verification/upload/',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+
   return data;
 };

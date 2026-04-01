@@ -111,12 +111,13 @@ interface ProviderMapProps {
   mapCtr: [number,number];
   mapTile: string;
   online: boolean;
+  restricted: boolean;
   profileName: string;
   visible: Req[];
   onAccept: (r: Req) => void;
   onGoOnline: () => void;
 }
-const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, profileName, visible, onAccept, onGoOnline }: ProviderMapProps) {
+const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, restricted, profileName, visible, onAccept, onGoOnline }: ProviderMapProps) {
   return (
     <Paper radius="xl" style={{overflow:'hidden',border:'1px solid var(--ot-border)',position:'relative'}}>
       <MapContainer center={mapCtr} zoom={14} style={{width:'100%',height:420}}>
@@ -132,7 +133,7 @@ const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, profile
                 <Text size="sm" fw={700}>{catName(r.catId)}</Text>
                 <Text size="xs">{r.desc}</Text>
                 <Text size="xs" c="dimmed">{r.addr}</Text>
-                <Button mt={4} size="xs" color="teal" onClick={()=>onAccept(r)}>Accept</Button>
+                <Button mt={4} size="xs" color="teal" onClick={()=>onAccept(r)} disabled={restricted}>Accept</Button>
               </Stack>
             </Popup>
           </Marker>
@@ -149,8 +150,8 @@ const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, profile
       {!online&&(
         <Box style={{position:'absolute',inset:0,zIndex:600,background:'rgba(0,0,0,.55)',
           display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
-          <Text fw={800} size="lg" c="white">Go Online to See Requests</Text>
-          <Button size="sm" style={{background:T}} onClick={onGoOnline}>Go Online</Button>
+          <Text fw={800} size="lg" c="white">{restricted ? 'Your account is under review' : 'Go Online to See Requests'}</Text>
+          <Button size="sm" style={{background:T}} onClick={onGoOnline} disabled={restricted}>Go Online</Button>
         </Box>
       )}
     </Paper>
@@ -210,6 +211,7 @@ export function ProviderHome() {
 
   const tier     = profile?.loyaltyTier ?? 'rising_pro';
   const tierInfo = LOYALTY_CONFIG.providerTiers.find(t=>t.tier===tier);
+  const isUnderReview = currentUser?.verificationStatus !== 'verified';
   // Platform commission percentage (fixed)
   const commPct  = 2;
   const mapCtr: [number,number] = (profile?.lat&&profile?.lng) ? [profile.lat,profile.lng] : MAP_CTR;
@@ -230,13 +232,29 @@ export function ProviderHome() {
   
 
   const toggle = useCallback((v:boolean) => {
+    if (isUnderReview) {
+      notifications.show({
+        title: 'Account Under Review',
+        message: 'You cannot go online until your account is approved.',
+        color: 'yellow',
+      });
+      return;
+    }
     setOnline(v); updateProviderOnlineStatus(v);
     notifications.show({title:v?'You are Online':'You are Offline',
       message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[updateProviderOnlineStatus]);
+  },[isUnderReview, updateProviderOnlineStatus]);
 
   const accept = useCallback((req:Req) => {
+    if (isUnderReview) {
+      notifications.show({
+        title: 'Account Under Review',
+        message: 'Job acceptance is disabled while your account is under review.',
+        color: 'yellow',
+      });
+      return;
+    }
     setTrials(prev => {
       if (prev>0) {
         const n = prev - 1;
@@ -250,7 +268,7 @@ export function ProviderHome() {
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[currentUser?.id]);
+  },[currentUser?.id, isUnderReview]);
 
   function finalize(req:Req) {
     setDismissed(s=>new Set([...s,req.id]));
@@ -362,7 +380,7 @@ export function ProviderHome() {
                 <Box w={8} h={8} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa',
                   boxShadow:online?`0 0 0 3px ${COLORS.success}44`:'none',transition:'all 0.3s'}}/>
                 <Text size="xs" fw={700} c={online?T:'dimmed'}>{online?'Online':'Offline'}</Text>
-                <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)} size="sm" color="teal"/>
+                <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)} size="sm" color="teal" disabled={isUnderReview}/>
               </Group>
               <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}>
                 {unreadCount>0?<IconBellFilled size={22} color={T}/>:<IconBell size={22}/>}
@@ -380,6 +398,13 @@ export function ProviderHome() {
 
       {/* Body */}
       <Box style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 64px'}}>
+
+        {isUnderReview && (
+          <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
+            <Text fw={700} size="sm" c={N}>Your account is under review</Text>
+            <Text size="xs" c="dimmed">You can access the dashboard, but going online and accepting jobs are disabled until approval.</Text>
+          </Paper>
+        )}
 
         {/* Online hero */}
         <Paper mb={20} p="lg" radius="xl"
@@ -408,7 +433,8 @@ export function ProviderHome() {
             </Box>
             <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)}
               size="xl" color="teal" onLabel="ON" offLabel="OFF"
-              styles={{track:{cursor:'pointer'}}}/>
+              styles={{track:{cursor:'pointer'}}}
+              disabled={isUnderReview}/>
           </Group>
         </Paper>
 
@@ -457,6 +483,7 @@ export function ProviderHome() {
             mapCtr={mapCtr}
             mapTile={mapTile}
             online={online}
+            restricted={isUnderReview}
             profileName={profile?.fullName??'You'}
             visible={visible}
             onAccept={accept}
@@ -474,8 +501,8 @@ export function ProviderHome() {
               <Paper p="xl" radius="xl" style={{background:'var(--ot-bg-card)',border:'2px dashed var(--ot-border)',textAlign:'center'}}>
                 <Stack align="center" gap={10}>
                   <Text style={{fontSize:44}}>📡</Text>
-                  <Text size="sm" c="var(--ot-text-sub)">Go online to see requests</Text>
-                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)}>Go Online</Button>
+                  <Text size="sm" c="var(--ot-text-sub)">{isUnderReview ? 'Your account is under review' : 'Go online to see requests'}</Text>
+                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)} disabled={isUnderReview}>Go Online</Button>
                 </Stack>
               </Paper>
             ):visible.length===0?(
@@ -532,6 +559,7 @@ export function ProviderHome() {
                             <Button flex={1} size="xs" radius="xl"
                               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                               leftSection={<IconCheck size={13}/>} 
+                              disabled={isUnderReview}
                               onClick={() => {
                                 try { accept(req); }
                                 catch(e){ notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
@@ -597,6 +625,7 @@ export function ProviderHome() {
                   <IconWifiOff size={14} color={COLORS.warning}/>
                   <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
                   <Switch size="xs" color="orange"
+                    disabled={isUnderReview}
                     onChange={e=>{if(e.currentTarget.checked){toggle(false);notifications.show({title:'You are now Offline',message:'No new requests will reach you.',color:'orange'});}}} />
                 </Group>
               </Paper>
