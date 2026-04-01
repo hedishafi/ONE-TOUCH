@@ -19,6 +19,7 @@
     "@mantine/notifications": "^8.3.15",
     "@tabler/icons-react": "^3.37.1",
     "@types/leaflet": "^1.9.21",
+    "axios": "^1.13.6",
     "dayjs": "^1.11.19",
     "i18next": "^25.8.13",
     "leaflet": "^1.9.4",
