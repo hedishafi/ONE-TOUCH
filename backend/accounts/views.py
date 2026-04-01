@@ -969,6 +969,72 @@ class ProviderManualVerificationStatusView(APIView):
 		return Response(ProviderManualVerificationStatusSerializer(verification).data)
 
 
+class ProviderVerificationOverviewView(APIView):
+	"""Provider dashboard verification/trial summary endpoint."""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={
+			200: inline_serializer(
+				'ProviderVerificationOverviewResponse',
+				{
+					'verification_status': rest_framework_serializers.CharField(),
+					'manual_verification_status': rest_framework_serializers.CharField(allow_null=True),
+					'dashboard_status': rest_framework_serializers.CharField(),
+					'trial_jobs_limit': rest_framework_serializers.IntegerField(),
+					'trial_jobs_used': rest_framework_serializers.IntegerField(),
+					'trial_jobs_remaining': rest_framework_serializers.IntegerField(),
+					'can_accept_work': rest_framework_serializers.BooleanField(),
+				},
+			),
+		},
+		summary='Provider verification and trial overview',
+		description='Returns provider verification state and trial-job allowance for dashboard gating.',
+	)
+	def get(self, request):
+		trial_jobs_limit = 3
+		try:
+			provider_profile = request.user.provider_profile
+			trial_jobs_used = int(provider_profile.total_jobs or 0)
+		except ProviderProfile.DoesNotExist:
+			trial_jobs_used = 0
+
+		trial_jobs_remaining = max(0, trial_jobs_limit - trial_jobs_used)
+
+		latest_manual = (
+			ProviderManualVerification.objects
+			.filter(provider=request.user)
+			.order_by('-submitted_at')
+			.first()
+		)
+		manual_status = latest_manual.status if latest_manual else None
+
+		if request.user.verification_status == User.STATUS_VERIFIED:
+			dashboard_status = 'approved'
+			can_accept_work = True
+		elif request.user.verification_status == User.STATUS_REJECTED:
+			dashboard_status = 'rejected'
+			can_accept_work = False
+		else:
+			dashboard_status = 'under_review'
+			can_accept_work = trial_jobs_remaining > 0
+
+		return Response(
+			{
+				'verification_status': request.user.verification_status,
+				'manual_verification_status': manual_status,
+				'dashboard_status': dashboard_status,
+				'trial_jobs_limit': trial_jobs_limit,
+				'trial_jobs_used': trial_jobs_used,
+				'trial_jobs_remaining': trial_jobs_remaining,
+				'can_accept_work': can_accept_work,
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PROVIDER ONBOARDING  (5-step signup flow)
 # ─────────────────────────────────────────────────────────────────────────────

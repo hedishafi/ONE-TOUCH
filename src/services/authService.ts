@@ -36,35 +36,44 @@ export interface OTPResponse {
 }
 
 export interface AuthTokenResponse {
-  access_token: string;
-  refresh_token: string;
+  access?: string;
+  refresh?: string;
+  access_token?: string;
+  refresh_token?: string;
   user: {
     id: number;
-    username: string;
+    username?: string;
     phone_number: string;
     role: 'client' | 'provider' | 'admin';
-    first_name: string;
-    last_name: string;
+    first_name?: string;
+    last_name?: string;
     email?: string;
-    is_on_trial: boolean;
+    is_on_trial?: boolean;
     trial_ends_at?: string;
-    biometric_verified: boolean;
+    biometric_verified?: boolean;
+    verification_status?: string;
   };
 }
 
 export interface UserProfile {
   id: number;
-  username: string;
+  username?: string;
   phone_number: string;
   role: 'client' | 'provider' | 'admin';
-  first_name: string;
-  last_name: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
-  is_on_trial: boolean;
+  is_on_trial?: boolean;
   trial_ends_at?: string;
-  biometric_verified: boolean;
+  biometric_verified?: boolean;
   verification_status?: string;
 }
+
+const extractTokens = (data: AuthTokenResponse) => {
+  const accessToken = data.access || data.access_token || '';
+  const refreshToken = data.refresh || data.refresh_token || '';
+  return { accessToken, refreshToken };
+};
 
 // ─── Signup ───────────────────────────────────────────────────────────────
 
@@ -97,9 +106,14 @@ export const signupVerify = async (payload: {
     username: `client_${Date.now()}`,
   });
 
+  const { accessToken, refreshToken } = extractTokens(data);
+  if (!accessToken || !refreshToken) {
+    throw new Error('Authentication tokens were not returned by the server.');
+  }
+
   // Store tokens and user info
-  localStorage.setItem('access_token', data.access_token);
-  localStorage.setItem('refresh_token', data.refresh_token);
+  localStorage.setItem('access_token', accessToken);
+  localStorage.setItem('refresh_token', refreshToken);
   localStorage.setItem('user', JSON.stringify(data.user));
   localStorage.setItem('user_id', String(data.user.id));
 
@@ -122,11 +136,29 @@ export const loginRequestOTP = async (payload: LoginOTPRequest): Promise<OTPResp
 export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthTokenResponse> => {
   const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
 
-  // Store tokens and user info
-  localStorage.setItem('access_token', data.access_token);
-  localStorage.setItem('refresh_token', data.refresh_token);
-  localStorage.setItem('user', JSON.stringify(data.user));
+  const { accessToken, refreshToken } = extractTokens(data);
+  if (!accessToken || !refreshToken) {
+    throw new Error('Authentication tokens were not returned by the server.');
+  }
 
+  // Store tokens and user info
+  localStorage.setItem('access_token', accessToken);
+  localStorage.setItem('refresh_token', refreshToken);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  localStorage.setItem('user_id', String(data.user.id));
+
+  return data;
+};
+
+/**
+ * Resend signup OTP (same behavior as requesting OTP).
+ */
+export const signupResendOTP = async (payload: { phone: string }): Promise<OTPResponse> => {
+  const normalizedPhone = payload.phone?.trim() || '';
+  const { data } = await api.post<OTPResponse>('/auth/signup/resend-otp/', {
+    phone_number: normalizedPhone,
+    role: 'client',
+  });
   return data;
 };
 

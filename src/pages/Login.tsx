@@ -125,10 +125,19 @@ export default function Login() {
         otp_code: code,
       });
 
+      const normalizedUser = {
+        id: String(response.user.id),
+        email: response.user.email ?? '',
+        phone: response.user.phone_number,
+        role: response.user.role,
+        createdAt: new Date().toISOString(),
+        verificationStatus: (response.user.verification_status as 'pending' | 'verified' | 'rejected' | 're-verification-requested') ?? 'pending',
+      };
+
       // Update authStore with user data
-      storage.set(STORAGE_KEYS.currentUser, response.user);
+      storage.set(STORAGE_KEYS.currentUser, normalizedUser);
       useAuthStore.setState({
-        currentUser: response.user,
+        currentUser: normalizedUser,
         isAuthenticated: true,
       });
 

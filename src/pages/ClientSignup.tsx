@@ -15,7 +15,6 @@ import {
   IconChevronLeft, IconAlertCircle, IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
 import { signupVerify } from '../services/authService';
 import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
 import type { IdentityResult } from './signup/shared';
@@ -55,7 +54,6 @@ function StepPhoneOTP({
   const [attempts, setAttempts] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const { seconds, begin }      = useCountdown(60);
-  const navigate = useNavigate();
 
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;

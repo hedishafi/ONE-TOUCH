@@ -5,11 +5,13 @@ from .views import (
     LoginVerifyView,
     LogoutView,
     ProfileView,
+    ProviderProfileView,
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
     ProviderManualVerificationUploadView,
     ProviderManualVerificationStatusView,
+    ProviderVerificationOverviewView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -31,7 +33,11 @@ urlpatterns = [
     # Authenticated profile endpoint
     path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
 
+    # Provider profile setup (business info)
+    path('provider/profile/', ProviderProfileView.as_view(), name='provider-profile'),
+
     # ── Provider Identity Verification (manual admin review) ──────────────────
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
     path('provider/manual-verification/status/', ProviderManualVerificationStatusView.as_view(), name='provider-manual-verification-status'),
+    path('provider/manual-verification/overview/', ProviderVerificationOverviewView.as_view(), name='provider-manual-verification-overview'),
 ]
