@@ -1,7 +1,7 @@
 from django.db import models
 from accounts.models import ProviderProfile
 from orders.models import Order
-from services.models import CommissionRule
+# from services.models import CommissionRule
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ class CommissionPayment(models.Model):
     order           = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='commission_payments')
     provider        = models.ForeignKey(ProviderProfile, on_delete=models.PROTECT, related_name='commission_payments')
     # Snapshot the rule used at the time of payment (rule may change later)
-    commission_rule = models.ForeignKey(CommissionRule, on_delete=models.SET_NULL, null=True, related_name='payments')
+    # commission_rule = models.ForeignKey(CommissionRule, on_delete=models.SET_NULL, null=True, related_name='payments')
 
     # Amounts stored separately for full auditability
     service_amount     = models.DecimalField(max_digits=10, decimal_places=2)
