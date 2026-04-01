@@ -37,6 +37,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
   const [backImage, setBackImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -65,23 +66,66 @@ export const ProviderOnboardingStep1: React.FC = () => {
     try {
       setCameraLoading(true);
       setError(null);
+      setCameraReady(false);
       stopCamera();
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: target === 'selfie_image' ? 'user' : 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Camera is not supported in this browser. Please use a modern browser like Chrome or Safari.');
+        return;
+      }
+
+      const prefersSelfie = target === 'selfie_image';
+      const constraintAttempts: MediaStreamConstraints[] = [
+        {
+          video: {
+            facingMode: { exact: prefersSelfie ? 'user' : 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
         },
-        audio: false,
-      });
+        {
+          video: {
+            facingMode: prefersSelfie ? 'user' : 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+        {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastError: unknown = null;
+
+      for (const constraints of constraintAttempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!stream) {
+        throw lastError ?? new Error('Unable to access camera stream.');
+      }
 
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraReady(true);
       }
-    } catch {
-      setError('Unable to access camera. Please allow camera permission and try again.');
+    } catch (err: any) {
+      const reason = err?.name ? ` (${err.name})` : '';
+      setError(`Unable to access camera${reason}. Please allow camera permission and try again.`);
     } finally {
       setCameraLoading(false);
     }
@@ -143,6 +187,9 @@ export const ProviderOnboardingStep1: React.FC = () => {
     if (activeTarget === 'id_back_image') setBackImage(file);
     if (activeTarget === 'selfie_image') setSelfieImage(file);
     setError(null);
+
+    if (activeTarget === 'id_front_image') setActiveTarget('id_back_image');
+    if (activeTarget === 'id_back_image') setActiveTarget('selfie_image');
   };
 
   const syncProviderSession = () => {
@@ -165,6 +212,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
       role: 'provider',
       createdAt: new Date().toISOString(),
       verificationStatus,
+      providerUid: stored.provider_uid,
     };
 
     storage.set(STORAGE_KEYS.currentUser, user);
@@ -257,7 +305,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
               />
               <canvas ref={canvasRef} style={{ display: 'none' }} />
               <Group>
-                <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading}>
+                <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
                   Capture
                 </Button>
                 <Button

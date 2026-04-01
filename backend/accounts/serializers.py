@@ -29,6 +29,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
@@ -37,6 +38,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
@@ -66,6 +68,7 @@ class ProviderFullUserSerializer(serializers.ModelSerializer):
             'id',
             'phone_number',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',

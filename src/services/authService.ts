@@ -45,6 +45,7 @@ export interface AuthTokenResponse {
     username?: string;
     phone_number: string;
     role: 'client' | 'provider' | 'admin';
+    provider_uid?: string;
     first_name?: string;
     last_name?: string;
     email?: string;
@@ -60,6 +61,7 @@ export interface UserProfile {
   username?: string;
   phone_number: string;
   role: 'client' | 'provider' | 'admin';
+  provider_uid?: string;
   first_name?: string;
   last_name?: string;
   email?: string;

@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+import random
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ class User(AbstractUser):
     phone_number        = models.CharField(max_length=30, unique=True)
     role                = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    provider_uid        = models.CharField(max_length=6, unique=True, null=True, blank=True, db_index=True)
 
     # Free-trial support: providers get trial_ends_at set on signup
     is_on_trial    = models.BooleanField(default=False)
@@ -64,6 +66,18 @@ class User(AbstractUser):
         if not self.is_on_trial or not self.trial_ends_at:
             return False
         return timezone.now() < self.trial_ends_at
+
+    @classmethod
+    def generate_provider_uid(cls) -> str:
+        while True:
+            candidate = f'{random.randint(0, 999_999):06d}'
+            if not cls.objects.filter(provider_uid=candidate).exists():
+                return candidate
+
+    def save(self, *args, **kwargs):
+        if self.role == self.ROLE_PROVIDER and not self.provider_uid:
+            self.provider_uid = self.generate_provider_uid()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.username} ({self.role})'

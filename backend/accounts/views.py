@@ -569,6 +569,21 @@ class LogoutView(APIView):
 		)
 
 
+class UserProfileView(APIView):
+	"""Return current authenticated user profile for status/role-aware frontend refreshes."""
+
+	permission_classes = [permissions.IsAuthenticated]
+
+	@extend_schema(
+		tags=['Auth'],
+		responses={200: UserProfileSerializer},
+		summary='Get my profile',
+		description='Returns the authenticated user profile including provider UID and verification status.',
+	)
+	def get(self, request):
+		return Response(UserProfileSerializer(request.user).data, status=status.HTTP_200_OK)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CLIENT PROFILE  GET / PATCH /api/v1/client/profile/
 # ─────────────────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from .views import (
     LoginRequestOTPView,
     LoginVerifyView,
     LogoutView,
+    UserProfileView,
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
@@ -26,6 +27,7 @@ urlpatterns = [
     # Token management + logout
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/logout/',        LogoutView.as_view(),        name='logout'),
+    path('auth/profile/',       UserProfileView.as_view(),   name='auth-profile'),
 
     # ── Provider Identity Verification (manual admin review) ──────────────────
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),

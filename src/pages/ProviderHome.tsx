@@ -23,8 +23,8 @@ import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES } from '../utils/constants';
+import * as authService from '../services/authService';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
-import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile } from '../types';
 
@@ -175,11 +175,11 @@ function PulseRings({ctr, on}: {ctr:[number,number]; on:boolean}) {
 }
 
 const NAV = [
-  {label:'Home',       icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
-  {label:'Active Jobs',icon:<IconBriefcase    size={16}/>, r:ROUTES.providerJobs},
-  {label:'Earnings',   icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
-  {label:'Profile',    icon:<IconUser         size={16}/>, r:ROUTES.providerProfile},
-  {label:'Wallet',     icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
+  {label:'Dashboard',                    icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
+  {label:'Profile Setup',                icon:<IconUser         size={16}/>, r:'/provider/profile-setup'},
+  {label:'Services & Subservices',       icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
+  {label:'Wallet / Commission Overview', icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
+  {label:'Earnings',                     icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
 ];
 
 export function ProviderHome() {
@@ -209,9 +209,11 @@ export function ProviderHome() {
   const [cancelReason,  setCancelReason]  = useState('');
   const [cancelDone,    setCancelDone]    = useState(false);
 
-  const tier     = profile?.loyaltyTier ?? 'rising_pro';
-  const tierInfo = LOYALTY_CONFIG.providerTiers.find(t=>t.tier===tier);
-  const isUnderReview = currentUser?.verificationStatus !== 'verified';
+  const verificationStatus = currentUser?.verificationStatus ?? 'pending';
+  const isVerified = verificationStatus === 'verified';
+  const isUnderReview = verificationStatus === 'pending';
+  const isRestricted = !isVerified;
+  const localizedDate = new Intl.DateTimeFormat('en-ET', { dateStyle: 'medium' }).format(new Date());
   // Platform commission percentage (fixed)
   const commPct  = 2;
   const mapCtr: [number,number] = (profile?.lat&&profile?.lng) ? [profile.lat,profile.lng] : MAP_CTR;
@@ -226,16 +228,58 @@ export function ProviderHome() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
 
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'provider') return;
+
+    let isMounted = true;
+
+    const refreshProviderStatus = async () => {
+      try {
+        const latest = await authService.getProfile();
+        if (!isMounted || latest.role !== 'provider') return;
+
+        const latestStatus: 'pending' | 'verified' | 'rejected' | 're-verification-requested' =
+          latest.verification_status === 'verified'
+            ? 'verified'
+            : latest.verification_status === 'rejected'
+              ? 'rejected'
+              : latest.verification_status === 're-verification-requested'
+                ? 're-verification-requested'
+                : 'pending';
+
+        const updatedUser = {
+          ...currentUser,
+          phone: latest.phone_number,
+          verificationStatus: latestStatus,
+          providerUid: latest.provider_uid,
+        };
+
+        storage.set(STORAGE_KEYS.currentUser, updatedUser);
+        useAuthStore.setState({ currentUser: updatedUser });
+      } catch {
+        // Keep local status if refresh fails.
+      }
+    };
+
+    refreshProviderStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.role]);
+
   const visible   = DEMO.filter(r=>!dismissed.has(r.id)&&online);
   const myJobs    = jobs.filter(j=>j.providerId===currentUser?.id);
   const done      = myJobs.filter(j=>j.status==='completed');
   
 
   const toggle = useCallback((v:boolean) => {
-    if (isUnderReview) {
+    if (isRestricted) {
       notifications.show({
-        title: 'Account Under Review',
-        message: 'You cannot go online until your account is approved.',
+        title: isUnderReview ? 'Account Under Review' : 'Account Not Verified',
+        message: isUnderReview
+          ? 'You cannot go online until your account is approved.'
+          : 'You cannot go online until your account is verified.',
         color: 'yellow',
       });
       return;
@@ -244,13 +288,15 @@ export function ProviderHome() {
     notifications.show({title:v?'You are Online':'You are Offline',
       message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[isUnderReview, updateProviderOnlineStatus]);
+  },[isRestricted, isUnderReview, updateProviderOnlineStatus]);
 
   const accept = useCallback((req:Req) => {
-    if (isUnderReview) {
+    if (isRestricted) {
       notifications.show({
-        title: 'Account Under Review',
-        message: 'Job acceptance is disabled while your account is under review.',
+        title: isUnderReview ? 'Account Under Review' : 'Account Not Verified',
+        message: isUnderReview
+          ? 'Job acceptance is disabled while your account is under review.'
+          : 'Job acceptance is disabled until your account is verified.',
         color: 'yellow',
       });
       return;
@@ -268,7 +314,7 @@ export function ProviderHome() {
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[currentUser?.id, isUnderReview]);
+  },[currentUser?.id, isRestricted, isUnderReview]);
 
   function finalize(req:Req) {
     setDismissed(s=>new Set([...s,req.id]));
@@ -330,16 +376,20 @@ export function ProviderHome() {
             <Box>
               <Text size="sm" fw={700} lineClamp={1}>{profile?.fullName??currentUser?.email??'Provider'}</Text>
               <Group gap={6}>
-                <Badge size="xs" variant="light" color="blue">{tierInfo?.label??'Rising Pro'}</Badge>
+                <Badge size="xs" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
+                  {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
+                </Badge>
                 <Box w={7} h={7} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa'}}/>
                 <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online?'Online':'Offline'}</Text>
               </Group>
+              <Text size="10px" c="dimmed">UID: {currentUser?.providerUid ?? '—'}</Text>
+              <Text size="10px" c="dimmed">{localizedDate}</Text>
             </Box>
           </Group>
         </Box>
         <Divider/>
         <Stack gap={2} p="sm" style={{flex:1}}>
-          {NAV.map(n=>(
+          {currentUser?.role === 'provider' && NAV.map(n=>(
             <Box key={n.label} p={10}
               onClick={()=>{setSidebar(false);nav(n.r);}}
               style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
@@ -348,6 +398,12 @@ export function ProviderHome() {
               {n.icon} {n.label}
             </Box>
           ))}
+          <Paper p="xs" radius="md" mt="xs" style={{border:'1px solid var(--ot-border)'}}>
+            <Text size="xs" fw={700} c={N}>Identity Verification Status</Text>
+            <Badge mt={6} size="sm" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
+              {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
+            </Badge>
+          </Paper>
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
           <Box p={10}
@@ -380,7 +436,7 @@ export function ProviderHome() {
                 <Box w={8} h={8} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa',
                   boxShadow:online?`0 0 0 3px ${COLORS.success}44`:'none',transition:'all 0.3s'}}/>
                 <Text size="xs" fw={700} c={online?T:'dimmed'}>{online?'Online':'Offline'}</Text>
-                <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)} size="sm" color="teal" disabled={isUnderReview}/>
+                <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)} size="sm" color="teal" disabled={isRestricted}/>
               </Group>
               <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}>
                 {unreadCount>0?<IconBellFilled size={22} color={T}/>:<IconBell size={22}/>}
@@ -434,7 +490,7 @@ export function ProviderHome() {
             <Switch checked={online} onChange={e=>toggle(e.currentTarget.checked)}
               size="xl" color="teal" onLabel="ON" offLabel="OFF"
               styles={{track:{cursor:'pointer'}}}
-              disabled={isUnderReview}/>
+              disabled={isRestricted}/>
           </Group>
         </Paper>
 
@@ -483,7 +539,7 @@ export function ProviderHome() {
             mapCtr={mapCtr}
             mapTile={mapTile}
             online={online}
-            restricted={isUnderReview}
+            restricted={isRestricted}
             profileName={profile?.fullName??'You'}
             visible={visible}
             onAccept={accept}
@@ -501,8 +557,8 @@ export function ProviderHome() {
               <Paper p="xl" radius="xl" style={{background:'var(--ot-bg-card)',border:'2px dashed var(--ot-border)',textAlign:'center'}}>
                 <Stack align="center" gap={10}>
                   <Text style={{fontSize:44}}>📡</Text>
-                  <Text size="sm" c="var(--ot-text-sub)">{isUnderReview ? 'Your account is under review' : 'Go online to see requests'}</Text>
-                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)} disabled={isUnderReview}>Go Online</Button>
+                  <Text size="sm" c="var(--ot-text-sub)">{isUnderReview ? 'Your account is under review' : isVerified ? 'Go online to see requests' : 'Your account is not yet verified'}</Text>
+                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)} disabled={isRestricted}>Go Online</Button>
                 </Stack>
               </Paper>
             ):visible.length===0?(
@@ -559,7 +615,7 @@ export function ProviderHome() {
                             <Button flex={1} size="xs" radius="xl"
                               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                               leftSection={<IconCheck size={13}/>} 
-                              disabled={isUnderReview}
+                              disabled={isRestricted}
                               onClick={() => {
                                 try { accept(req); }
                                 catch(e){ notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
@@ -625,7 +681,7 @@ export function ProviderHome() {
                   <IconWifiOff size={14} color={COLORS.warning}/>
                   <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
                   <Switch size="xs" color="orange"
-                    disabled={isUnderReview}
+                    disabled={isRestricted}
                     onChange={e=>{if(e.currentTarget.checked){toggle(false);notifications.show({title:'You are now Offline',message:'No new requests will reach you.',color:'orange'});}}} />
                 </Group>
               </Paper>

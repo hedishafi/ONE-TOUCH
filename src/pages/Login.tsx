@@ -132,6 +132,7 @@ export default function Login() {
         role: response.user.role,
         createdAt: new Date().toISOString(),
         verificationStatus: (response.user.verification_status as 'pending' | 'verified' | 'rejected' | 're-verification-requested') ?? 'pending',
+        providerUid: response.user.provider_uid,
       };
 
       // Update authStore with user data

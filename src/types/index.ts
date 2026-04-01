@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   createdAt: string;
   verificationStatus: VerificationStatus;
+  providerUid?: string;
   isOnline?: boolean;
 }
 

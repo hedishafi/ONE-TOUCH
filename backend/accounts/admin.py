@@ -16,21 +16,22 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display  = ('username', 'phone_number', 'role', 'verification_status', 'biometric_verified', 'is_on_trial', 'date_joined')
+    list_display  = ('username', 'phone_number', 'provider_uid', 'role', 'verification_status', 'biometric_verified', 'is_on_trial', 'date_joined')
     list_filter   = ('role', 'verification_status', 'biometric_verified', 'is_on_trial', 'is_staff')
-    search_fields = ('username', 'phone_number', 'first_name', 'last_name')
+    search_fields = ('username', 'phone_number', 'provider_uid', 'first_name', 'last_name')
     ordering      = ('-date_joined',)
 
     fieldsets = BaseUserAdmin.fieldsets + (
         ('OneTouch Fields', {
             'fields': (
                 'phone_number', 'role', 'verification_status',
+                'provider_uid',
                 'biometric_verified', 'biometric_score',
                 'is_on_trial', 'trial_ends_at',
             )
         }),
     )
-    readonly_fields = ('biometric_score',)
+    readonly_fields = ('provider_uid', 'biometric_score',)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
