@@ -36,46 +36,64 @@ export interface OTPResponse {
 }
 
 export interface AuthTokenResponse {
-  access_token: string;
-  refresh_token: string;
+  access?: string;
+  refresh?: string;
+  access_token?: string;
+  refresh_token?: string;
   user: {
     id: number;
-    username: string;
+    username?: string;
     phone_number: string;
     role: 'client' | 'provider' | 'admin';
-    first_name: string;
-    last_name: string;
+    provider_uid?: string;
+    first_name?: string;
+    last_name?: string;
     email?: string;
-    is_on_trial: boolean;
+    is_on_trial?: boolean;
     trial_ends_at?: string;
-    biometric_verified: boolean;
+    biometric_verified?: boolean;
+    verification_status?: string;
   };
 }
 
 export interface UserProfile {
   id: number;
-  username: string;
+  username?: string;
   phone_number: string;
   role: 'client' | 'provider' | 'admin';
-  first_name: string;
-  last_name: string;
+  provider_uid?: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
-  is_on_trial: boolean;
+  is_on_trial?: boolean;
   trial_ends_at?: string;
-  biometric_verified: boolean;
+  biometric_verified?: boolean;
   verification_status?: string;
 }
+
+export interface ProviderOnboardingStatus {
+  next_step: 'profile_setup' | 'identity_upload' | 'dashboard';
+  next_route: string;
+  profile_completed: boolean;
+  verification_status: string;
+}
+
+const extractTokens = (data: AuthTokenResponse) => {
+  const accessToken = data.access || data.access_token || '';
+  const refreshToken = data.refresh || data.refresh_token || '';
+  return { accessToken, refreshToken };
+};
 
 // ─── Signup ───────────────────────────────────────────────────────────────
 
 /**
  * Request OTP for signup (supports both phone and phone_number)
  */
-export const signupRequestOTP = async (payload: { phone: string }): Promise<OTPResponse> => {
+export const signupRequestOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
   const { data } = await api.post<OTPResponse>('/auth/signup/otp/', {
     phone_number: normalizedPhone,
-    role: 'client',
+    role: payload.role ?? 'client',
   });
   return data;
 };
@@ -86,20 +104,30 @@ export const signupRequestOTP = async (payload: { phone: string }): Promise<OTPR
 export const signupVerify = async (payload: {
   phone: string;
   otp_code: string;
+  role?: 'client' | 'provider';
+  first_name?: string;
+  last_name?: string;
+  username?: string;
 }): Promise<AuthTokenResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
+  const role = payload.role ?? 'client';
   const { data } = await api.post<AuthTokenResponse>('/auth/signup/verify/', {
     phone_number: normalizedPhone,
     otp_code: payload.otp_code,
-    role: 'client',
-    first_name: 'Client',
-    last_name: 'User',
-    username: `client_${Date.now()}`,
+    role,
+    first_name: payload.first_name ?? (role === 'provider' ? 'Provider' : 'Client'),
+    last_name: payload.last_name ?? 'User',
+    username: payload.username ?? `${role}_${Date.now()}`,
   });
 
+  const { accessToken, refreshToken } = extractTokens(data);
+  if (!accessToken || !refreshToken) {
+    throw new Error('Authentication tokens were not returned by the server.');
+  }
+
   // Store tokens and user info
-  localStorage.setItem('access_token', data.access_token);
-  localStorage.setItem('refresh_token', data.refresh_token);
+  localStorage.setItem('access_token', accessToken);
+  localStorage.setItem('refresh_token', refreshToken);
   localStorage.setItem('user', JSON.stringify(data.user));
   localStorage.setItem('user_id', String(data.user.id));
 
@@ -122,11 +150,29 @@ export const loginRequestOTP = async (payload: LoginOTPRequest): Promise<OTPResp
 export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthTokenResponse> => {
   const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
 
-  // Store tokens and user info
-  localStorage.setItem('access_token', data.access_token);
-  localStorage.setItem('refresh_token', data.refresh_token);
-  localStorage.setItem('user', JSON.stringify(data.user));
+  const { accessToken, refreshToken } = extractTokens(data);
+  if (!accessToken || !refreshToken) {
+    throw new Error('Authentication tokens were not returned by the server.');
+  }
 
+  // Store tokens and user info
+  localStorage.setItem('access_token', accessToken);
+  localStorage.setItem('refresh_token', refreshToken);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  localStorage.setItem('user_id', String(data.user.id));
+
+  return data;
+};
+
+/**
+ * Resend signup OTP (same behavior as requesting OTP).
+ */
+export const signupResendOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
+  const normalizedPhone = payload.phone?.trim() || '';
+  const { data } = await api.post<OTPResponse>('/auth/signup/resend-otp/', {
+    phone_number: normalizedPhone,
+    role: payload.role ?? 'client',
+  });
   return data;
 };
 
@@ -137,6 +183,11 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
  */
 export const getProfile = async (): Promise<UserProfile> => {
   const { data } = await api.get<UserProfile>('/auth/profile/');
+  return data;
+};
+
+export const getProviderOnboardingStatus = async (): Promise<ProviderOnboardingStatus> => {
+  const { data } = await api.get<ProviderOnboardingStatus>('/provider/onboarding/status/');
   return data;
 };
 

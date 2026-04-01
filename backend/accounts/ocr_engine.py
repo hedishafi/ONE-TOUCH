@@ -151,6 +151,20 @@ class OCREngine(ABC):
         
         # 2. Check expiry date
         expiry_str = extracted_fields.get('expiry_date')
+        issue_str = extracted_fields.get('issue_date')
+
+        issue_date = None
+        if issue_str:
+            try:
+                for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y']:
+                    try:
+                        issue_date = datetime.strptime(issue_str.strip(), fmt).date()
+                        break
+                    except ValueError:
+                        continue
+            except Exception:
+                issue_date = None
+
         if expiry_str:
             try:
                 # Try multiple date formats
@@ -162,7 +176,16 @@ class OCREngine(ABC):
                     except ValueError:
                         continue
                 
-                if expiry_date and expiry_date < date.today():
+                if expiry_date and issue_date and expiry_date <= issue_date:
+                    validation['warnings'].append(
+                        f'Expiry date candidate ({expiry_str}) is not after issue date ({issue_str}); treating as uncertain OCR date.'
+                    )
+                elif expiry_date and expiry_date.year < 2020:
+                    # Avoid hard-failing on obviously misread old dates (often issue date or OCR confusion)
+                    validation['warnings'].append(
+                        f'Expiry date candidate ({expiry_str}) looks implausibly old; treating as uncertain OCR date.'
+                    )
+                elif expiry_date and expiry_date < date.today():
                     validation['is_expired'] = True
                     msg = f'Document expired on {expiry_str}'
                     validation['errors'].append(msg)
@@ -197,7 +220,7 @@ class OCREngine(ABC):
             validation['warnings'].append('Nationality not detected on document')
         
         # 4. Check phone number format
-        phone = extracted_fields.get('phone')
+        phone = extracted_fields.get('phone_number') or extracted_fields.get('phone')
         if phone:
             # Should match Ethiopian phone format
             import re
@@ -206,7 +229,7 @@ class OCREngine(ABC):
                 validation['warnings'].append(msg)
         
         # 5. Check name quality
-        name = extracted_fields.get('name', '').strip()
+        name = (extracted_fields.get('full_name') or extracted_fields.get('name') or '').strip()
         if name:
             if len(name) < 5:
                 msg = f'Name seems too short: "{name}"'
@@ -344,18 +367,44 @@ class TesseractOCR(OCREngine):
             'phone_number': None,
         }
 
-        # ── Extract dates (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY format)
-        # Capture up to 3 dates - typically DOB, Issue date, Expiry date
-        date_pattern = r'(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})'
-        dates = re.findall(date_pattern, raw_text)
-        
-        if len(dates) >= 1:
-            # Normalize to DD/MM/YYYY if it's YYYY-MM-DD
-            fields['date_of_birth'] = self._normalize_date(dates[0])
-        if len(dates) >= 2:
-            fields['issue_date'] = self._normalize_date(dates[1])
-        if len(dates) >= 3:
-            fields['expiry_date'] = self._normalize_date(dates[2])
+        lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
+
+        def first_match(patterns, text):
+            for pattern in patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    value = next((g for g in match.groups() if g is not None), None)
+                    if value:
+                        return value.strip(' :.-\t')
+            return None
+
+        # ── Labeled date extraction first, fallback to global date list
+        date_patterns = {
+            'date_of_birth': [
+                r'(?:date\s*of\s*birth|dob|birth\s*date)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+            ],
+            'issue_date': [
+                r'(?:issue\s*date|issued\s*on|date\s*of\s*issue)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+            ],
+            'expiry_date': [
+                r'(?:expiry\s*date|expires?\s*on|valid\s*until)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+            ],
+        }
+
+        for key, patterns in date_patterns.items():
+            labeled_date = first_match(patterns, raw_text)
+            if labeled_date:
+                fields[key] = self._normalize_date(labeled_date)
+
+        # Fallback date assignment if any date fields are still missing
+        date_pattern = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})'
+        dates = [self._normalize_date(d) for d in re.findall(date_pattern, raw_text)]
+        if not fields['date_of_birth'] and len(dates) >= 1:
+            fields['date_of_birth'] = dates[0]
+        if not fields['issue_date'] and len(dates) >= 2:
+            fields['issue_date'] = dates[1]
+        if not fields['expiry_date'] and len(dates) >= 3:
+            fields['expiry_date'] = dates[2]
 
         # ── Extract ID number patterns (document-type specific)
         # Support multiple document formats:
@@ -369,22 +418,41 @@ class TesseractOCR(OCREngine):
             r'[A-Z]{2,3}[-\s]?[\d]{6,10}',          # Generic pattern
         ]
         
+        # Prefer labeled ID first
+        labeled_id = first_match([
+            r'\bFIN\b\s*[:\-]?\s*([0-9\s]{8,30})',
+            r'(?:id\s*(?:no|number|#)|document\s*(?:no|number|#)|license\s*(?:no|number|#))\s*[:\-]?\s*([A-Z0-9\-/]{5,})',
+        ], raw_text)
+        if labeled_id:
+            cleaned_id = re.sub(r'\s+', '', labeled_id)
+            fields['id_number'] = cleaned_id
+
         for pattern in id_patterns:
+            if fields['id_number']:
+                break
             matches = re.findall(pattern, raw_text, re.IGNORECASE)
             if matches:
                 fields['id_number'] = matches[0].replace(' ', '-')
                 break
 
+        # Fallback: capture long digit groups often used as FIN/card numbers (e.g., 9651 8793 1974 6102)
+        if not fields['id_number']:
+            long_digit_match = re.search(r'\b(?:\d{4}[\s-]?){3,5}\d{2,4}\b', raw_text)
+            if long_digit_match:
+                fields['id_number'] = re.sub(r'[^0-9]', '', long_digit_match.group(0))
+
         # ── Extract phone number (+251 format or 0251 or 09XX)
         phone_patterns = [
-            r'\+251\d{9}',           # +251911234567
-            r'(?:^|\W)251\d{9}',     # 251911234567
-            r'0\d{9}',               # 0911234567
+            r'\+251\s*\d{2}\s*\d{3}\s*\d{4}',
+            r'\+251\d{9}',
+            r'(?:^|\W)251\d{9}',
+            r'0\d{9}',
+            r'\b09\d{8}\b',
         ]
         for pattern in phone_patterns:
             phones = re.findall(pattern, raw_text)
             if phones:
-                phone = phones[0].lstrip('+')
+                phone = re.sub(r'\s+', '', phones[0]).lstrip('+')
                 # Normalize to +251 format
                 if phone.startswith('251'):
                     fields['phone_number'] = '+' + phone
@@ -399,7 +467,16 @@ class TesseractOCR(OCREngine):
             (r'\b(?:Male|M|ወ)\b', 'Male'),
             (r'\b(?:Female|F|ሴ)\b', 'Female'),
         ]
+        labeled_gender = first_match([
+            r'(?:sex|gender)\s*[:\-]?\s*(male|female|m|f)',
+        ], raw_text)
+        if labeled_gender:
+            normalized_gender = labeled_gender.lower()
+            fields['gender'] = 'Male' if normalized_gender in ('male', 'm') else 'Female'
+
         for pattern, gender in gender_patterns:
+            if fields['gender']:
+                break
             if re.search(pattern, raw_text, re.IGNORECASE):
                 fields['gender'] = gender
                 break
@@ -414,36 +491,87 @@ class TesseractOCR(OCREngine):
                 break
 
         # ── Extract location (Region/Sub-City and Woreda)
+        labeled_region = first_match([
+            r'(?:region|sub\s*city|city|zone|address)\s*[:\-]?\s*([A-Za-z\s\-]{3,})',
+        ], raw_text)
+        if labeled_region:
+            fields['region_sub_city'] = labeled_region
+
         # Common Ethiopian regions: Addis Ababa, Oromia, Amhara, SNNPR, etc.
         regions = [
             'Addis Ababa', 'Oromia', 'Amhara', 'SNNPR', 'Tigray', 'Somali', 
             'Afar', 'Benishangul-Gumuz', 'Gambela', 'Harari', 'Dire Dawa'
         ]
         for region in regions:
+            if fields['region_sub_city']:
+                break
             if re.search(re.escape(region), raw_text, re.IGNORECASE):
                 fields['region_sub_city'] = region
                 break
 
         # For Woreda (district), look for common ones in Addis Ababa or other regions
+        labeled_woreda = first_match([
+            r'(?:woreda|wereda|district)\s*[:\-#]?\s*([A-Za-z0-9\-\s]{1,30})',
+        ], raw_text)
+        if labeled_woreda:
+            fields['woreda'] = labeled_woreda
+
         woredas = [
             'Bole', 'Kirkos', 'Lideta', 'Kolfe', 'Yeka', 'Arada', 'Nifas Silk-Lafto',
             'Gulele', 'Akaki Kality', 'Addis Ketema',
         ]
         for woreda in woredas:
+            if fields['woreda']:
+                break
             if re.search(re.escape(woreda), raw_text, re.IGNORECASE):
                 fields['woreda'] = woreda
                 break
 
-        # ── Extract full name (longest sequence of letters + spaces in first few lines)
-        lines = [l.strip() for l in raw_text.split('\n') if l.strip()]
-        for line in lines[:5]:  # Check first 5 lines
-            # Name should be 5+ characters, mostly letters (allow spaces, hyphens)
-            if len(line) >= 5:
-                # Count alphabetic characters
-                alpha_count = sum(1 for c in line if c.isalpha())
-                if alpha_count / max(len(line), 1) > 0.7:  # 70%+ alphabetic
-                    fields['full_name'] = line
-                    break
+        # ── Extract full name (labeled first, then robust fallback)
+        # Case 1: value on same line as label
+        labeled_name = first_match([
+            r'(?:full\s*name|holder\s*name|owner\s*name|ሙሉ\s*ስም|ስም)\s*[:\-]?\s*([A-Za-z][A-Za-z\s\-]{3,80})',
+        ], raw_text)
+        if labeled_name:
+            fields['full_name'] = labeled_name
+
+        # Case 2: value appears on next line after label (common in Ethiopian IDs)
+        if not fields['full_name']:
+            name_label_patterns = [
+                r'full\s*name',
+                r'holder\s*name',
+                r'owner\s*name',
+                r'ሙሉ\s*ስም',
+                r'\bስም\b',
+            ]
+            for index, line in enumerate(lines):
+                if any(re.search(pattern, line, re.IGNORECASE) for pattern in name_label_patterns):
+                    for candidate in lines[index + 1:index + 4]:
+                        cleaned = re.sub(r'[^A-Za-z\s\-]', ' ', candidate).strip()
+                        words = [word for word in cleaned.split() if len(word) > 1]
+                        if 2 <= len(words) <= 5:
+                            fields['full_name'] = ' '.join(words)
+                            break
+                    if fields['full_name']:
+                        break
+
+        if not fields['full_name']:
+            banned_line_keywords = {
+                'ethiopian', 'digital', 'id', 'card', 'national', 'date', 'birth',
+                'expiry', 'issue', 'sex', 'female', 'male', 'phone', 'address',
+                'woreda', 'fin'
+            }
+            for line in lines[:8]:
+                cleaned = re.sub(r'[^A-Za-z\s\-]', ' ', line).strip()
+                words = [w for w in cleaned.split() if len(w) > 1]
+                if 2 <= len(words) <= 5:
+                    lower_tokens = {token.lower() for token in words}
+                    if lower_tokens & banned_line_keywords:
+                        continue
+                    alpha_count = sum(1 for c in cleaned if c.isalpha())
+                    if alpha_count / max(len(cleaned), 1) > 0.75:
+                        fields['full_name'] = ' '.join(words)
+                        break
 
         # ── Ensure all None values are preserved (not converted to empty strings)
         return {k: (v.strip() if isinstance(v, str) else v) for k, v in fields.items()}
@@ -467,6 +595,20 @@ class TesseractOCR(OCREngine):
         if match:
             year, month, day = match.groups()
             return f'{int(day):02d}/{int(month):02d}/{year}'
+
+        # Try YYYY/Mon/DD or YYYY/Month/DD (e.g., 2003/May/10)
+        match = re.match(r'(\d{4})[-/](\w{3,9})[-/](\d{1,2})', date_str)
+        if match:
+            year, month_text, day = match.groups()
+            month_text = month_text.lower()[:3]
+            month_map = {
+                'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+                'may': 5, 'jun': 6, 'jul': 7, 'aug': 8,
+                'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+            }
+            month = month_map.get(month_text)
+            if month:
+                return f'{int(day):02d}/{month:02d}/{year}'
         
         # Try DD/MM/YYYY or DD-MM-YYYY (already normalized or needs slash conversion)
         match = re.match(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
@@ -619,6 +761,18 @@ def get_ocr_engine(engine_name: str = None) -> OCREngine:
     """
     if engine_name is None:
         engine_name = os.getenv('OCR_ENGINE', 'tesseract').lower()
+
+    if engine_name == 'google':
+        credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '').strip()
+        if not credentials_path:
+            logger.warning('OCR_ENGINE=google but GOOGLE_APPLICATION_CREDENTIALS is not set. Falling back to Tesseract.')
+            engine_name = 'tesseract'
+        elif not os.path.exists(credentials_path):
+            logger.warning(
+                'OCR_ENGINE=google but credentials file not found at %s. Falling back to Tesseract.',
+                credentials_path,
+            )
+            engine_name = 'tesseract'
 
     engines = {
         'tesseract': TesseractOCR,

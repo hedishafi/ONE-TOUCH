@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+import random
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ class User(AbstractUser):
     phone_number        = models.CharField(max_length=30, unique=True)
     role                = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    provider_uid        = models.CharField(max_length=6, unique=True, null=True, blank=True, db_index=True)
 
     # Free-trial support: providers get trial_ends_at set on signup
     is_on_trial    = models.BooleanField(default=False)
@@ -65,8 +67,34 @@ class User(AbstractUser):
             return False
         return timezone.now() < self.trial_ends_at
 
+    @classmethod
+    def generate_provider_uid(cls) -> str:
+        while True:
+            candidate = f'{random.randint(0, 999_999):06d}'
+            if not cls.objects.filter(provider_uid=candidate).exists():
+                return candidate
+
+    def save(self, *args, **kwargs):
+        if self.role == self.ROLE_PROVIDER and not self.provider_uid:
+            self.provider_uid = self.generate_provider_uid()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.username} ({self.role})'
+
+
+class DeletedProviderRecord(models.Model):
+    phone_number = models.CharField(max_length=30, unique=True, db_index=True)
+    provider_uid = models.CharField(max_length=6, blank=True)
+    deleted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-deleted_at']
+        verbose_name = 'Deleted Provider Record'
+        verbose_name_plural = 'Deleted Provider Records'
+
+    def __str__(self):
+        return f'{self.phone_number} (deleted provider)'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,6 +197,8 @@ class IdentityDocument(models.Model):
 # ─────────────────────────────────────────────────────────────────────────────
 class ProviderProfile(models.Model):
     user               = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
+    profile_completed  = models.BooleanField(default=False)
+    profile_picture    = models.ImageField(upload_to='provider/profile_pictures/', null=True, blank=True)
     bio                = models.TextField(blank=True)
     address            = models.CharField(max_length=255, blank=True, help_text='Service area description (e.g., "Addis Ababa")')
     
@@ -363,6 +393,52 @@ class FaceBiometricVerification(models.Model):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER MANUAL VERIFICATION (provider-only manual review by admin)
+# ─────────────────────────────────────────────────────────────────────────────
+class ProviderManualVerification(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    provider = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='manual_verifications',
+        help_text='Service provider who submitted this verification package.',
+    )
+    id_front_image = models.FileField(upload_to='provider_verification/id_front/')
+    id_back_image = models.FileField(upload_to='provider_verification/id_back/')
+    selfie_image = models.FileField(upload_to='provider_verification/selfie/')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    rejection_reason = models.TextField(blank=True)
+
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_manual_verifications',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+        verbose_name = 'Provider Manual Verification'
+        verbose_name_plural = 'Provider Manual Verifications'
+
+    def __str__(self):
+        return f'{self.provider.username} — Manual verification ({self.status})'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SERVICE CATEGORIES & SUB-SERVICES
 # ─────────────────────────────────────────────────────────────────────────────
 class ServiceCategory(models.Model):
@@ -444,7 +520,8 @@ class ProviderOnboardingSession(models.Model):
     status            = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_IN_PROGRESS)
 
     # ── Step 1: Document Upload ───────────────────────────────────────────────
-    document_file     = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
+    front_image       = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
+    back_image        = models.FileField(upload_to='onboarding_temp/', null=True, blank=True)
     document_type     = models.CharField(
         max_length=20,
         choices=IdentityDocument.DOC_CHOICES,

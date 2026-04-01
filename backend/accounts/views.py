@@ -1,12 +1,16 @@
 import random
+import os
+import tempfile
 from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -16,8 +20,10 @@ from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshV
 
 from .models import (
 	IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+	ProviderManualVerification, DeletedProviderRecord,
 )
+from .ocr_engine import get_ocr_engine
 from .permissions import IsProvider, IsClient
 from .serializers import (
 	AuthTokenSerializer,
@@ -30,6 +36,7 @@ from .serializers import (
 	OTPSentSerializer,
 	ProviderFullUserSerializer,
 	ProviderProfileSerializer,
+	ProviderProfileSetupSerializer,
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
@@ -42,6 +49,8 @@ from .serializers import (
 	OnboardingStep4Serializer,
 	OnboardingStep5Serializer,
 	ClientOnboardingProfileUpdateSerializer,
+	ProviderManualVerificationUploadSerializer,
+	ProviderManualVerificationStatusSerializer,
 )
 
 User = get_user_model()
@@ -219,6 +228,102 @@ def _otp_response(code: str) -> dict:
 	return payload
 
 
+def _first_error_text(errors) -> str:
+	if isinstance(errors, dict):
+		for value in errors.values():
+			return _first_error_text(value)
+	if isinstance(errors, list) and errors:
+		return _first_error_text(errors[0])
+	return str(errors)
+
+
+def _provider_resume_status(user):
+	try:
+		provider_profile = user.provider_profile
+		profile_completed = provider_profile.profile_completed
+	except ProviderProfile.DoesNotExist:
+		profile_completed = False
+
+	latest_verification = (
+		ProviderManualVerification.objects
+		.filter(provider=user)
+		.order_by('-submitted_at')
+		.first()
+	)
+
+	verification_status = latest_verification.status if latest_verification else 'not_submitted'
+
+	if not profile_completed:
+		return {
+			'next_step': 'profile_setup',
+			'next_route': '/provider/profile-setup',
+			'profile_completed': False,
+			'verification_status': verification_status,
+		}
+
+	if latest_verification is None or latest_verification.status == ProviderManualVerification.STATUS_REJECTED:
+		return {
+			'next_step': 'identity_upload',
+			'next_route': '/provider/onboarding/step1',
+			'profile_completed': True,
+			'verification_status': verification_status,
+		}
+
+	return {
+		'next_step': 'dashboard',
+		'next_route': '/provider/dashboard',
+		'profile_completed': True,
+		'verification_status': verification_status,
+	}
+
+class OCREngineDebugView(APIView):
+	"""Simple debug endpoint to report which OCR engine is active.
+
+	This is meant for development/testing so you can confirm whether
+	Google Vision or Tesseract is being used in the running container.
+	"""
+
+	permission_classes = [permissions.AllowAny]
+
+	@extend_schema(
+		methods=['GET'],
+		operation_id='ocr_engine_debug',
+		responses={
+			200: inline_serializer(
+				'OCREngineDebugResponse',
+				{
+					'engine_env': rest_framework_serializers.CharField(),
+					'credentials_env': rest_framework_serializers.CharField(allow_blank=True),
+					'resolved_engine_class': rest_framework_serializers.CharField(),
+					'credentials_file_exists': rest_framework_serializers.BooleanField(),
+				},
+			),
+		},
+		summary='Debug — show active OCR engine',
+		description=(
+			'Returns which OCR engine implementation is currently active in this '
+			'container (Tesseract vs Google Vision), along with the raw OCR-related '
+			'environment variables and whether the credentials file exists.'
+		),
+	)
+	def get(self, request):
+		engine_env = os.getenv('OCR_ENGINE') or ''
+		creds_env = os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or ''
+		engine = get_ocr_engine()
+		resolved_class = engine.__class__.__name__
+		credentials_file_exists = bool(creds_env and os.path.isfile(creds_env))
+
+		return Response(
+			{
+				'engine_env': engine_env,
+				'credentials_env': creds_env,
+				'resolved_engine_class': resolved_class,
+				'credentials_file_exists': credentials_file_exists,
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SIGNUP — Step 1  POST /api/v1/auth/signup/otp/
 # ─────────────────────────────────────────────────────────────────────────────
@@ -261,7 +366,15 @@ class SignupRequestOTPView(APIView):
 	)
 	def post(self, request):
 		serializer = SignupOTPRequestSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
+		if not serializer.is_valid():
+			detail = _first_error_text(serializer.errors)
+			payload = {
+				'detail': detail,
+				'errors': serializer.errors,
+			}
+			if 'already registered' in detail.lower():
+				payload['next_action'] = 'login'
+			return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 		vd = serializer.validated_data
 
 		# Persist pending signup data inside the OTP record isn't possible with the
@@ -326,35 +439,38 @@ class SignupVerifyView(APIView):
 		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
-		# We need the original signup payload (role, name) — the client must resend it
-		# on the verify call so the account can be created.  Add those fields here so
-		# Swagger/clients know what to send.
-		role       = request.data.get('role', User.ROLE_CLIENT)
+		requested_role = request.data.get('role')
 		first_name = request.data.get('first_name', '')
 		last_name  = request.data.get('last_name', '')
 		username   = request.data.get('username') or phone_number
 
-		if role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
-			return Response(
-				{'role': 'Must be "client" or "provider".'},
-				status=status.HTTP_400_BAD_REQUEST,
-			)
+		if requested_role and requested_role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
+			return Response({'role': 'Must be "client" or "provider".'}, status=status.HTTP_400_BAD_REQUEST)
 
 		try:
 			otp = _verify_otp(phone_number, PhoneOTP.PURPOSE_REGISTER, otp_code)
 		except ValueError as exc:
 			return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-		# Use values persisted on the OTP record (from OCR/extraction) as primary
-		# but allow the client to override if they provide values in the verify call.
-		role = request.data.get('role') or otp.role or User.ROLE_CLIENT
+		# IMPORTANT: role from OTP request is the source of truth for shared signup flow.
+		# This prevents provider OTPs from being verified as client (or vice versa).
+		if otp.role and requested_role and requested_role != otp.role:
+			return Response(
+				{'detail': 'Role mismatch. Please verify using the same role selected when requesting OTP.'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		role = otp.role or requested_role or User.ROLE_CLIENT
+		if role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
+			return Response({'detail': 'Invalid role for signup verification.'}, status=status.HTTP_400_BAD_REQUEST)
+
 		username = request.data.get('username') or otp.username or phone_number
 		first_name = request.data.get('first_name') or otp.first_name or ''
 		last_name = request.data.get('last_name') or otp.last_name or ''
 
 		if User.objects.filter(phone_number=phone_number).exists():
 			return Response(
-				{'detail': 'This phone number is already registered.'},
+				{'detail': 'This phone number is already registered. Please log in.'},
 				status=status.HTTP_400_BAD_REQUEST,
 			)
 
@@ -410,8 +526,21 @@ class LoginRequestOTPView(APIView):
 	)
 	def post(self, request):
 		serializer = LoginOTPRequestSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
+		if not serializer.is_valid():
+			return Response(
+				{
+					'detail': _first_error_text(serializer.errors),
+					'errors': serializer.errors,
+				},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
 		phone_number = serializer.validated_data['phone_number']
+
+		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
+			return Response(
+				{'detail': 'This provider account was removed by admin. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
 
 		code = _issue_otp(phone_number, PhoneOTP.PURPOSE_LOGIN)
 		return Response(_otp_response(code), status=status.HTTP_200_OK)
@@ -449,6 +578,12 @@ class LoginVerifyView(APIView):
 		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
+		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
+			return Response(
+				{'detail': 'This provider account was removed by admin. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		try:
 			_verify_otp(phone_number, PhoneOTP.PURPOSE_LOGIN, otp_code)
 		except ValueError as exc:
@@ -462,7 +597,35 @@ class LoginVerifyView(APIView):
 				status=status.HTTP_404_NOT_FOUND,
 			)
 
+		if not user.is_active:
+			return Response(
+				{'detail': 'This account is inactive. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		return Response(_build_token_response(user), status=status.HTTP_200_OK)
+
+
+class ProviderOnboardingStatusView(APIView):
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={
+			200: inline_serializer(
+				'ProviderOnboardingStatusResponse',
+				{
+					'next_step': rest_framework_serializers.CharField(),
+					'next_route': rest_framework_serializers.CharField(),
+					'profile_completed': rest_framework_serializers.BooleanField(),
+					'verification_status': rest_framework_serializers.CharField(),
+				},
+			)
+		},
+		summary='Get provider onboarding resume status',
+	)
+	def get(self, request):
+		return Response(_provider_resume_status(request.user), status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -510,12 +673,8 @@ class LogoutView(APIView):
 		)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PROFILE  GET / PATCH /api/v1/auth/profile/
-# ─────────────────────────────────────────────────────────────────────────────
-
-class ProfileView(APIView):
-	"""Read or update the currently authenticated user's profile."""
+class UserProfileView(APIView):
+	"""Return current authenticated user profile for status/role-aware frontend refreshes."""
 
 	permission_classes = [permissions.IsAuthenticated]
 
@@ -523,75 +682,10 @@ class ProfileView(APIView):
 		tags=['Auth'],
 		responses={200: UserProfileSerializer},
 		summary='Get my profile',
+		description='Returns the authenticated user profile including provider UID and verification status.',
 	)
 	def get(self, request):
-		return Response(UserProfileSerializer(request.user).data)
-
-	@extend_schema(
-		tags=['Auth'],
-		request=UserProfileSerializer,
-		responses={200: UserProfileSerializer},
-		summary='Update my profile',
-		description='Supports partial updates (PATCH). `role` and `verification_status` are read-only.',
-	)
-	def patch(self, request):
-		serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
-		serializer.is_valid(raise_exception=True)
-		serializer.save()
-		return Response(serializer.data)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PROVIDER PROFILE  GET / POST / PATCH /api/v1/provider/profile/
-# ─────────────────────────────────────────────────────────────────────────────
-
-class ProviderProfileView(APIView):
-	"""Create, retrieve, or partially update the authenticated provider's profile."""
-
-	permission_classes = [permissions.IsAuthenticated, IsProvider]
-
-	@extend_schema(
-		tags=['Provider'],
-		responses={200: ProviderProfileSerializer},
-		summary='Get my provider profile',
-	)
-	def get(self, request):
-		try:
-			profile = request.user.provider_profile
-		except ProviderProfile.DoesNotExist:
-			return Response({'detail': 'Profile not created yet.'}, status=status.HTTP_404_NOT_FOUND)
-		return Response(ProviderProfileSerializer(profile).data)
-
-	@extend_schema(
-		tags=['Provider'],
-		request=ProviderProfileSerializer,
-		responses={201: ProviderProfileSerializer},
-		summary='Create provider profile',
-		description='Creates the ProviderProfile for the authenticated provider. Only allowed once.',
-	)
-	def post(self, request):
-		if ProviderProfile.objects.filter(user=request.user).exists():
-			return Response({'detail': 'Profile already exists. Use PATCH to update.'}, status=status.HTTP_400_BAD_REQUEST)
-		serializer = ProviderProfileSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
-		serializer.save(user=request.user)
-		return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-	@extend_schema(
-		tags=['Provider'],
-		request=ProviderProfileSerializer,
-		responses={200: ProviderProfileSerializer},
-		summary='Update provider profile',
-	)
-	def patch(self, request):
-		try:
-			profile = request.user.provider_profile
-		except ProviderProfile.DoesNotExist:
-			return Response({'detail': 'Profile not found. POST to create one first.'}, status=status.HTTP_404_NOT_FOUND)
-		serializer = ProviderProfileSerializer(profile, data=request.data, partial=True)
-		serializer.is_valid(raise_exception=True)
-		serializer.save()
-		return Response(serializer.data)
+		return Response(UserProfileSerializer(request.user).data, status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -839,29 +933,98 @@ class FaceVerificationView(APIView):
 		)
 
 
+class ProviderManualVerificationUploadView(APIView):
+	"""Provider-only endpoint to upload ID front, ID back, and selfie for manual review."""
+
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request=OpenApiRequest(
+			request=ProviderManualVerificationUploadSerializer,
+			encoding={
+				'id_front_image': {'contentType': 'image/*'},
+				'id_back_image': {'contentType': 'image/*'},
+				'selfie_image': {'contentType': 'image/*'},
+			},
+		),
+		responses={
+			201: ProviderManualVerificationStatusSerializer,
+			400: OpenApiResponse(description='Validation error'),
+		},
+		summary='Upload provider verification package (manual review)',
+		description=(
+			'Uploads ID front, ID back, and selfie for service providers only. '
+			'Creates a manual verification record with pending status for admin review.'
+		),
+	)
+	def post(self, request):
+		serializer = ProviderManualVerificationUploadSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+
+		verification = serializer.save(
+			provider=request.user,
+			status=ProviderManualVerification.STATUS_PENDING,
+			rejection_reason='',
+			reviewed_by=None,
+			reviewed_at=None,
+		)
+
+		request.user.verification_status = User.STATUS_PENDING
+		request.user.save(update_fields=['verification_status'])
+
+		return Response(
+			ProviderManualVerificationStatusSerializer(verification).data,
+			status=status.HTTP_201_CREATED,
+		)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PROVIDER ONBOARDING  (5-step signup flow)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ProviderOnboardingStep1View(APIView):
-	"""Step 1: Upload identity document and extract via OCR."""
+	"""Step 1: Upload identity document images and extract via OCR."""
 	permission_classes = [permissions.AllowAny]
 	parser_classes = [MultiPartParser, FormParser]
 	
 	@extend_schema(
-		request=OnboardingStep1Serializer,
+		request=OpenApiRequest(
+			request=OnboardingStep1Serializer,
+			encoding={
+				'front_image': {'contentType': 'image/*'},
+				'back_image': {'contentType': 'image/*'},
+			},
+		),
 		responses={201: inline_serializer('Step1Response', {
 			'session_id': rest_framework_serializers.CharField(),
 			'step': rest_framework_serializers.IntegerField(),
-			'extracted_data': rest_framework_serializers.JSONField(),
+			'extracted_data': inline_serializer('Step1ExtractedData', {
+				'full_name': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'id_number': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'date_of_birth': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'gender': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'nationality': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'region_sub_city': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'woreda': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'issue_date': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'expiry_date': rest_framework_serializers.CharField(allow_null=True, required=False),
+				'phone_number': rest_framework_serializers.CharField(allow_null=True, required=False),
+			}),
 			'image_quality': rest_framework_serializers.FloatField(),
 			'quality_warnings': rest_framework_serializers.ListField(),
 			'ocr_confidence': rest_framework_serializers.FloatField(),
 		})}
 	)
 	def post(self, request):
-		"""Upload document and perform OCR extraction."""
-		serializer = OnboardingStep1Serializer(data=request.data)
+		"""Upload front/back document images and perform OCR extraction."""
+		payload = {
+			'document_type': request.data.get('document_type'),
+			'front_image': request.FILES.get('front_image'),
+			'back_image': request.FILES.get('back_image'),
+		}
+		serializer = OnboardingStep1Serializer(data=payload)
 		serializer.is_valid(raise_exception=True)
 		
 		import uuid
@@ -869,39 +1032,119 @@ class ProviderOnboardingStep1View(APIView):
 		
 		# Create onboarding session
 		session_id = str(uuid.uuid4())
-		doc_file = serializer.validated_data['document_file']
+		front_image = serializer.validated_data['front_image']
+		back_image = serializer.validated_data['back_image']
 		doc_type = serializer.validated_data['document_type']
 		
 		session = ProviderOnboardingSession.objects.create(
 			session_id=session_id,
 			step=1,
-			document_file=doc_file,
+			front_image=front_image,
+			back_image=back_image,
 			document_type=doc_type,
 			expires_at=timezone.now() + timedelta(hours=12)
 		)
 		
-		# Perform OCR extraction
+		# Perform OCR extraction (front from persisted file path)
 		ocr_engine = get_ocr_engine()
-		ocr_result = ocr_engine.extract_text(doc_file.path, language='auto')
+		ocr_result_front = ocr_engine.extract_text(session.front_image.path, language='auto')
+
+		# OCR extraction (back from temporary file path)
+		back_tmp_path = None
+		try:
+			with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as back_tmp:
+				for chunk in back_image.chunks():
+					back_tmp.write(chunk)
+				back_tmp_path = back_tmp.name
+			ocr_result_back = ocr_engine.extract_text(back_tmp_path, language='auto')
+		finally:
+			if back_tmp_path and os.path.exists(back_tmp_path):
+				os.remove(back_tmp_path)
 		
 		# Check document validation
-		validation = ocr_result.get('validation', {})
-		if validation.get('flagged'):
-			# Document is invalid - return detailed error
-			error_details = {
-				'error': 'Document validation failed',
-				'is_expired': validation.get('is_expired', False),
-				'is_non_ethiopian': validation.get('is_non_ethiopian', False),
-				'validation_errors': validation.get('errors', []),
-				'validation_warnings': validation.get('warnings', []),
-			}
-			return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+		validation_front = ocr_result_front.get('validation', {})
+		validation_back = ocr_result_back.get('validation', {}) if ocr_result_back else {}
+		if validation_front.get('flagged') or validation_back.get('flagged'):
+			is_expired = validation_front.get('is_expired', False) or validation_back.get('is_expired', False)
+			is_non_ethiopian = validation_front.get('is_non_ethiopian', False) or validation_back.get('is_non_ethiopian', False)
+			validation_errors = list(dict.fromkeys(
+				(validation_front.get('errors', []) + validation_back.get('errors', []))
+			))
+			validation_warnings = list(dict.fromkeys(
+				(validation_front.get('warnings', []) + validation_back.get('warnings', []))
+			))
+			non_critical_errors = [
+				error for error in validation_errors
+				if not error.lower().startswith('missing critical fields')
+			]
+			has_hard_failure = is_expired or is_non_ethiopian or len(non_critical_errors) > 0
+
+			if is_non_ethiopian:
+				user_message = 'Please upload a valid Ethiopian government-issued ID (front and back).'
+			elif is_expired:
+				user_message = 'Your ID appears expired. Please upload a valid, non-expired ID.'
+			elif non_critical_errors:
+				user_message = 'We could not validate this document. Please upload a clearer image of your ID (front and back).'
+			else:
+				user_message = 'Some details were not auto-detected. You can continue and review/edit extracted data in the next step.'
+
+			if has_hard_failure:
+				# Document is invalid - return detailed error
+				error_details = {
+					'error': 'Document validation failed',
+					'user_message': user_message,
+					'is_expired': is_expired,
+					'is_non_ethiopian': is_non_ethiopian,
+					'validation_errors': validation_errors,
+					'validation_warnings': validation_warnings,
+				}
+				return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+
+			# Non-blocking case: keep missing-field feedback as warnings and continue.
+			ocr_result_front['quality_warnings'] = list(dict.fromkeys(
+				(ocr_result_front.get('quality_warnings', []) or []) + validation_errors + validation_warnings
+			))
 		
-		# Store extracted data
-		session.extracted_data = ocr_result['extracted_fields']
-		session.ocr_confidence = ocr_result.get('confidence', 0.0)
-		session.image_quality = ocr_result.get('image_quality', 0.0)
-		session.quality_warnings = ocr_result.get('quality_warnings', [])
+		# Merge extracted fields (prefer front, fill missing from back)
+		front_fields = ocr_result_front.get('extracted_fields', {}) or {}
+		back_fields = ocr_result_back.get('extracted_fields', {}) or {}
+		merged_fields = front_fields.copy()
+		for key, value in back_fields.items():
+			if merged_fields.get(key) in (None, '') and value not in (None, ''):
+				merged_fields[key] = value
+
+		def normalize_value(value):
+			if value in ('', 'N/A', 'UNKNOWN', 'unknown'):
+				return None
+			return value
+
+		# Store extracted data in the required structured format
+		normalized_data = {
+			'full_name': normalize_value(merged_fields.get('full_name') or merged_fields.get('name')),
+			'id_number': normalize_value(merged_fields.get('id_number') or merged_fields.get('document_number')),
+			'date_of_birth': normalize_value(merged_fields.get('date_of_birth') or merged_fields.get('dob')),
+			'gender': normalize_value(merged_fields.get('gender') or merged_fields.get('sex')),
+			'nationality': normalize_value(merged_fields.get('nationality')),
+			'region_sub_city': normalize_value(merged_fields.get('region_sub_city') or merged_fields.get('region')),
+			'woreda': normalize_value(merged_fields.get('woreda') or merged_fields.get('wereda') or merged_fields.get('district')),
+			'issue_date': normalize_value(merged_fields.get('issue_date')),
+			'expiry_date': normalize_value(merged_fields.get('expiry_date')),
+			'phone_number': normalize_value(merged_fields.get('phone_number') or merged_fields.get('phone')),
+		}
+
+		session.extracted_data = normalized_data
+		session.ocr_confidence = max(
+			ocr_result_front.get('confidence', 0.0),
+			ocr_result_back.get('confidence', 0.0) if ocr_result_back else 0.0,
+		)
+		session.image_quality = max(
+			ocr_result_front.get('image_quality', 0.0),
+			ocr_result_back.get('image_quality', 0.0) if ocr_result_back else 0.0,
+		)
+		session.quality_warnings = list(set(
+			(ocr_result_front.get('quality_warnings', []) or []) +
+			(ocr_result_back.get('quality_warnings', []) or [])
+		))
 		session.save()
 		
 		return Response({
@@ -1086,7 +1329,7 @@ class ProviderOnboardingStep3OTPVerifyView(APIView):
 			IdentityDocument.objects.create(
 				user=user,
 				doc_type=session.document_type,
-				document_url=session.document_file,
+				document_url=session.front_image,
 				ocr_confidence=session.ocr_confidence,
 				ocr_extracted=session.extracted_data,
 				extracted_name=confirmed.get('name'),
@@ -1163,7 +1406,7 @@ class ProviderOnboardingStep4View(APIView):
 		
 		# Compare faces
 		face_match_result = face_engine.compare_faces(
-			id_photo_path=session.document_file.path,
+			id_photo_path=session.front_image.path,
 			selfie_image_path=session.selfie_file.path
 		)
 		session.face_match_score = face_match_result.get('face_match_score', 0.0)
@@ -1245,7 +1488,7 @@ class ProviderOnboardingStep5View(APIView):
 		identity_doc = IdentityDocument.objects.create(
 			user=user,
 			doc_type=session.document_type,
-			document_url=session.document_file,
+			document_url=session.front_image,
 			biometric_selfie=session.selfie_file,
 			status='approved',
 			auto_verified=True,
@@ -1329,6 +1572,126 @@ class SubServiceListView(APIView):
 		return Response(serializer.data)
 
 
+class ProviderProfileSetupView(APIView):
+	"""Create/update authenticated provider profile and offered services."""
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+	parser_classes = [MultiPartParser, FormParser]
+
+	@extend_schema(
+		tags=['Provider'],
+		request=ProviderProfileSetupSerializer,
+		responses={
+			200: inline_serializer(
+				'ProviderProfileSetupResponse',
+				{
+					'user_id': rest_framework_serializers.IntegerField(),
+					'phone_number': rest_framework_serializers.CharField(),
+					'full_name': rest_framework_serializers.CharField(),
+					'service_category': rest_framework_serializers.CharField(),
+					'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
+					'price_min': rest_framework_serializers.IntegerField(),
+					'price_max': rest_framework_serializers.IntegerField(),
+					'bio': rest_framework_serializers.CharField(allow_blank=True),
+					'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
+					'profile_completed': rest_framework_serializers.BooleanField(),
+					'message': rest_framework_serializers.CharField(),
+				},
+			),
+			400: OpenApiResponse(description='Validation error.'),
+			401: OpenApiResponse(description='Authentication required.'),
+			403: OpenApiResponse(description='Only service providers can perform this action.'),
+		},
+		summary='Provider profile setup',
+		description='Create or update the authenticated service provider profile before identity upload.',
+	)
+
+	@transaction.atomic
+	def post(self, request):
+		serializer = ProviderProfileSetupSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		vd = serializer.validated_data
+
+		def _ensure_unique_slug(model_cls, base_name: str) -> str:
+			base_slug = slugify(base_name) or 'item'
+			slug = base_slug
+			counter = 1
+			while model_cls.objects.filter(slug=slug).exists():
+				slug = f'{base_slug}-{counter}'
+				counter += 1
+			return slug
+
+		full_name = vd['full_name']
+		category_name = vd['service_category']
+		sub_service_names = vd['sub_services']
+
+		# Keep user name in sync with provider profile setup.
+		name_parts = full_name.split()
+		request.user.first_name = name_parts[0] if name_parts else ''
+		request.user.last_name = ' '.join(name_parts[1:]) if len(name_parts) > 1 else ''
+		request.user.save(update_fields=['first_name', 'last_name'])
+
+		provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
+		provider_profile.bio = vd.get('bio', '')
+		provider_profile.price_min = vd['price_min']
+		provider_profile.price_max = vd['price_max']
+		if vd.get('profile_picture') is not None:
+			provider_profile.profile_picture = vd['profile_picture']
+		provider_profile.profile_completed = True
+		provider_profile.save()
+
+		service_category = ServiceCategory.objects.filter(name__iexact=category_name).first()
+		if not service_category:
+			service_category = ServiceCategory.objects.create(
+				name=category_name,
+				slug=_ensure_unique_slug(ServiceCategory, category_name),
+				is_active=True,
+			)
+
+		sub_service_objects = []
+		for sub_name in sub_service_names:
+			sub_service = SubService.objects.filter(
+				category=service_category,
+				name__iexact=sub_name,
+			).first()
+			if not sub_service:
+				sub_service = SubService.objects.create(
+					category=service_category,
+					name=sub_name,
+					slug=_ensure_unique_slug(SubService, sub_name),
+					is_active=True,
+				)
+			sub_service_objects.append(sub_service)
+
+		provider_service, _ = ProviderService.objects.get_or_create(provider=provider_profile)
+		provider_service.primary_service = service_category
+		provider_service.save()
+		provider_service.subservices.set(sub_service_objects)
+
+		profile_picture_url = ''
+		if provider_profile.profile_picture:
+			try:
+				profile_picture_url = request.build_absolute_uri(provider_profile.profile_picture.url)
+			except Exception:
+				profile_picture_url = provider_profile.profile_picture.url
+
+		return Response(
+			{
+				'user_id': request.user.id,
+				'phone_number': request.user.phone_number,
+				'full_name': full_name,
+				'service_category': service_category.name,
+				'sub_services': [item.name for item in sub_service_objects],
+				'price_min': vd['price_min'],
+				'price_max': vd['price_max'],
+				'bio': provider_profile.bio,
+				'profile_picture': profile_picture_url,
+				'profile_completed': provider_profile.profile_completed,
+				'message': 'Profile setup completed successfully. Proceed to identity upload.',
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CLIENT ONBOARDING — Unified with Provider (but simpler: no face verification)
 #
@@ -1386,15 +1749,41 @@ class ClientOnboardingStep1View(APIView):
 			# Check document validation
 			validation = ocr_result.get('validation', {})
 			if validation.get('flagged'):
-				# Document is invalid - return detailed error
-				error_details = {
-					'error': 'Document validation failed',
-					'is_expired': validation.get('is_expired', False),
-					'is_non_ethiopian': validation.get('is_non_ethiopian', False),
-					'validation_errors': validation.get('errors', []),
-					'validation_warnings': validation.get('warnings', []),
-				}
-				return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+				is_expired = validation.get('is_expired', False)
+				is_non_ethiopian = validation.get('is_non_ethiopian', False)
+				validation_errors = list(dict.fromkeys(validation.get('errors', [])))
+				validation_warnings = list(dict.fromkeys(validation.get('warnings', [])))
+				non_critical_errors = [
+					error for error in validation_errors
+					if not error.lower().startswith('missing critical fields')
+				]
+				has_hard_failure = is_expired or is_non_ethiopian or len(non_critical_errors) > 0
+
+				if is_non_ethiopian:
+					user_message = 'Please upload a valid Ethiopian government-issued ID.'
+				elif is_expired:
+					user_message = 'Your ID appears expired. Please upload a valid, non-expired ID.'
+				elif non_critical_errors:
+					user_message = 'We could not validate this document. Please upload a clearer image of your ID.'
+				else:
+					user_message = 'Some details were not auto-detected. You can continue and review/edit extracted data in the next step.'
+
+				if has_hard_failure:
+					# Document is invalid - return detailed error
+					error_details = {
+						'error': 'Document validation failed',
+						'user_message': user_message,
+						'is_expired': is_expired,
+						'is_non_ethiopian': is_non_ethiopian,
+						'validation_errors': validation_errors,
+						'validation_warnings': validation_warnings,
+					}
+					return Response(error_details, status=status.HTTP_400_BAD_REQUEST)
+
+				# Non-blocking case: keep missing-field feedback as warnings and continue.
+				ocr_result['quality_warnings'] = list(dict.fromkeys(
+					(ocr_result.get('quality_warnings', []) or []) + validation_errors + validation_warnings
+				))
 			
 			# Store OCR results
 			session.extracted_data = ocr_result.get('extracted_fields', {})

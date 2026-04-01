@@ -4,10 +4,14 @@ services:
     command: gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 2 --reload
     volumes:
       - .:/home/appuser/code        # live-reload: local changes reflect instantly
+      - ./.secrets:/home/appuser/code/.secrets:ro
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      OCR_ENGINE: ${OCR_ENGINE:-tesseract}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/home/appuser/code/.secrets/google-vision.json}
     depends_on:
       db:
         condition: service_healthy
@@ -40,8 +44,12 @@ services:
     command: celery -A core worker --loglevel=info --concurrency=2
     volumes:
       - .:/home/appuser/code
+      - ./.secrets:/home/appuser/code/.secrets:ro
     env_file:
       - .env
+    environment:
+      OCR_ENGINE: ${OCR_ENGINE:-tesseract}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-/home/appuser/code/.secrets/google-vision.json}
     depends_on:
       - db
       - redis

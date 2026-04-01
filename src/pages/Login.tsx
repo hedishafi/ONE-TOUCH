@@ -103,7 +103,13 @@ export default function Login() {
       });
     } catch (error: any) {
       setPhoneLoading(false);
-      setPhoneError(error?.message || 'Failed to request OTP. Please try again.');
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.errors?.phone_number?.[0] ||
+        error?.response?.data?.phone_number?.[0] ||
+        error?.message ||
+        'Failed to request OTP. Please try again.';
+      setPhoneError(message);
     }
   };
 
@@ -125,10 +131,20 @@ export default function Login() {
         otp_code: code,
       });
 
+      const normalizedUser = {
+        id: String(response.user.id),
+        email: response.user.email ?? '',
+        phone: response.user.phone_number,
+        role: response.user.role,
+        createdAt: new Date().toISOString(),
+        verificationStatus: (response.user.verification_status as 'pending' | 'verified' | 'rejected' | 're-verification-requested') ?? 'pending',
+        providerUid: response.user.provider_uid,
+      };
+
       // Update authStore with user data
-      storage.set(STORAGE_KEYS.currentUser, response.user);
+      storage.set(STORAGE_KEYS.currentUser, normalizedUser);
       useAuthStore.setState({
-        currentUser: response.user,
+        currentUser: normalizedUser,
         isAuthenticated: true,
       });
 
@@ -136,6 +152,16 @@ export default function Login() {
       handleSuccess();
     } catch (error: any) {
       setOtpVerifying(false);
+      const apiMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.otp_code?.[0] ||
+        '';
+
+      if (apiMessage) {
+        setOtpError(apiMessage);
+        return;
+      }
+
       const remaining = 5 - otpAttempts - 1;
       setOtpAttempts(prev => prev + 1);
       
@@ -172,22 +198,40 @@ export default function Login() {
         autoClose: 5000,
       });
     } catch (error: any) {
-      setOtpError(error?.message || 'Failed to resend code. Please try again.');
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.errors?.phone_number?.[0] ||
+        error?.message ||
+        'Failed to resend code. Please try again.';
+      setOtpError(message);
     }
   };
 
   // ─── Handle successful login ──────────────────────────────────────────────
-  const handleSuccess = () => {
+  const handleSuccess = async () => {
     const { currentUser } = useAuthStore.getState();
     notifications.show({
       title: 'Welcome back!',
       message: 'Signed in successfully.',
       color: 'teal',
     });
-    
-    if (currentUser?.role === 'client') navigate(ROUTES.clientDashboard, { replace: true });
-    else if (currentUser?.role === 'provider') navigate(ROUTES.providerDashboard, { replace: true });
-    else navigate(ROUTES.adminDashboard, { replace: true });
+
+    if (currentUser?.role === 'client') {
+      navigate(ROUTES.clientDashboard, { replace: true });
+      return;
+    }
+
+    if (currentUser?.role === 'provider') {
+      try {
+        const status = await authService.getProviderOnboardingStatus();
+        navigate(status.next_route, { replace: true });
+      } catch {
+        navigate(ROUTES.providerDashboard, { replace: true });
+      }
+      return;
+    }
+
+    navigate(ROUTES.adminDashboard, { replace: true });
   };
 
   // ─── Layout components ───────────────────────────────────────────────────

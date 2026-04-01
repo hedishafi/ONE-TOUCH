@@ -1,54 +1,232 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Container,
-  Paper,
-  Title,
-  Text,
-  Button,
-  Group,
-  Stack,
-  Radio,
   Alert,
+  Button,
   Center,
+  Container,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  Title,
 } from '@mantine/core';
-import {
-  IconAlertCircle,
-  IconCloudUpload,
-} from '@tabler/icons-react';
+import { IconAlertCircle, IconCamera, IconRefresh } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import * as providerService from '../../services/providerOnboardingService';
+import * as authService from '../../services/authService';
+import { useAuthStore } from '../../store/authStore';
+import type { User } from '../../types';
+import { ROUTES } from '../../utils/constants';
+import { STORAGE_KEYS, storage } from '../../utils/storage';
+
+type CaptureTarget = 'id_front_image' | 'id_back_image' | 'selfie_image';
+
+const TARGET_LABELS: Record<CaptureTarget, string> = {
+  id_front_image: 'ID Front',
+  id_back_image: 'ID Back',
+  selfie_image: 'Selfie',
+};
 
 export const ProviderOnboardingStep1: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [docType, setDocType] = useState<'national_id' | 'drivers_license' | 'kebele_id'>('national_id');
-  const [file, setFile] = useState<File | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [activeTarget, setActiveTarget] = useState<CaptureTarget>('id_front_image');
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [selfieImage, setSelfieImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      // Validate file size (max 5MB)
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
-        return;
-      }
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-      // Validate file type
-      if (!selectedFile.type.startsWith('image/')) {
-        setError('Please upload an image file (JPG, PNG, etc.)');
-        return;
-      }
+  const previewFront = useMemo(() => (frontImage ? URL.createObjectURL(frontImage) : null), [frontImage]);
+  const previewBack = useMemo(() => (backImage ? URL.createObjectURL(backImage) : null), [backImage]);
+  const previewSelfie = useMemo(() => (selfieImage ? URL.createObjectURL(selfieImage) : null), [selfieImage]);
 
-      setFile(selectedFile);
-      setError(null);
+  useEffect(() => {
+    return () => {
+      if (previewFront) URL.revokeObjectURL(previewFront);
+      if (previewBack) URL.revokeObjectURL(previewBack);
+      if (previewSelfie) URL.revokeObjectURL(previewSelfie);
+    };
+  }, [previewFront, previewBack, previewSelfie]);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) {
-      setError('Please select a file to upload');
+  const startCamera = async (target: CaptureTarget) => {
+    try {
+      setCameraLoading(true);
+      setError(null);
+      setCameraReady(false);
+      stopCamera();
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Camera is not supported in this browser. Please use a modern browser like Chrome or Safari.');
+        return;
+      }
+
+      const prefersSelfie = target === 'selfie_image';
+      const constraintAttempts: MediaStreamConstraints[] = [
+        {
+          video: {
+            facingMode: { exact: prefersSelfie ? 'user' : 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+        {
+          video: {
+            facingMode: prefersSelfie ? 'user' : 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+        {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        },
+      ];
+
+      let stream: MediaStream | null = null;
+      let lastError: unknown = null;
+
+      for (const constraints of constraintAttempts) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!stream) {
+        throw lastError ?? new Error('Unable to access camera stream.');
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setCameraReady(true);
+      }
+    } catch (err: any) {
+      const reason = err?.name ? ` (${err.name})` : '';
+      setError(`Unable to access camera${reason}. Please allow camera permission and try again.`);
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    startCamera(activeTarget);
+    return () => {
+      stopCamera();
+    };
+  }, [activeTarget]);
+
+  const validateCapturedFile = (selectedFile: File): boolean => {
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError('Captured image size must be less than 10MB. Please capture again.');
+      return false;
+    }
+    return true;
+  };
+
+  const captureCurrentFrame = async () => {
+    if (!videoRef.current || !canvasRef.current) {
+      setError('Camera is not ready yet.');
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (!video.videoWidth || !video.videoHeight) {
+      setError('Camera stream is not ready yet.');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setError('Unable to capture image. Please try again.');
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((result) => resolve(result), 'image/jpeg', 0.92);
+    });
+
+    if (!blob) {
+      setError('Capture failed. Please retake the photo.');
+      return;
+    }
+
+    const file = new File([blob], `${activeTarget}-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    if (!validateCapturedFile(file)) return;
+
+    if (activeTarget === 'id_front_image') setFrontImage(file);
+    if (activeTarget === 'id_back_image') setBackImage(file);
+    if (activeTarget === 'selfie_image') setSelfieImage(file);
+    setError(null);
+
+    if (activeTarget === 'id_front_image') setActiveTarget('id_back_image');
+    if (activeTarget === 'id_back_image') setActiveTarget('selfie_image');
+  };
+
+  const syncProviderSession = () => {
+    const stored = authService.getStoredUser();
+    if (!stored || stored.role !== 'provider') return;
+
+    const verificationStatus: User['verificationStatus'] =
+      stored.verification_status === 'verified'
+        ? 'verified'
+        : stored.verification_status === 'rejected'
+          ? 'rejected'
+          : stored.verification_status === 're-verification-requested'
+            ? 're-verification-requested'
+            : 'pending';
+
+    const user: User = {
+      id: String(stored.id),
+      email: stored.email || `${stored.phone_number}@onetouch.local`,
+      phone: stored.phone_number,
+      role: 'provider',
+      createdAt: new Date().toISOString(),
+      verificationStatus,
+      providerUid: stored.provider_uid,
+    };
+
+    storage.set(STORAGE_KEYS.currentUser, user);
+    useAuthStore.setState({
+      currentUser: user,
+      isAuthenticated: true,
+      clientProfile: null,
+      providerProfile: null,
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (!frontImage || !backImage || !selfieImage) {
+      setError('Please capture ID front, ID back, and selfie images.');
       return;
     }
 
@@ -56,69 +234,33 @@ export const ProviderOnboardingStep1: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await providerService.uploadDocument({
-        doc_type: docType,
-        document_file: file,
+      await providerService.uploadProviderManualVerification({
+        id_front_image: frontImage,
+        id_back_image: backImage,
+        selfie_image: selfieImage,
       });
 
       notifications.show({
-        title: 'Document Uploaded',
-        message: 'Your document has been uploaded successfully and OCR validation passed',
+        title: 'Verification Submitted',
+        message: 'Your account is under review.',
         color: 'green',
       });
 
-      // Extract phone from OCR results
-      const extractedPhone = response.extracted_data?.phone;
-      
-      // Move to phone choice screen
-      navigate('/provider/onboarding/phone-choice', {
-        state: {
-          sessionId: response.session_id,
-          extractedPhone: extractedPhone,
-          extractedData: response.extracted_data,
-        },
-      });
+      syncProviderSession();
+      navigate(ROUTES.providerDashboard);
     } catch (err: any) {
-      const errorData = err.response?.data;
-      let errorMessage = '';
-      let errorList: string[] = [];
-
-      // Handle validation errors from OCR
-      if (errorData?.error === 'Document validation failed') {
-        errorMessage = '❌ Document Validation Failed';
-        
-        // Build detailed error list
-        if (errorData.is_expired) {
-          errorList.push('Document has expired');
-        }
-        if (errorData.is_non_ethiopian) {
-          errorList.push('Document must be an Ethiopian government-issued ID');
-        }
-        if (errorData.validation_errors?.length > 0) {
-          errorList.push(...errorData.validation_errors);
-        }
-        if (errorData.validation_warnings?.length > 0) {
-          errorList.push(...errorData.validation_warnings);
-        }
-      } else {
-        // Generic error handling
-        errorMessage =
-          err.response?.data?.detail ||
-          err.response?.data?.document_file?.[0] ||
-          err.response?.data?.error ||
-          'Failed to upload document';
-      }
-
-      const fullMessage = errorList.length > 0 
-        ? `${errorMessage}\n\n${errorList.map(e => `• ${e}`).join('\n')}`
-        : errorMessage;
-      
-      setError(fullMessage);
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.id_front_image?.[0] ||
+        err?.response?.data?.id_back_image?.[0] ||
+        err?.response?.data?.selfie_image?.[0] ||
+        err?.response?.data?.error ||
+        'Failed to submit verification images.';
+      setError(message);
       notifications.show({
-        title: 'Upload Failed - Validation Error',
-        message: errorMessage,
+        title: 'Submission Failed',
+        message,
         color: 'red',
-        autoClose: false,
       });
     } finally {
       setLoading(false);
@@ -127,134 +269,96 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
   return (
     <Container size="md" py="xl">
-      <div style={{ marginBottom: '40px' }}>
-        <h2>Step 1 of 5: Upload Your Identity Document</h2>
-        <p>Please upload a clear photo of your government-issued ID.</p>
-      </div>
-
       <Paper p="xl" radius="md" withBorder>
-        <Title order={2} mb="md">
-          Upload Your Identity Document
-        </Title>
-        <Text color="dimmed" mb="xl">
-          Please upload a clear photo of your government-issued ID.
-          We support National ID, Driver's License, and Kebele ID.
-        </Text>
-
-        {error && (
-          <Alert icon={<IconAlertCircle size={16} />} color="red" mb="xl" title="Validation Failed">
-            <div style={{ whiteSpace: 'pre-wrap' }}>
-              {error}
-            </div>
-          </Alert>
-        )}
-
         <Stack gap="lg">
-          {/* Document Type Selection */}
-          <div>
-            <Text fw={500} mb="md">
-              Document Type
-            </Text>
-            <Radio.Group value={docType} onChange={(value: any) => setDocType(value)}>
-              <Stack gap="sm">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="radio"
-                    name="docType"
-                    value="national_id"
-                    checked={docType === 'national_id'}
-                    onChange={(e) => setDocType(e.target.value as any)}
-                    id="national_id"
-                  />
-                  <label htmlFor="national_id" style={{ cursor: 'pointer' }}>
-                    <Text>National ID - Ethiopian National ID Card</Text>
-                  </label>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="radio"
-                    name="docType"
-                    value="drivers_license"
-                    checked={docType === 'drivers_license'}
-                    onChange={(e) => setDocType(e.target.value as any)}
-                    id="drivers_license"
-                  />
-                  <label htmlFor="drivers_license" style={{ cursor: 'pointer' }}>
-                    <Text>Driver's License - Driving License</Text>
-                  </label>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="radio"
-                    name="docType"
-                    value="kebele_id"
-                    checked={docType === 'kebele_id'}
-                    onChange={(e) => setDocType(e.target.value as any)}
-                    id="kebele_id"
-                  />
-                  <label htmlFor="kebele_id" style={{ cursor: 'pointer' }}>
-                    <Text>Kebele ID - Kebele Identification Certificate</Text>
-                  </label>
-                </div>
-              </Stack>
-            </Radio.Group>
-          </div>
+          <Title order={2}>Identity Capture</Title>
+          <Text c="dimmed">Capture ID front, ID back, and selfie using live camera only.</Text>
 
-          {/* File Upload */}
-          <div>
-            <Text fw={500} mb="md">
-              Upload Document Photo
-            </Text>
-            <div
-              style={{
-                border: '2px dashed #ccc',
-                borderRadius: '8px',
-                padding: '40px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                backgroundColor: '#f9f9f9',
-              }}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-                id="file-input"
-                disabled={loading}
+          {error && (
+            <Alert icon={<IconAlertCircle size={16} />} color="red">
+              {error}
+            </Alert>
+          )}
+
+          <Group>
+            {(Object.keys(TARGET_LABELS) as CaptureTarget[]).map((target) => (
+              <Button
+                key={target}
+                variant={activeTarget === target ? 'filled' : 'default'}
+                onClick={() => setActiveTarget(target)}
+                disabled={loading || cameraLoading}
+              >
+                {TARGET_LABELS[target]}
+              </Button>
+            ))}
+          </Group>
+
+          <Paper withBorder p="md" radius="md">
+            <Stack gap="sm">
+              <Text fw={600}>Live Camera — {TARGET_LABELS[activeTarget]}</Text>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', minHeight: 280, background: '#000', borderRadius: 8 }}
               />
-              <label htmlFor="file-input" style={{ cursor: 'pointer' }}>
-                <Center mb="md">
-                  <IconCloudUpload size={48} color="#0066cc" />
-                </Center>
-                <Text fw={500}>Click to upload or drag and drop</Text>
-                <Text color="dimmed" size="sm">
-                  PNG, JPG up to 5MB
-                </Text>
-                {file && (
-                  <Text color="green" size="sm" mt="md" fw={500}>
-                    ✓ {file.name}
-                  </Text>
-                )}
-              </label>
-            </div>
-          </div>
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <Group>
+                <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
+                  Capture
+                </Button>
+                <Button
+                  variant="default"
+                  leftSection={<IconRefresh size={16} />}
+                  onClick={() => startCamera(activeTarget)}
+                  disabled={loading || cameraLoading}
+                >
+                  Restart Camera
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
 
-          {/* Upload Button */}
-          <Group justify="flex-end" mt="xl">
-            <Button
-              variant="default"
-              onClick={() => navigate('/signup')}
-              disabled={loading}
-            >
+          <Group grow align="flex-start">
+            {[
+              { key: 'id_front_image' as CaptureTarget, label: TARGET_LABELS.id_front_image, src: previewFront, captured: !!frontImage },
+              { key: 'id_back_image' as CaptureTarget, label: TARGET_LABELS.id_back_image, src: previewBack, captured: !!backImage },
+              { key: 'selfie_image' as CaptureTarget, label: TARGET_LABELS.selfie_image, src: previewSelfie, captured: !!selfieImage },
+            ].map((item) => (
+              <Paper key={item.key} withBorder p="sm" radius="md">
+                <Stack gap="xs">
+                  <Text fw={600} size="sm">{item.label}</Text>
+                  {item.src ? (
+                    <img src={item.src} alt={item.label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                  ) : (
+                    <Center style={{ height: 120, borderRadius: 8, border: '1px dashed #ccc' }}>
+                      <Text size="xs" c="dimmed">Not captured</Text>
+                    </Center>
+                  )}
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={() => {
+                      setActiveTarget(item.key);
+                      if (item.key === 'id_front_image') setFrontImage(null);
+                      if (item.key === 'id_back_image') setBackImage(null);
+                      if (item.key === 'selfie_image') setSelfieImage(null);
+                    }}
+                  >
+                    {item.captured ? 'Retake' : 'Capture'}
+                  </Button>
+                </Stack>
+              </Paper>
+            ))}
+          </Group>
+
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => navigate('/provider/profile-setup')} disabled={loading}>
               Back
             </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={!file || loading}
-              loading={loading}
-            >
-              {loading ? 'Uploading...' : 'Upload & Continue'}
+            <Button onClick={handleSubmit} loading={loading} disabled={!frontImage || !backImage || !selfieImage || cameraLoading}>
+              Continue
             </Button>
           </Group>
         </Stack>

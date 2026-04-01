@@ -5,7 +5,8 @@ from rest_framework import serializers
 
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession
+    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+    ProviderManualVerification, DeletedProviderRecord,
 )
 
 
@@ -28,6 +29,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
@@ -36,6 +38,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
@@ -65,6 +68,7 @@ class ProviderFullUserSerializer(serializers.ModelSerializer):
             'id',
             'phone_number',
             'role',
+            'provider_uid',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
@@ -176,7 +180,10 @@ class SignupOTPRequestSerializer(serializers.Serializer):
         
         # Check if already registered
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError('This phone number is already registered.')
+            raise serializers.ValidationError('This phone number is already registered. Please log in.')
+
+        if DeletedProviderRecord.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError('This provider account was removed. Please contact admin support.')
         
         return value
 
@@ -236,6 +243,8 @@ class LoginOTPRequestSerializer(serializers.Serializer):
     def validate_phone_number(self, value: str) -> str:
         from .views import _normalize_phone_number
         value = _normalize_phone_number(value)
+        if DeletedProviderRecord.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError('This provider account was removed by admin. Please contact admin support.')
         if not User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('No account found for this phone number.')
         return value
@@ -281,6 +290,7 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
         model  = ProviderProfile
         fields = [
             'id',
+            'profile_picture',
             'bio',
             'address',
             'is_online',
@@ -321,6 +331,44 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             validated_data['last_location_update'] = timezone.now()
         
         return super().update(instance, validated_data)
+
+
+class ProviderProfileSetupSerializer(serializers.Serializer):
+    """Authenticated provider profile setup payload (pre-identity-upload stage)."""
+
+    full_name = serializers.CharField(max_length=255)
+    service_category = serializers.CharField(max_length=100)
+    sub_services = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        allow_empty=False,
+    )
+    price_min = serializers.IntegerField(min_value=0)
+    price_max = serializers.IntegerField(min_value=0)
+    bio = serializers.CharField(required=False, allow_blank=True)
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+
+    def validate_full_name(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('full_name is required.')
+        return value
+
+    def validate_service_category(self, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('service_category is required.')
+        return value
+
+    def validate_sub_services(self, value):
+        cleaned = [item.strip() for item in value if str(item).strip()]
+        if not cleaned:
+            raise serializers.ValidationError('At least one sub service is required.')
+        return cleaned
+
+    def validate(self, attrs):
+        if attrs['price_min'] > attrs['price_max']:
+            raise serializers.ValidationError({'price_max': 'price_max must be greater than or equal to price_min.'})
+        return attrs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -465,6 +513,54 @@ class FaceBiometricVerificationSerializer(serializers.ModelSerializer):
         return value
 
 
+class ProviderManualVerificationUploadSerializer(serializers.ModelSerializer):
+    """Upload provider manual verification package (ID front, ID back, selfie)."""
+
+    class Meta:
+        model = ProviderManualVerification
+        fields = ['id', 'id_front_image', 'id_back_image', 'selfie_image', 'status', 'submitted_at']
+        read_only_fields = ['id', 'status', 'submitted_at']
+
+    ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+    MAX_IMAGE_SIZE_MB = 10
+
+    def _validate_image(self, value, field_name: str):
+        if value.content_type not in self.ALLOWED_IMAGE_TYPES:
+            raise serializers.ValidationError(
+                {field_name: f'Unsupported file type "{value.content_type}". Allowed: {", ".join(sorted(self.ALLOWED_IMAGE_TYPES))}'}
+            )
+        if value.size > self.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                {field_name: f'File too large. Maximum size is {self.MAX_IMAGE_SIZE_MB} MB.'}
+            )
+        return value
+
+    def validate_id_front_image(self, value):
+        return self._validate_image(value, 'id_front_image')
+
+    def validate_id_back_image(self, value):
+        return self._validate_image(value, 'id_back_image')
+
+    def validate_selfie_image(self, value):
+        return self._validate_image(value, 'selfie_image')
+
+
+class ProviderManualVerificationStatusSerializer(serializers.ModelSerializer):
+    """Read-only status payload for provider manual verification."""
+
+    class Meta:
+        model = ProviderManualVerification
+        fields = [
+            'id',
+            'status',
+            'rejection_reason',
+            'reviewed_at',
+            'submitted_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PROVIDER ONBOARDING FLOW  (5-step signup)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -486,18 +582,39 @@ class SubServiceSerializer(serializers.ModelSerializer):
 
 
 class OnboardingStep1Serializer(serializers.Serializer):
-    """Step 1: Upload and OCR extract document."""
-    document_type = serializers.ChoiceField(choices=IdentityDocument.DOC_CHOICES)
-    document_file = serializers.FileField(max_length=10485760)  # 10MB
-    
-    def validate_document_file(self, value):
+    """Step 1: Upload front/back document images and OCR extract."""
+    document_type = serializers.ChoiceField(
+        choices=['national_id', 'drivers_license', 'kebele_id']
+    )
+    front_image = serializers.FileField(
+        max_length=10485760,
+        required=True,
+        use_url=False,
+    )
+    back_image = serializers.FileField(
+        max_length=10485760,
+        required=True,
+        use_url=False,
+    )
+
+    def validate_front_image(self, value):
         ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
         MAX_SIZE_MB = 10
-        
+
         if value.content_type not in ALLOWED_TYPES:
-            raise serializers.ValidationError(f'File type not supported. Use JPEG or PNG.')
+            raise serializers.ValidationError('Front image type not supported. Use JPEG, PNG, or WEBP.')
         if value.size > MAX_SIZE_MB * 1024 * 1024:
-            raise serializers.ValidationError(f'File exceeds {MAX_SIZE_MB}MB limit.')
+            raise serializers.ValidationError(f'Front image exceeds {MAX_SIZE_MB}MB limit.')
+        return value
+
+    def validate_back_image(self, value):
+        ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+        MAX_SIZE_MB = 10
+
+        if value.content_type not in ALLOWED_TYPES:
+            raise serializers.ValidationError('Back image type not supported. Use JPEG, PNG, or WEBP.')
+        if value.size > MAX_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'Back image exceeds {MAX_SIZE_MB}MB limit.')
         return value
 
 

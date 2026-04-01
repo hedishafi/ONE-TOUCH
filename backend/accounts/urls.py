@@ -1,59 +1,57 @@
 from django.urls import path
 
 from .views import (
+    ClientOnboardingStep1View,
+    ClientOnboardingStep2View,
+    ClientOnboardingStep3OTPRequestView,
+    ClientOnboardingStep3OTPVerifyView,
+    ClientOnboardingStep4ProfileView,
     ClientProfileView,
     FaceVerificationView,
     IdentityDocumentUploadView,
     LoginRequestOTPView,
     LoginVerifyView,
+    OCRTestView,
     LogoutView,
-    ProfileView,
-    ProviderProfileView,
-    SignupRequestOTPView,
-    SignupVerifyView,
-    TokenRefreshView,
+    ProviderManualVerificationUploadView,
+    ProviderOnboardingStatusView,
     ProviderOnboardingStep1View,
     ProviderOnboardingStep2View,
     ProviderOnboardingStep3OTPRequestView,
     ProviderOnboardingStep3OTPVerifyView,
     ProviderOnboardingStep4View,
     ProviderOnboardingStep5View,
+    ProviderProfileSetupView,
+    SignupRequestOTPView,
+    SignupVerifyView,
     SubServiceListView,
-    ClientOnboardingStep1View,
-    ClientOnboardingStep2View,
-    ClientOnboardingStep3OTPRequestView,
-    ClientOnboardingStep3OTPVerifyView,
-    ClientOnboardingStep4ProfileView,
-    OCRTestView,
+    TokenRefreshView,
+    UserProfileView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
 urlpatterns = [
-    # Signup
-    path('auth/signup/otp/',    SignupRequestOTPView.as_view(), name='signup-otp-request'),
-    path('auth/signup/verify/', SignupVerifyView.as_view(),     name='signup-otp-verify'),
+    # Client authentication
+    path('auth/signup/otp/', SignupRequestOTPView.as_view(), name='signup-otp-request'),
+    path('auth/signup/resend-otp/', SignupRequestOTPView.as_view(), name='signup-otp-resend'),
+    path('auth/signup/verify/', SignupVerifyView.as_view(), name='signup-otp-verify'),
+    path('auth/login/otp/', LoginRequestOTPView.as_view(), name='login-otp-request'),
+    path('auth/login/verify/', LoginVerifyView.as_view(), name='login-otp-verify'),
 
-    # Login
-    path('auth/login/otp/',    LoginRequestOTPView.as_view(), name='login-otp-request'),
-    path('auth/login/verify/', LoginVerifyView.as_view(),     name='login-otp-verify'),
-
-    # Token management
+    # Token management and profile
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
-    path('auth/logout/',        LogoutView.as_view(),        name='logout'),
+    path('auth/logout/', LogoutView.as_view(), name='logout'),
+    path('auth/profile/', UserProfileView.as_view(), name='auth-profile'),
 
-    # Authenticated user
-    path('auth/profile/', ProfileView.as_view(), name='auth-profile'),
-
-    # Provider-only: GET/POST/PATCH profile
-    path('provider/profile/', ProviderProfileView.as_view(), name='provider-profile'),
-    # Client-only: GET/PATCH profile
+    # Provider/client profile and verification
+    path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('client/profile/', ClientProfileView.as_view(), name='client-profile'),
-    # Provider-only: GET list / POST upload identity doc (triggers verification task)
-    path('identity-docs/',    IdentityDocumentUploadView.as_view(), name='identity-docs'),
-    # Provider-only: POST face verification for an identity doc
+    path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
+    path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
+    path('identity-docs/', IdentityDocumentUploadView.as_view(), name='identity-docs'),
     path('identity-docs/<int:id>/verify-face/', FaceVerificationView.as_view(), name='face-verification'),
 
-    # ── Provider Onboarding (5-step flow) ──────────────────────────────────────
+    # Provider onboarding flow
     path('provider/onboarding/step1/', ProviderOnboardingStep1View.as_view(), name='onboarding-step1'),
     path('provider/onboarding/step2/', ProviderOnboardingStep2View.as_view(), name='onboarding-step2'),
     path('provider/onboarding/step3/otp-request/', ProviderOnboardingStep3OTPRequestView.as_view(), name='onboarding-step3-otp-request'),
@@ -61,17 +59,16 @@ urlpatterns = [
     path('provider/onboarding/step4/', ProviderOnboardingStep4View.as_view(), name='onboarding-step4'),
     path('provider/onboarding/step5/', ProviderOnboardingStep5View.as_view(), name='onboarding-step5'),
 
-    # ── Client Onboarding (Phone OTP + Optional Document Upload) ───────────────
+    # Client onboarding flow
     path('client/onboarding/step1/', ClientOnboardingStep1View.as_view(), name='client-onboarding-step1'),
     path('client/onboarding/step2/', ClientOnboardingStep2View.as_view(), name='client-onboarding-step2'),
     path('client/onboarding/step3/otp-request/', ClientOnboardingStep3OTPRequestView.as_view(), name='client-onboarding-step3-otp-request'),
     path('client/onboarding/step3/otp-verify/', ClientOnboardingStep3OTPVerifyView.as_view(), name='client-onboarding-step3-otp-verify'),
     path('client/onboarding/step4/', ClientOnboardingStep4ProfileView.as_view(), name='client-onboarding-step4'),
 
-    # ── Services (Category & SubService) ───────────────────────────────────────
-    # path('services/categories/', ServiceCategoryListView.as_view(), name='service-categories'),  # Commented out to avoid conflict with services app
+    # Services (avoid route overlap with services app category list)
     path('services/categories/<int:category_id>/subservices/', SubServiceListView.as_view(), name='category-subservices'),
 
-    # ── Testing / Development ──────────────────────────────────────────────────
+    # Testing/development
     path('test/ocr-extract/', OCRTestView.as_view(), name='ocr-test'),
 ]

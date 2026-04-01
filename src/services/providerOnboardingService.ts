@@ -3,26 +3,25 @@ import api from './api';
 // ─── Types ───────────────────────────────────────────────────────────────
 
 export interface OnboardingStep1Request {
-  doc_type: 'national_id' | 'drivers_license' | 'kebele_id';
-  document_file: File;
+  document_type: 'national_id' | 'drivers_license' | 'kebele_id';
+  front_image: File;
+  back_image: File;
 }
 
 export interface OnboardingStep1Response {
   session_id: string;
   step: number;
   extracted_data: {
-    name?: string;
-    document_number?: string;
-    dob?: string;
+    full_name?: string | null;
+    id_number?: string | null;
+    date_of_birth?: string | null;
     gender?: string;
-    nationality?: string;
-    region?: string;
-    wereda?: string;
-    kebele?: string;
-    home_address?: string;
-    issue_date?: string;
-    expiry_date?: string;
-    phone?: string;
+    nationality?: string | null;
+    region_sub_city?: string | null;
+    woreda?: string | null;
+    issue_date?: string | null;
+    expiry_date?: string | null;
+    phone_number?: string | null;
   };
   image_quality: number;
   quality_warnings: string[];
@@ -80,12 +79,25 @@ export interface OnboardingStep5Response {
   status: string;
 }
 
+export interface ProviderManualVerificationUploadRequest {
+  id_front_image: File;
+  id_back_image: File;
+  selfie_image: File;
+}
+
+export interface ProviderManualVerificationUploadResponse {
+  id: number;
+  status: string;
+  submitted_at: string;
+}
+
 // ─── Step 1: Upload Document ──────────────────────────────────────────────
 
 export const uploadDocument = async (payload: OnboardingStep1Request): Promise<OnboardingStep1Response> => {
   const formData = new FormData();
-  formData.append('document_type', payload.doc_type);
-  formData.append('document_file', payload.document_file);
+  formData.append('document_type', payload.document_type);
+  formData.append('front_image', payload.front_image);
+  formData.append('back_image', payload.back_image);
 
   const { data } = await api.post<OnboardingStep1Response>(
     '/provider/onboarding/step1/',
@@ -155,5 +167,24 @@ export const completeProfile = async (payload: OnboardingStep5Request): Promise<
     '/provider/onboarding/step5/',
     payload
   );
+  return data;
+};
+
+export const uploadProviderManualVerification = async (
+  payload: ProviderManualVerificationUploadRequest
+): Promise<ProviderManualVerificationUploadResponse> => {
+  const formData = new FormData();
+  formData.append('id_front_image', payload.id_front_image);
+  formData.append('id_back_image', payload.id_back_image);
+  formData.append('selfie_image', payload.selfie_image);
+
+  const { data } = await api.post<ProviderManualVerificationUploadResponse>(
+    '/provider/manual-verification/upload/',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+
   return data;
 };
