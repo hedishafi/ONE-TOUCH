@@ -10,6 +10,7 @@ from .views import (
     TokenRefreshView,
     ProviderProfileSetupView,
     ProviderManualVerificationUploadView,
+    ProviderOnboardingStatusView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -32,4 +33,5 @@ urlpatterns = [
     # ── Provider Identity Verification (manual admin review) ──────────────────
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
+    path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
 ]

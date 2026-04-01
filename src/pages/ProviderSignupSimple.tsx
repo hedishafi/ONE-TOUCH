@@ -29,6 +29,7 @@ export default function ProviderSignupSimple() {
   const [verifying, setVerifying] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [phoneRegistered, setPhoneRegistered] = useState(false);
   const [demoOtp, setDemoOtp] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -61,13 +62,16 @@ export default function ProviderSignupSimple() {
     try {
       setLoading(true);
       setError(null);
+      setPhoneRegistered(false);
       const response = await authService.signupRequestOTP({ phone, role: 'provider' });
       setDemoOtp(response.otp_code ?? null);
       setStep(2);
       startTimer();
       notifications.show({ title: 'OTP sent', message: 'Verification code sent successfully.', color: 'green' });
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to send OTP. Please try again.');
+      const message = err?.response?.data?.detail || 'Failed to send OTP. Please try again.';
+      setError(message);
+      setPhoneRegistered(message.toLowerCase().includes('already registered'));
     } finally {
       setLoading(false);
     }
@@ -129,6 +133,12 @@ export default function ProviderSignupSimple() {
 
               {error && (
                 <Alert icon={<IconAlertCircle size={16} />} color="red">{error}</Alert>
+              )}
+
+              {phoneRegistered && (
+                <Button variant="light" onClick={() => navigate('/login')}>
+                  Go to Login
+                </Button>
               )}
 
               <TextInput

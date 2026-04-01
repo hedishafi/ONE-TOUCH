@@ -170,6 +170,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       await authService.signupVerify({
         phone,
         otp_code: code,
+        role: 'client',
       });
 
       notifications.show({
@@ -200,7 +201,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
     if (seconds > 0) return;
 
     try {
-      await authService.signupRequestOTP({ phone });
+      await authService.signupRequestOTP({ phone, role: 'client' });
       setSeconds(60);
       setOtp('');
       notifications.show({
@@ -316,7 +317,7 @@ export const ClientSignupSimple: React.FC = () => {
       setError(null);
 
       // Request OTP from backend
-      const response = await authService.signupRequestOTP({ phone: phoneInput });
+      const response = await authService.signupRequestOTP({ phone: phoneInput, role: 'client' });
 
       setPhone(phoneInput);
       setStep(2);

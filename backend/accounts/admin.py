@@ -5,7 +5,7 @@ from django.utils.html import format_html
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, User, FaceBiometricVerification,
     ServiceCategory, SubService, ProviderService, ProviderOnboardingSession,
-    ProviderManualVerification,
+    ProviderManualVerification, DeletedProviderRecord,
     ClientOnboardingSession
 )
 
@@ -331,3 +331,10 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
 
         if prev_status != obj.status and obj.status in (ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED):
             self._notify_provider(obj, approved=(obj.status == ProviderManualVerification.STATUS_APPROVED))
+
+
+@admin.register(DeletedProviderRecord)
+class DeletedProviderRecordAdmin(admin.ModelAdmin):
+    list_display = ('phone_number', 'provider_uid', 'deleted_at')
+    search_fields = ('phone_number', 'provider_uid')
+    readonly_fields = ('phone_number', 'provider_uid', 'deleted_at')

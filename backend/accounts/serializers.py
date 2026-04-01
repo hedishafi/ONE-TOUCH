@@ -6,7 +6,7 @@ from rest_framework import serializers
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
     ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
-    ProviderManualVerification,
+    ProviderManualVerification, DeletedProviderRecord,
 )
 
 
@@ -180,7 +180,10 @@ class SignupOTPRequestSerializer(serializers.Serializer):
         
         # Check if already registered
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError('This phone number is already registered.')
+            raise serializers.ValidationError('This phone number is already registered. Please log in.')
+
+        if DeletedProviderRecord.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError('This provider account was removed. Please contact admin support.')
         
         return value
 
@@ -240,6 +243,8 @@ class LoginOTPRequestSerializer(serializers.Serializer):
     def validate_phone_number(self, value: str) -> str:
         from .views import _normalize_phone_number
         value = _normalize_phone_number(value)
+        if DeletedProviderRecord.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError('This provider account was removed by admin. Please contact admin support.')
         if not User.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('No account found for this phone number.')
         return value

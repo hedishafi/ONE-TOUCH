@@ -83,6 +83,20 @@ class User(AbstractUser):
         return f'{self.username} ({self.role})'
 
 
+class DeletedProviderRecord(models.Model):
+    phone_number = models.CharField(max_length=30, unique=True, db_index=True)
+    provider_uid = models.CharField(max_length=6, blank=True)
+    deleted_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-deleted_at']
+        verbose_name = 'Deleted Provider Record'
+        verbose_name_plural = 'Deleted Provider Records'
+
+    def __str__(self):
+        return f'{self.phone_number} (deleted provider)'
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # IDENTITY DOCUMENT  (one user may upload multiple verification docs)
 # ─────────────────────────────────────────────────────────────────────────────

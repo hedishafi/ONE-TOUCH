@@ -21,7 +21,7 @@ from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshV
 from .models import (
 	IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
 	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
-	ProviderManualVerification,
+	ProviderManualVerification, DeletedProviderRecord,
 )
 from .ocr_engine import get_ocr_engine
 from .permissions import IsProvider, IsClient
@@ -227,6 +227,46 @@ def _otp_response(code: str) -> dict:
 		payload['otp_code'] = code   # ← remove / replace with real SMS in production
 	return payload
 
+
+def _provider_resume_status(user):
+	try:
+		provider_profile = user.provider_profile
+		profile_completed = provider_profile.profile_completed
+	except ProviderProfile.DoesNotExist:
+		profile_completed = False
+
+	latest_verification = (
+		ProviderManualVerification.objects
+		.filter(provider=user)
+		.order_by('-submitted_at')
+		.first()
+	)
+
+	verification_status = latest_verification.status if latest_verification else 'not_submitted'
+
+	if not profile_completed:
+		return {
+			'next_step': 'profile_setup',
+			'next_route': '/provider/profile-setup',
+			'profile_completed': False,
+			'verification_status': verification_status,
+		}
+
+	if latest_verification is None or latest_verification.status == ProviderManualVerification.STATUS_REJECTED:
+		return {
+			'next_step': 'identity_upload',
+			'next_route': '/provider/onboarding/step1',
+			'profile_completed': True,
+			'verification_status': verification_status,
+		}
+
+	return {
+		'next_step': 'dashboard',
+		'next_route': '/provider/dashboard',
+		'profile_completed': True,
+		'verification_status': verification_status,
+	}
+
 class OCREngineDebugView(APIView):
 	"""Simple debug endpoint to report which OCR engine is active.
 
@@ -413,7 +453,7 @@ class SignupVerifyView(APIView):
 
 		if User.objects.filter(phone_number=phone_number).exists():
 			return Response(
-				{'detail': 'This phone number is already registered.'},
+				{'detail': 'This phone number is already registered. Please log in.'},
 				status=status.HTTP_400_BAD_REQUEST,
 			)
 
@@ -472,6 +512,12 @@ class LoginRequestOTPView(APIView):
 		serializer.is_valid(raise_exception=True)
 		phone_number = serializer.validated_data['phone_number']
 
+		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
+			return Response(
+				{'detail': 'This provider account was removed by admin. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		code = _issue_otp(phone_number, PhoneOTP.PURPOSE_LOGIN)
 		return Response(_otp_response(code), status=status.HTTP_200_OK)
 
@@ -508,6 +554,12 @@ class LoginVerifyView(APIView):
 		phone_number = _normalize_phone_number(vd['phone_number'])
 		otp_code     = vd['otp_code']
 
+		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
+			return Response(
+				{'detail': 'This provider account was removed by admin. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		try:
 			_verify_otp(phone_number, PhoneOTP.PURPOSE_LOGIN, otp_code)
 		except ValueError as exc:
@@ -521,7 +573,35 @@ class LoginVerifyView(APIView):
 				status=status.HTTP_404_NOT_FOUND,
 			)
 
+		if not user.is_active:
+			return Response(
+				{'detail': 'This account is inactive. Please contact admin support.'},
+				status=status.HTTP_403_FORBIDDEN,
+			)
+
 		return Response(_build_token_response(user), status=status.HTTP_200_OK)
+
+
+class ProviderOnboardingStatusView(APIView):
+	permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+	@extend_schema(
+		tags=['Provider'],
+		responses={
+			200: inline_serializer(
+				'ProviderOnboardingStatusResponse',
+				{
+					'next_step': rest_framework_serializers.CharField(),
+					'next_route': rest_framework_serializers.CharField(),
+					'profile_completed': rest_framework_serializers.BooleanField(),
+					'verification_status': rest_framework_serializers.CharField(),
+				},
+			)
+		},
+		summary='Get provider onboarding resume status',
+	)
+	def get(self, request):
+		return Response(_provider_resume_status(request.user), status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

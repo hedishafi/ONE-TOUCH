@@ -103,7 +103,12 @@ export default function Login() {
       });
     } catch (error: any) {
       setPhoneLoading(false);
-      setPhoneError(error?.message || 'Failed to request OTP. Please try again.');
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.phone_number?.[0] ||
+        error?.message ||
+        'Failed to request OTP. Please try again.';
+      setPhoneError(message);
     }
   };
 
@@ -146,6 +151,16 @@ export default function Login() {
       handleSuccess();
     } catch (error: any) {
       setOtpVerifying(false);
+      const apiMessage =
+        error?.response?.data?.detail ||
+        error?.response?.data?.otp_code?.[0] ||
+        '';
+
+      if (apiMessage) {
+        setOtpError(apiMessage);
+        return;
+      }
+
       const remaining = 5 - otpAttempts - 1;
       setOtpAttempts(prev => prev + 1);
       
@@ -187,17 +202,30 @@ export default function Login() {
   };
 
   // ─── Handle successful login ──────────────────────────────────────────────
-  const handleSuccess = () => {
+  const handleSuccess = async () => {
     const { currentUser } = useAuthStore.getState();
     notifications.show({
       title: 'Welcome back!',
       message: 'Signed in successfully.',
       color: 'teal',
     });
-    
-    if (currentUser?.role === 'client') navigate(ROUTES.clientDashboard, { replace: true });
-    else if (currentUser?.role === 'provider') navigate(ROUTES.providerDashboard, { replace: true });
-    else navigate(ROUTES.adminDashboard, { replace: true });
+
+    if (currentUser?.role === 'client') {
+      navigate(ROUTES.clientDashboard, { replace: true });
+      return;
+    }
+
+    if (currentUser?.role === 'provider') {
+      try {
+        const status = await authService.getProviderOnboardingStatus();
+        navigate(status.next_route, { replace: true });
+      } catch {
+        navigate(ROUTES.providerDashboard, { replace: true });
+      }
+      return;
+    }
+
+    navigate(ROUTES.adminDashboard, { replace: true });
   };
 
   // ─── Layout components ───────────────────────────────────────────────────

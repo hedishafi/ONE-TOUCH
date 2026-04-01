@@ -71,6 +71,13 @@ export interface UserProfile {
   verification_status?: string;
 }
 
+export interface ProviderOnboardingStatus {
+  next_step: 'profile_setup' | 'identity_upload' | 'dashboard';
+  next_route: string;
+  profile_completed: boolean;
+  verification_status: string;
+}
+
 const extractTokens = (data: AuthTokenResponse) => {
   const accessToken = data.access || data.access_token || '';
   const refreshToken = data.refresh || data.refresh_token || '';
@@ -176,6 +183,11 @@ export const signupResendOTP = async (payload: { phone: string; role?: 'client' 
  */
 export const getProfile = async (): Promise<UserProfile> => {
   const { data } = await api.get<UserProfile>('/auth/profile/');
+  return data;
+};
+
+export const getProviderOnboardingStatus = async (): Promise<ProviderOnboardingStatus> => {
+  const { data } = await api.get<ProviderOnboardingStatus>('/provider/onboarding/status/');
   return data;
 };
 
