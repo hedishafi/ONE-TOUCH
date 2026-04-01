@@ -105,6 +105,7 @@ export default function Login() {
       setPhoneLoading(false);
       const message =
         error?.response?.data?.detail ||
+        error?.response?.data?.errors?.phone_number?.[0] ||
         error?.response?.data?.phone_number?.[0] ||
         error?.message ||
         'Failed to request OTP. Please try again.';
@@ -197,7 +198,12 @@ export default function Login() {
         autoClose: 5000,
       });
     } catch (error: any) {
-      setOtpError(error?.message || 'Failed to resend code. Please try again.');
+      const message =
+        error?.response?.data?.detail ||
+        error?.response?.data?.errors?.phone_number?.[0] ||
+        error?.message ||
+        'Failed to resend code. Please try again.';
+      setOtpError(message);
     }
   };
 

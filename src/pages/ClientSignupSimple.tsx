@@ -32,6 +32,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import * as authService from '../services/authService';
+import { storage, STORAGE_KEYS } from '../utils/storage';
+import { useAuthStore } from '../store/authStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Step 1: Enter Phone
@@ -167,10 +169,28 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       setVerifying(true);
 
       // Verify OTP with backend
-      await authService.signupVerify({
+      const response = await authService.signupVerify({
         phone,
         otp_code: code,
         role: 'client',
+      });
+
+      const normalizedUser = {
+        id: String(response.user.id),
+        email: response.user.email ?? '',
+        phone: response.user.phone_number,
+        role: response.user.role,
+        createdAt: new Date().toISOString(),
+        verificationStatus: (response.user.verification_status as 'pending' | 'verified' | 'rejected' | 're-verification-requested') ?? 'verified',
+        providerUid: response.user.provider_uid,
+      };
+
+      storage.set(STORAGE_KEYS.currentUser, normalizedUser);
+      useAuthStore.setState({
+        currentUser: normalizedUser,
+        isAuthenticated: true,
+        clientProfile: null,
+        providerProfile: null,
       });
 
       notifications.show({
@@ -182,9 +202,10 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       onSuccess();
     } catch (err: any) {
       const message =
+        err.response?.data?.detail ||
+        err.response?.data?.errors?.otp_code?.[0] ||
         err.response?.data?.non_field_errors?.[0] ||
         err.response?.data?.otp_code?.[0] ||
-        err.response?.data?.detail ||
         'Invalid OTP. Please try again.';
 
       notifications.show({
@@ -334,10 +355,11 @@ export const ClientSignupSimple: React.FC = () => {
       });
     } catch (err: any) {
       const message =
+        err.response?.data?.detail ||
+        err.response?.data?.errors?.phone_number?.[0] ||
         err.response?.data?.phone_number?.[0] ||
         err.response?.data?.phone?.[0] ||
         err.response?.data?.non_field_errors?.[0] ||
-        err.response?.data?.detail ||
         err.message ||
         'Failed to send OTP. Please try again.';
       setError(message);

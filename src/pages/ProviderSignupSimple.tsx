@@ -69,7 +69,12 @@ export default function ProviderSignupSimple() {
       startTimer();
       notifications.show({ title: 'OTP sent', message: 'Verification code sent successfully.', color: 'green' });
     } catch (err: any) {
-      const message = err?.response?.data?.detail || 'Failed to send OTP. Please try again.';
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.errors?.phone_number?.[0] ||
+        err?.response?.data?.phone_number?.[0] ||
+        err?.response?.data?.non_field_errors?.[0] ||
+        'Failed to send OTP. Please try again.';
       setError(message);
       setPhoneRegistered(message.toLowerCase().includes('already registered'));
     } finally {
@@ -92,7 +97,12 @@ export default function ProviderSignupSimple() {
       notifications.show({ title: 'Success', message: 'Phone verified successfully.', color: 'green' });
       navigate('/provider/profile-setup');
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to verify OTP. Please try again.');
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.errors?.otp_code?.[0] ||
+        err?.response?.data?.otp_code?.[0] ||
+        'Failed to verify OTP. Please try again.';
+      setError(message);
     } finally {
       setVerifying(false);
     }

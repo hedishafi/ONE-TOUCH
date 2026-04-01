@@ -228,6 +228,15 @@ def _otp_response(code: str) -> dict:
 	return payload
 
 
+def _first_error_text(errors) -> str:
+	if isinstance(errors, dict):
+		for value in errors.values():
+			return _first_error_text(value)
+	if isinstance(errors, list) and errors:
+		return _first_error_text(errors[0])
+	return str(errors)
+
+
 def _provider_resume_status(user):
 	try:
 		provider_profile = user.provider_profile
@@ -357,7 +366,15 @@ class SignupRequestOTPView(APIView):
 	)
 	def post(self, request):
 		serializer = SignupOTPRequestSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
+		if not serializer.is_valid():
+			detail = _first_error_text(serializer.errors)
+			payload = {
+				'detail': detail,
+				'errors': serializer.errors,
+			}
+			if 'already registered' in detail.lower():
+				payload['next_action'] = 'login'
+			return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 		vd = serializer.validated_data
 
 		# Persist pending signup data inside the OTP record isn't possible with the
@@ -509,7 +526,14 @@ class LoginRequestOTPView(APIView):
 	)
 	def post(self, request):
 		serializer = LoginOTPRequestSerializer(data=request.data)
-		serializer.is_valid(raise_exception=True)
+		if not serializer.is_valid():
+			return Response(
+				{
+					'detail': _first_error_text(serializer.errors),
+					'errors': serializer.errors,
+				},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
 		phone_number = serializer.validated_data['phone_number']
 
 		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
