@@ -83,15 +83,10 @@ class IdentityDocumentAdmin(admin.ModelAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display  = ('user', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
+    list_display  = ('user', 'is_available', 'avg_rating', 'total_reviews', 'total_jobs', 'years_of_experience', 'created_at')
     list_filter   = ('is_available',)
     search_fields = ('user__username', 'user__phone_number', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
-
-    def commission_amount_display(self, obj):
-        val = obj.commission_amount
-        return f'{val} ETB' if val is not None else '—'
-    commission_amount_display.short_description = '2% Commission'
 
 
 # ─────────────────────────────────────────────────────────────────────────────

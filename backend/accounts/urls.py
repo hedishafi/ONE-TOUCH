@@ -18,7 +18,6 @@ from .views import (
     ProviderOnboardingStep3OTPVerifyView,
     ProviderOnboardingStep4View,
     ProviderOnboardingStep5View,
-    ServiceCategoryListView,
     SubServiceListView,
     ClientOnboardingStep1View,
     ClientOnboardingStep2View,
@@ -70,7 +69,7 @@ urlpatterns = [
     path('client/onboarding/step4/', ClientOnboardingStep4ProfileView.as_view(), name='client-onboarding-step4'),
 
     # ── Services (Category & SubService) ───────────────────────────────────────
-    path('services/categories/', ServiceCategoryListView.as_view(), name='service-categories'),
+    # path('services/categories/', ServiceCategoryListView.as_view(), name='service-categories'),  # Commented out to avoid conflict with services app
     path('services/categories/<int:category_id>/subservices/', SubServiceListView.as_view(), name='category-subservices'),
 
     # ── Testing / Development ──────────────────────────────────────────────────

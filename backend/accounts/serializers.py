@@ -274,12 +274,8 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
     - When `is_online=False`, location tracking is disabled.
     - Mobile app sends location updates when going online or periodically while online.
     
-    **Commission:** Auto-calculated from price_min/price_max — always read-only.
+    Pricing is managed in services provider-category pricing endpoints.
     """
-
-    commission_amount = serializers.SerializerMethodField(
-        help_text='Platform commission in ETB — 2% of (price_min + price_max) / 2. Read-only.'
-    )
 
     class Meta:
         model  = ProviderProfile
@@ -293,26 +289,15 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             'last_location_update',
             'is_available',
             'years_of_experience',
-            'price_min',
-            'price_max',
-            'commission_amount',
             'avg_rating',
             'total_reviews',
             'total_jobs',
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'avg_rating', 'total_reviews', 'total_jobs', 'commission_amount', 'last_location_update', 'created_at', 'updated_at']
-
-    def get_commission_amount(self, obj):
-        return str(obj.commission_amount) if obj.commission_amount is not None else None
+        read_only_fields = ['id', 'avg_rating', 'total_reviews', 'total_jobs', 'last_location_update', 'created_at', 'updated_at']
 
     def validate(self, data):
-        price_min = data.get('price_min', getattr(self.instance, 'price_min', None))
-        price_max = data.get('price_max', getattr(self.instance, 'price_max', None))
-        if price_min is not None and price_max is not None and price_min > price_max:
-            raise serializers.ValidationError({'price_max': 'price_max must be ≥ price_min.'})
-        
         # Validate location updates: can only send lat/long if is_online=True
         is_online = data.get('is_online', getattr(self.instance, 'is_online', False))
         has_lat = data.get('current_latitude') is not None or (self.instance and self.instance.current_latitude is not None)

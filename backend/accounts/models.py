@@ -183,6 +183,8 @@ class ProviderProfile(models.Model):
     is_available       = models.BooleanField(default=True)
     years_of_experience = models.PositiveSmallIntegerField(default=0)
 
+
+    """"
     # Price range set by the provider — used to calculate commission.
     # Commission = (price_min + price_max) / 2  ×  2%
     price_min = models.DecimalField(
@@ -193,7 +195,7 @@ class ProviderProfile(models.Model):
         max_digits=10, decimal_places=2, null=True, blank=True,
         help_text='Maximum service price in ETB.'
     )
-
+    """ 
     # Denormalized cache — updated by signals after each Review
     avg_rating         = models.FloatField(default=0.0)
     total_reviews      = models.PositiveIntegerField(default=0)

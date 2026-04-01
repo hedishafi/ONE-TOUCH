@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django.db import models
 from django.utils.text import slugify
+from django.core.exceptions import ValidationError
 from accounts.models import ProviderProfile
 
 
@@ -11,7 +14,7 @@ class ServiceCategory(models.Model):
     slug        = models.SlugField(max_length=120, unique=True, blank=True)
     icon        = models.CharField(max_length=100, blank=True, help_text='Icon name or URL')
     description = models.TextField(blank=True)
-    is_active   = models.BooleanField(default=True)
+    # is_active   = models.BooleanField(default=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -59,7 +62,7 @@ class ProviderSkill(models.Model):
     class Meta:
         unique_together = ('provider', 'skill')
         verbose_name = 'Provider Skill'
-
+ 
     def __str__(self):
         return f'{self.provider.user.username} — {self.skill.name}'
 
@@ -68,12 +71,12 @@ class ProviderSkill(models.Model):
 # SERVICE  (a specific offering listed by a provider)
 # ─────────────────────────────────────────────────────────────────────────────
 class Service(models.Model):
-    provider    = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='services')
+    providers   = models.ManyToManyField(ProviderProfile, related_name='services')
     category    = models.ForeignKey(ServiceCategory, on_delete=models.PROTECT, related_name='services')
     title       = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     base_price  = models.DecimalField(max_digits=10, decimal_places=2)
-    is_active   = models.BooleanField(default=True)
+    # is_active   = models.BooleanField(default=True)
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
@@ -81,45 +84,34 @@ class Service(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.title} by {self.provider.user.username}'
+        return f'{self.title}'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COMMISSION RULE  (policy-driven — edit rows, not code)
-#
-# Admin sets commission per category, with optional flat fee OR percentage.
-# effective_from/to allows time-boxed promotions without code changes.
-# is_trial_exempt = True means trial providers pay 0 commission for this rule.
+# PROVIDER CATEGORY PRICING  (provider sets price range per category)
 # ─────────────────────────────────────────────────────────────────────────────
-class CommissionRule(models.Model):
-    # Null category = global default rule (fallback)
-    category        = models.ForeignKey(
-        ServiceCategory, on_delete=models.CASCADE,
-        null=True, blank=True,
-        related_name='commission_rules',
-        help_text='Leave blank for a global default rule'
-    )
-    percentage      = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0,
-        help_text='Commission as a percentage of service_amount (e.g. 10.00 = 10%)'
-    )
-    flat_fee        = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0,
-        help_text='Fixed fee in ETB applied on top of percentage'
-    )
-    is_trial_exempt = models.BooleanField(
-        default=True,
-        help_text='If True, providers on active trial pay 0 commission'
-    )
-    effective_from  = models.DateTimeField(null=True, blank=True)
-    effective_to    = models.DateTimeField(null=True, blank=True)
-    description     = models.CharField(max_length=255, blank=True)
-    created_at      = models.DateTimeField(auto_now_add=True)
+class ProviderCategoryPricing(models.Model):
+    provider    = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='category_pricings')
+    category    = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='provider_pricings')
+    min_price   = models.DecimalField(max_digits=10, decimal_places=2, help_text='Minimum price for services in this category')
+    max_price   = models.DecimalField(max_digits=10, decimal_places=2, help_text='Maximum price for services in this category')
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Commission Rule'
-        ordering = ['-effective_from']
+        unique_together = ('provider', 'category')
+        verbose_name = 'Provider Category Pricing'
+        verbose_name_plural = 'Provider Category Pricings'
+        ordering = ['provider', 'category']
+
+    def clean(self):
+        if self.min_price >= self.max_price:
+            raise ValidationError('Minimum price must be less than maximum price.')
+        # Ensure reasonable gap for comparison (e.g., max price no more than 50% above min price)
+        if self.max_price > self.min_price * Decimal('1.5'):
+            raise ValidationError('Price range gap is too large for reasonable comparison. Maximum price cannot exceed 50% above minimum price.')
 
     def __str__(self):
-        cat = self.category.name if self.category else 'Global'
-        return f'CommissionRule [{cat}] — {self.percentage}% + {self.flat_fee} ETB'
+        return f'{self.provider.user.username} — {self.category.name}: {self.min_price} - {self.max_price} ETB'
+
+
