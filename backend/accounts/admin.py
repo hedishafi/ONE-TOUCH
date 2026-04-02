@@ -116,12 +116,11 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
     list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
     search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
-    readonly_fields = ('submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
+    readonly_fields = ('reviewed_at', 'submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
     fields = (
         'provider',
         'status',
         'rejection_reason',
-        'reviewed_by',
         'reviewed_at',
         'id_front_image',
         'id_front_preview',
@@ -133,6 +132,17 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
         'updated_at',
     )
     actions = ['approve_selected', 'reject_selected']
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'provider':
+            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if obj.status in {ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED}:
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+        super().save_model(request, obj, form, change)
 
     def get_urls(self):
         urls = super().get_urls()
