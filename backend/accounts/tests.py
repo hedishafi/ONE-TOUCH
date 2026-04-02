@@ -6,7 +6,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import DeletedProviderRecord, PhoneOTP
+from .models import (
+	DeletedProviderRecord,
+	PhoneOTP,
+	ProviderManualVerification,
+	ProviderProfile,
+	ServiceCategory,
+	SubService,
+)
 
 
 User = get_user_model()
@@ -181,4 +188,42 @@ class AuthSecurityTests(APITestCase):
 			format='json',
 		)
 		self.assertEqual(client_login_response.status_code, status.HTTP_200_OK)
+
+	def test_provider_onboarding_status_includes_rejection_reason(self):
+		ProviderProfile.objects.update_or_create(
+			user=self.provider,
+			defaults={'profile_completed': True},
+		)
+		ProviderManualVerification.objects.create(
+			provider=self.provider,
+			id_front_image='provider_verification/id_front/test.jpg',
+			id_back_image='provider_verification/id_back/test.jpg',
+			selfie_image='provider_verification/selfie/test.jpg',
+			status=ProviderManualVerification.STATUS_REJECTED,
+			rejection_reason='ID image is unclear',
+		)
+
+		access = str(RefreshToken.for_user(self.provider).access_token)
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+		response = self.client.get('/api/v1/provider/onboarding/status/')
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data.get('verification_status'), ProviderManualVerification.STATUS_REJECTED)
+		self.assertEqual(response.data.get('rejection_reason'), 'ID image is unclear')
+
+	def test_provider_service_category_and_subservice_endpoints(self):
+		category = ServiceCategory.objects.create(name='Plumbing', slug='plumbing', is_active=True)
+		SubService.objects.create(category=category, name='Leak Fix', slug='leak-fix', is_active=True)
+		SubService.objects.create(category=category, name='Pipe Repair', slug='pipe-repair', is_active=True)
+
+		access = str(RefreshToken.for_user(self.provider).access_token)
+		self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+		categories_response = self.client.get('/api/v1/provider/service-categories/')
+		self.assertEqual(categories_response.status_code, status.HTTP_200_OK)
+		self.assertTrue(any(item['name'] == 'Plumbing' for item in categories_response.data.get('results', [])))
+
+		subservices_response = self.client.get(f'/api/v1/provider/service-categories/{category.id}/sub-services/')
+		self.assertEqual(subservices_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(subservices_response.data.get('results', [])), 2)
 

@@ -76,6 +76,7 @@ export interface ProviderOnboardingStatus {
   next_route: string;
   profile_completed: boolean;
   verification_status: string;
+  rejection_reason?: string;
 }
 
 const extractTokens = (data: AuthTokenResponse) => {

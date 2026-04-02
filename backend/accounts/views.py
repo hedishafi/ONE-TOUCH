@@ -243,6 +243,9 @@ def _provider_resume_status(user):
     )
 
     verification_status = latest_verification.status if latest_verification else 'not_submitted'
+    rejection_reason = ''
+    if latest_verification and latest_verification.status == ProviderManualVerification.STATUS_REJECTED:
+        rejection_reason = latest_verification.rejection_reason or ''
 
     if not profile_completed:
         return {
@@ -250,6 +253,7 @@ def _provider_resume_status(user):
             'next_route': '/provider/profile-setup',
             'profile_completed': False,
             'verification_status': verification_status,
+            'rejection_reason': rejection_reason,
         }
 
     if latest_verification is None or latest_verification.status == ProviderManualVerification.STATUS_REJECTED:
@@ -258,6 +262,7 @@ def _provider_resume_status(user):
             'next_route': '/provider/onboarding/step1',
             'profile_completed': True,
             'verification_status': verification_status,
+            'rejection_reason': rejection_reason,
         }
 
     return {
@@ -265,6 +270,7 @@ def _provider_resume_status(user):
         'next_route': '/provider/dashboard',
         'profile_completed': True,
         'verification_status': verification_status,
+        'rejection_reason': rejection_reason,
     }
 
 
@@ -497,6 +503,7 @@ class ProviderOnboardingStatusView(APIView):
                     'next_route': rest_framework_serializers.CharField(),
                     'profile_completed': rest_framework_serializers.BooleanField(),
                     'verification_status': rest_framework_serializers.CharField(),
+                    'rejection_reason': rest_framework_serializers.CharField(allow_blank=True),
                 },
             )
         },
@@ -725,6 +732,90 @@ class ProviderProfileSetupView(APIView):
                 'profile_picture': profile_picture_url,
                 'profile_completed': provider_profile.profile_completed,
                 'message': 'Profile setup completed successfully. Proceed to identity upload.',
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ServiceCategoryListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        responses={
+            200: inline_serializer(
+                'ServiceCategoryListResponse',
+                {
+                    'results': rest_framework_serializers.ListField(
+                        child=inline_serializer(
+                            'ServiceCategoryItem',
+                            {
+                                'id': rest_framework_serializers.IntegerField(),
+                                'name': rest_framework_serializers.CharField(),
+                                'slug': rest_framework_serializers.CharField(),
+                            },
+                        )
+                    )
+                },
+            )
+        },
+        summary='List service categories for profile setup',
+    )
+    def get(self, request):
+        categories = ServiceCategory.objects.filter(is_active=True).order_by('name')
+        return Response(
+            {
+                'results': [
+                    {
+                        'id': category.id,
+                        'name': category.name,
+                        'slug': category.slug,
+                    }
+                    for category in categories
+                ]
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class SubServiceListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        responses={
+            200: inline_serializer(
+                'SubServiceListResponse',
+                {
+                    'results': rest_framework_serializers.ListField(
+                        child=inline_serializer(
+                            'SubServiceItem',
+                            {
+                                'id': rest_framework_serializers.IntegerField(),
+                                'name': rest_framework_serializers.CharField(),
+                                'slug': rest_framework_serializers.CharField(),
+                                'category_id': rest_framework_serializers.IntegerField(),
+                            },
+                        )
+                    )
+                },
+            )
+        },
+        summary='List sub-services by service category',
+    )
+    def get(self, request, category_id: int):
+        sub_services = SubService.objects.filter(category_id=category_id, is_active=True).order_by('name')
+        return Response(
+            {
+                'results': [
+                    {
+                        'id': item.id,
+                        'name': item.name,
+                        'slug': item.slug,
+                        'category_id': item.category_id,
+                    }
+                    for item in sub_services
+                ]
             },
             status=status.HTTP_200_OK,
         )

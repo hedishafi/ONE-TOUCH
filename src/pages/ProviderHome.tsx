@@ -208,6 +208,7 @@ export function ProviderHome() {
   const [cancelTarget,  setCancelTarget]  = useState<Req|null>(null);
   const [cancelReason,  setCancelReason]  = useState('');
   const [cancelDone,    setCancelDone]    = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const verificationStatus = currentUser?.verificationStatus ?? 'pending';
   const isVerified = verificationStatus === 'verified';
@@ -235,7 +236,10 @@ export function ProviderHome() {
 
     const refreshProviderStatus = async () => {
       try {
-        const latest = await authService.getProfile();
+        const [latest, onboardingStatus] = await Promise.all([
+          authService.getProfile(),
+          authService.getProviderOnboardingStatus(),
+        ]);
         if (!isMounted || latest.role !== 'provider') return;
 
         const latestStatus: 'pending' | 'verified' | 'rejected' | 're-verification-requested' =
@@ -256,6 +260,12 @@ export function ProviderHome() {
 
         storage.set(STORAGE_KEYS.currentUser, updatedUser);
         useAuthStore.setState({ currentUser: updatedUser });
+
+        if (latestStatus === 'rejected' && onboardingStatus.rejection_reason) {
+          setRejectionReason(onboardingStatus.rejection_reason);
+        } else {
+          setRejectionReason('');
+        }
       } catch {
         // Keep local status if refresh fails.
       }
@@ -459,6 +469,18 @@ export function ProviderHome() {
           <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
             <Text fw={700} size="sm" c={N}>Your account is under review</Text>
             <Text size="xs" c="dimmed">You can access the dashboard, but going online and accepting jobs are disabled until approval.</Text>
+          </Paper>
+        )}
+
+        {verificationStatus === 'rejected' && rejectionReason && (
+          <Paper mb={20} p="md" radius="xl" style={{background:'#FFF1F2', border:'1px solid #FCA5A5'}}>
+            <Group gap={8} align="flex-start">
+              <IconAlertCircle size={18} color={COLORS.error} />
+              <Box>
+                <Text fw={700} size="sm" c={N}>Your verification was rejected</Text>
+                <Text size="xs" c="dimmed">Admin feedback: {rejectionReason}</Text>
+              </Box>
+            </Group>
           </Paper>
         )}
 

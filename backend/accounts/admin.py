@@ -57,12 +57,19 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     readonly_fields = ('code', 'created_at')
 
 
+class SubServiceInline(admin.TabularInline):
+    model = SubService
+    fields = ('name', 'slug', 'description', 'is_active')
+    extra = 1
+
+
 @admin.register(ServiceCategory)
 class ServiceCategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
+    # Allow manual editing of slug in admin — remove automatic prepopulation
+    inlines = [SubServiceInline]
 
 
 @admin.register(SubService)
@@ -70,7 +77,7 @@ class SubServiceAdmin(admin.ModelAdmin):
     list_display = ('name', 'category', 'slug', 'is_active', 'created_at')
     list_filter = ('category', 'is_active')
     search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
+    # Allow manual editing of slug in admin — remove automatic prepopulation
 
 
 @admin.register(ProviderService)

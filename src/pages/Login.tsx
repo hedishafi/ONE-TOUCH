@@ -224,6 +224,14 @@ export default function Login() {
     if (currentUser?.role === 'provider') {
       try {
         const status = await authService.getProviderOnboardingStatus();
+        if (status.verification_status === 'rejected' && status.rejection_reason) {
+          notifications.show({
+            title: 'Verification Update',
+            message: `Admin feedback: ${status.rejection_reason}`,
+            color: 'orange',
+            autoClose: 8000,
+          });
+        }
         navigate(status.next_route, { replace: true });
       } catch {
         navigate(ROUTES.providerDashboard, { replace: true });

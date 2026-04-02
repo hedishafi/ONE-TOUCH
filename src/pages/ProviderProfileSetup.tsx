@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Avatar,
@@ -9,43 +9,88 @@ import {
   Group,
   NumberInput,
   Paper,
+  Select,
   Stack,
   Text,
   TextInput,
   Textarea,
   Title,
+  MultiSelect,
 } from '@mantine/core';
 import { IconAlertCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import { setupProviderProfile } from '../services/providerProfileService';
+import {
+  listServiceCategories,
+  listSubServices,
+  setupProviderProfile,
+  type ServiceCategoryItem,
+  type SubServiceItem,
+} from '../services/providerProfileService';
 
 export default function ProviderProfileSetup() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
-  const [serviceCategory, setServiceCategory] = useState('');
-  const [subServicesText, setSubServicesText] = useState('');
+  const [serviceCategoryId, setServiceCategoryId] = useState<string | null>(null);
+  const [subServices, setSubServices] = useState<string[]>([]);
   const [priceMin, setPriceMin] = useState<number | ''>('');
   const [priceMax, setPriceMax] = useState<number | ''>('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [categories, setCategories] = useState<ServiceCategoryItem[]>([]);
+  const [subServiceOptions, setSubServiceOptions] = useState<SubServiceItem[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [subServicesLoading, setSubServicesLoading] = useState(false);
 
   const previewUrl = useMemo(() => (profilePicture ? URL.createObjectURL(profilePicture) : null), [profilePicture]);
 
-  const parseSubServices = (input: string) => {
-    return input
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-  };
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const result = await listServiceCategories();
+        setCategories(result);
+      } catch {
+        setError('Failed to load service categories. Please refresh and try again.');
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
+    const loadSubServices = async () => {
+      if (!serviceCategoryId) {
+        setSubServiceOptions([]);
+        setSubServices([]);
+        return;
+      }
+
+      try {
+        setSubServicesLoading(true);
+        const result = await listSubServices(Number(serviceCategoryId));
+        setSubServiceOptions(result);
+        setSubServices([]);
+      } catch {
+        setError('Failed to load sub-services for the selected category.');
+      } finally {
+        setSubServicesLoading(false);
+      }
+    };
+
+    loadSubServices();
+  }, [serviceCategoryId]);
+
+  const selectedCategoryName = categories.find((item) => String(item.id) === serviceCategoryId)?.name ?? '';
 
   const validateForm = () => {
     if (!fullName.trim()) return 'Full name is required.';
-    if (!serviceCategory.trim()) return 'Service category is required.';
-    const parsed = parseSubServices(subServicesText);
-    if (!parsed.length) return 'At least one sub service is required (comma separated).';
+    if (!serviceCategoryId) return 'Service category is required.';
+    if (!subServices.length) return 'At least one sub service is required.';
     if (priceMin === '' || priceMax === '') return 'Price range is required.';
     if (Number(priceMin) > Number(priceMax)) return 'price_max must be greater than or equal to price_min.';
     return null;
@@ -64,8 +109,8 @@ export default function ProviderProfileSetup() {
 
       await setupProviderProfile({
         full_name: fullName.trim(),
-        service_category: serviceCategory.trim(),
-        sub_services: parseSubServices(subServicesText),
+        service_category: selectedCategoryName,
+        sub_services: subServices,
         price_min: Number(priceMin),
         price_max: Number(priceMax),
         bio: bio.trim(),
@@ -149,20 +194,24 @@ export default function ProviderProfileSetup() {
             required
           />
 
-          <TextInput
+          <Select
             label="Service Category"
-            placeholder="e.g. Plumbing"
-            value={serviceCategory}
-            onChange={(event) => setServiceCategory(event.currentTarget.value)}
+            placeholder={categoriesLoading ? 'Loading categories...' : 'Select a service category'}
+            data={categories.map((item) => ({ value: String(item.id), label: item.name }))}
+            value={serviceCategoryId}
+            onChange={setServiceCategoryId}
+            disabled={categoriesLoading}
             required
           />
 
-          <TextInput
+          <MultiSelect
             label="Sub Services"
-            placeholder="e.g. Pipe Repair, Leak Fix"
-            value={subServicesText}
-            onChange={(event) => setSubServicesText(event.currentTarget.value)}
-            description="Enter multiple values separated by commas"
+            placeholder={subServicesLoading ? 'Loading sub-services...' : 'Select sub-services'}
+            data={subServiceOptions.map((item) => ({ value: item.name, label: item.name }))}
+            value={subServices}
+            onChange={setSubServices}
+            disabled={!serviceCategoryId || subServicesLoading}
+            searchable
             required
           />
 

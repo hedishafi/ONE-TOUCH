@@ -37,6 +37,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
   const [backImage, setBackImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -137,6 +138,31 @@ export const ProviderOnboardingStep1: React.FC = () => {
       stopCamera();
     };
   }, [activeTarget]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadOnboardingStatus = async () => {
+      try {
+        const status = await authService.getProviderOnboardingStatus();
+        if (!isMounted) return;
+
+        if (status.verification_status === 'rejected' && status.rejection_reason) {
+          setRejectionReason(status.rejection_reason.trim());
+        } else {
+          setRejectionReason('');
+        }
+      } catch {
+        if (isMounted) setRejectionReason('');
+      }
+    };
+
+    loadOnboardingStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const validateCapturedFile = (selectedFile: File): boolean => {
     if (selectedFile.size > 10 * 1024 * 1024) {
@@ -273,6 +299,12 @@ export const ProviderOnboardingStep1: React.FC = () => {
         <Stack gap="lg">
           <Title order={2}>Identity Capture</Title>
           <Text c="dimmed">Capture ID front, ID back, and selfie using live camera only.</Text>
+
+          {rejectionReason && (
+            <Alert icon={<IconAlertCircle size={16} />} color="orange">
+              Admin feedback: {rejectionReason}
+            </Alert>
+          )}
 
           {error && (
             <Alert icon={<IconAlertCircle size={16} />} color="red">
