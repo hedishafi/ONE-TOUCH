@@ -46,6 +46,42 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+class ClientAuthProfileSerializer(serializers.ModelSerializer):
+    """Client profile payload for GET /auth/profile/."""
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'phone_number',
+            'first_name',
+            'last_name',
+            'role',
+            'date_joined',
+        ]
+        read_only_fields = fields
+
+
+class ProviderAuthProfileSerializer(serializers.ModelSerializer):
+    """Provider profile payload for GET /auth/profile/."""
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'phone_number',
+            'first_name',
+            'last_name',
+            'role',
+            'provider_uid',
+            'verification_status',
+            'is_on_trial',
+            'trial_ends_at',
+            'date_joined',
+        ]
+        read_only_fields = fields
+
+
 class ClientMinimalUserSerializer(serializers.ModelSerializer):
     """Minimal user response for clients (auth only)."""
 

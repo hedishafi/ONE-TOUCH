@@ -40,6 +40,8 @@ from .serializers import (
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
+	ClientAuthProfileSerializer,
+	ProviderAuthProfileSerializer,
 	ServiceCategorySerializer,
 	SubServiceSerializer,
 	OnboardingStep1Serializer,
@@ -680,12 +682,16 @@ class UserProfileView(APIView):
 
 	@extend_schema(
 		tags=['Auth'],
-		responses={200: UserProfileSerializer},
+		responses={200: OpenApiResponse(description='Role-based profile payload (client or provider).')},
 		summary='Get my profile',
 		description='Returns the authenticated user profile including provider UID and verification status.',
 	)
 	def get(self, request):
-		return Response(UserProfileSerializer(request.user).data, status=status.HTTP_200_OK)
+		if request.user.role == User.ROLE_PROVIDER:
+			data = ProviderAuthProfileSerializer(request.user).data
+		else:
+			data = ClientAuthProfileSerializer(request.user).data
+		return Response(data, status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
