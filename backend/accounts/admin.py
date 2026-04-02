@@ -26,9 +26,9 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('username', 'phone_number', 'provider_uid', 'role', 'verification_status', 'is_on_trial', 'date_joined')
+    list_display = ('display_user', 'phone_number', 'provider_uid', 'role', 'verification_status', 'is_on_trial', 'date_joined')
     list_filter = ('role', 'verification_status', 'is_on_trial', 'is_staff')
-    search_fields = ('username', 'phone_number', 'provider_uid', 'first_name', 'last_name')
+    search_fields = ('phone_number', 'provider_uid', 'first_name', 'last_name', 'email')
     ordering = ('-date_joined',)
 
     fieldsets = BaseUserAdmin.fieldsets + (
@@ -44,6 +44,15 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
     readonly_fields = ('provider_uid',)
+
+    def display_user(self, obj):
+        full_name = obj.get_full_name().strip()
+        if full_name:
+            return full_name
+        if obj.phone_number:
+            return obj.phone_number
+        return obj.email or 'User'
+    display_user.short_description = 'User'
 
 
 @admin.register(ProviderProfile)
@@ -104,9 +113,9 @@ class ProviderServiceAdmin(admin.ModelAdmin):
 @admin.register(ProviderManualVerification)
 class ProviderManualVerificationAdmin(admin.ModelAdmin):
     change_list_template = 'admin/accounts/providermanualverification/change_list.html'
-    list_display = ('provider', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at')
+    list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
-    search_fields = ('provider__username', 'provider__phone_number')
+    search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
     readonly_fields = ('submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
     fields = (
         'provider',
@@ -163,6 +172,9 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             .select_related('provider', 'reviewed_by')
             .order_by('-submitted_at')
         )
+        pending_count = queryset.filter(status=ProviderManualVerification.STATUS_PENDING).count()
+        approved_count = queryset.filter(status=ProviderManualVerification.STATUS_APPROVED).count()
+        rejected_count = queryset.filter(status=ProviderManualVerification.STATUS_REJECTED).count()
         paginator = Paginator(queryset, 20)
         page_obj = paginator.get_page(request.GET.get('page'))
         context = {
@@ -174,7 +186,9 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             'analytics_url': reverse('admin:accounts_providermanualverification_analytics'),
             'review_action_base_url': reverse('admin:accounts_providermanualverification_changelist'),
             'ai_helper_url': reverse('admin:accounts_providermanualverification_ai_helper'),
-            'pending_count': queryset.filter(status=ProviderManualVerification.STATUS_PENDING).count(),
+            'pending_count': pending_count,
+            'approved_count': approved_count,
+            'rejected_count': rejected_count,
         }
         return TemplateResponse(request, 'admin/accounts/provider_manual_verification/queue.html', context)
 
@@ -252,6 +266,27 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
         if request.method != 'POST':
             return JsonResponse({'detail': 'Method not allowed.'}, status=405)
 
+        mode = (request.POST.get('mode') or '').strip().lower()
+        if mode == 'rejection_reason':
+            document_issue = (request.POST.get('document_issue') or '').strip()
+            identity_issue = (request.POST.get('identity_issue') or '').strip()
+            additional_note = (request.POST.get('additional_note') or '').strip()
+
+            reason_parts = []
+            if document_issue:
+                reason_parts.append(f'{document_issue}.')
+            else:
+                reason_parts.append('The submitted identity documents are not clear enough for verification.')
+
+            if identity_issue:
+                reason_parts.append(f'{identity_issue}.')
+
+            reason_parts.append('Please upload clear, unedited photos of both sides of your ID and a well-lit selfie that matches the ID details.')
+            if additional_note:
+                reason_parts.append(additional_note)
+
+            return JsonResponse({'response': ' '.join(reason_parts)}, status=200)
+
         prompt = (request.POST.get('prompt') or '').strip()
         if not prompt:
             return JsonResponse({'detail': 'Prompt is required.'}, status=400)
@@ -265,6 +300,19 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             suggestion = 'AI helper suggestion: prioritize image clarity, identity consistency across documents, and complete rejection reasons for faster re-submission.'
 
         return JsonResponse({'response': suggestion}, status=200)
+
+    def provider_identity(self, obj):
+        full_name = obj.provider.get_full_name().strip()
+        if full_name:
+            return full_name
+        if obj.provider.phone_number:
+            return obj.provider.phone_number
+        return obj.provider.email or 'User'
+    provider_identity.short_description = 'User'
+
+    def provider_uid_display(self, obj):
+        return obj.provider.provider_uid or '—'
+    provider_uid_display.short_description = 'UID'
 
     def id_front_preview(self, obj):
         if obj.id_front_image:
