@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
+from django.middleware.csrf import get_token
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
@@ -15,6 +16,7 @@ from rest_framework import permissions, serializers as rest_framework_serializer
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -253,6 +255,25 @@ def _clear_refresh_cookie(response: Response) -> None:
 	)
 
 
+def _set_csrf_cookie(response: Response, request) -> None:
+	token = get_token(request)
+	response.set_cookie(
+		key=settings.CSRF_COOKIE_NAME,
+		value=token,
+		max_age=settings.CSRF_COOKIE_AGE,
+		httponly=settings.CSRF_COOKIE_HTTPONLY,
+		secure=settings.CSRF_COOKIE_SECURE,
+		samesite=settings.CSRF_COOKIE_SAMESITE,
+		path=settings.CSRF_COOKIE_PATH,
+	)
+
+
+def _csrf_valid(request) -> bool:
+	header_token = request.headers.get('X-CSRFToken') or request.headers.get('X-CSRF-Token')
+	cookie_token = request.COOKIES.get(settings.CSRF_COOKIE_NAME)
+	return bool(header_token and cookie_token and header_token == cookie_token)
+
+
 def _first_error_text(errors) -> str:
 	if isinstance(errors, dict):
 		for value in errors.values():
@@ -362,6 +383,8 @@ class SignupRequestOTPView(APIView):
 	"""
 
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [ScopedRateThrottle]
+	throttle_scope = 'signup_otp'
 
 	@extend_schema(
 		tags=['Signup'],
@@ -429,6 +452,8 @@ class SignupVerifyView(APIView):
 	"""
 
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [ScopedRateThrottle]
+	throttle_scope = 'signup_verify'
 
 	@extend_schema(
 		tags=['Signup'],
@@ -526,6 +551,7 @@ class SignupVerifyView(APIView):
 		payload = _build_token_response(user)
 		response = Response(payload, status=status.HTTP_201_CREATED)
 		_set_refresh_cookie(response, payload['refresh'])
+		_set_csrf_cookie(response, request)
 		return response
 
 
@@ -541,6 +567,8 @@ class LoginRequestOTPView(APIView):
 	"""
 
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [ScopedRateThrottle]
+	throttle_scope = 'login_otp'
 
 	@extend_schema(
 		tags=['Login'],
@@ -553,6 +581,15 @@ class LoginRequestOTPView(APIView):
 		description='Send `phone_number`. An OTP is dispatched via SMS (returned in DEBUG).',
 	)
 	def post(self, request):
+		raw_phone = request.data.get('phone_number') or request.data.get('phone')
+		if raw_phone:
+			normalized_phone = _normalize_phone_number(str(raw_phone))
+			if DeletedProviderRecord.objects.filter(phone_number=normalized_phone).exists():
+				return Response(
+					{'detail': 'This provider account was removed by admin. Please contact admin support.'},
+					status=status.HTTP_403_FORBIDDEN,
+				)
+
 		serializer = LoginOTPRequestSerializer(data=request.data)
 		if not serializer.is_valid():
 			return Response(
@@ -563,12 +600,6 @@ class LoginRequestOTPView(APIView):
 				status=status.HTTP_400_BAD_REQUEST,
 			)
 		phone_number = serializer.validated_data['phone_number']
-
-		if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
-			return Response(
-				{'detail': 'This provider account was removed by admin. Please contact admin support.'},
-				status=status.HTTP_403_FORBIDDEN,
-			)
 
 		code = _issue_otp(phone_number, PhoneOTP.PURPOSE_LOGIN)
 		return Response(_otp_response(code), status=status.HTTP_200_OK)
@@ -587,6 +618,8 @@ class LoginVerifyView(APIView):
 	"""
 
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [ScopedRateThrottle]
+	throttle_scope = 'login_verify'
 
 	@extend_schema(
 		tags=['Login'],
@@ -634,6 +667,7 @@ class LoginVerifyView(APIView):
 		payload = _build_token_response(user)
 		response = Response(payload, status=status.HTTP_200_OK)
 		_set_refresh_cookie(response, payload['refresh'])
+		_set_csrf_cookie(response, request)
 		return response
 
 
@@ -667,9 +701,14 @@ class TokenRefreshView(BaseTokenRefreshView):
 	"""Use the refresh token to obtain a new short-lived access token."""
 
 	permission_classes = [permissions.AllowAny]
+	throttle_classes = [ScopedRateThrottle]
+	throttle_scope = 'token_refresh'
 
 	@extend_schema(tags=['Auth'], summary='Refresh access token')
 	def post(self, request, *args, **kwargs):
+		if not _csrf_valid(request):
+			return Response({'detail': 'CSRF validation failed.'}, status=status.HTTP_403_FORBIDDEN)
+
 		refresh_token = request.data.get('refresh') or request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
 		if not refresh_token:
 			return Response({'detail': 'Refresh token missing. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -685,6 +724,7 @@ class TokenRefreshView(BaseTokenRefreshView):
 		data = serializer.validated_data
 		response = Response(data, status=status.HTTP_200_OK)
 		_set_refresh_cookie(response, data.get('refresh', refresh_token))
+		_set_csrf_cookie(response, request)
 		return response
 
 
@@ -715,6 +755,9 @@ class LogoutView(APIView):
 		description='Logout endpoint. Blacklists refresh token and clears refresh cookie.',
 	)
 	def post(self, request):
+		if not _csrf_valid(request):
+			return Response({'detail': 'CSRF validation failed.'}, status=status.HTTP_403_FORBIDDEN)
+
 		refresh_token = request.data.get('refresh') or request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
 
 		if refresh_token:

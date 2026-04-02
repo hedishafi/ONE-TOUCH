@@ -166,6 +166,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    const accessToken = localStorage.getItem('access_token');
+    const csrfToken = typeof document !== 'undefined'
+      ? (document.cookie.split('; ').find((entry) => entry.startsWith('csrftoken='))?.split('=')[1] ?? '')
+      : '';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
+    if (accessToken) {
+      fetch(`${apiBaseUrl}/auth/logout/`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+          ...(csrfToken ? { 'X-CSRFToken': decodeURIComponent(csrfToken) } : {}),
+        },
+        body: JSON.stringify({}),
+      }).catch(() => undefined);
+    }
+
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
     storage.remove(STORAGE_KEYS.currentUser);
     set({ currentUser: null, clientProfile: null, providerProfile: null, isAuthenticated: false });
   },

@@ -103,6 +103,16 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.ScopedRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'signup_otp': '5/min',
+        'login_otp': '5/min',
+        'signup_verify': '10/min',
+        'login_verify': '10/min',
+        'token_refresh': '30/min',
+    },
 }
 
 SIMPLE_JWT = {
@@ -134,6 +144,9 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if o.strip()
+]
 
 # ─── Celery / Redis ──────────────────────────────────────────────────────────
 REDIS_URL           = os.getenv('REDIS_URL', 'redis://redis:6379/0')
