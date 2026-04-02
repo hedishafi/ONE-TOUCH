@@ -184,6 +184,7 @@ const NAV = [
 
 export function ProviderHome() {
   const nav = useNavigate();
+  const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
   const {unreadCount, fetchNotifications, addNotification} = useNotificationStore();
@@ -209,6 +210,7 @@ export function ProviderHome() {
   const [cancelReason,  setCancelReason]  = useState('');
   const [cancelDone,    setCancelDone]    = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [showResubmittedNotice, setShowResubmittedNotice] = useState(false);
 
   const verificationStatus = currentUser?.verificationStatus ?? 'pending';
   const isVerified = verificationStatus === 'verified';
@@ -228,6 +230,13 @@ export function ProviderHome() {
     fetchNotifications(currentUser.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(RESUBMIT_SUCCESS_FLAG) === '1') {
+      setShowResubmittedNotice(true);
+      sessionStorage.removeItem(RESUBMIT_SUCCESS_FLAG);
+    }
+  }, []);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'provider') return;
@@ -469,6 +478,20 @@ export function ProviderHome() {
           <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
             <Text fw={700} size="sm" c={N}>Your account is under review</Text>
             <Text size="xs" c="dimmed">You can access the dashboard, but going online and accepting jobs are disabled until approval.</Text>
+          </Paper>
+        )}
+
+        {showResubmittedNotice && (
+          <Paper mb={20} p="md" radius="xl" style={{background:'#ECFDF5', border:'1px solid #6EE7B7'}}>
+            <Group justify="space-between" align="flex-start" gap={12}>
+              <Box>
+                <Text fw={700} size="sm" c={N}>Verification re-submitted successfully</Text>
+                <Text size="xs" c="dimmed">Your updated identity package is pending admin review.</Text>
+              </Box>
+              <Button size="xs" variant="subtle" color="teal" onClick={() => setShowResubmittedNotice(false)}>
+                Dismiss
+              </Button>
+            </Group>
           </Paper>
         )}
 

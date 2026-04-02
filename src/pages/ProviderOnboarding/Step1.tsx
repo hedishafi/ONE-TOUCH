@@ -30,6 +30,7 @@ const TARGET_LABELS: Record<CaptureTarget, string> = {
 
 export const ProviderOnboardingStep1: React.FC = () => {
   const navigate = useNavigate();
+  const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const [loading, setLoading] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [activeTarget, setActiveTarget] = useState<CaptureTarget>('id_front_image');
@@ -38,6 +39,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [isResubmissionFlow, setIsResubmissionFlow] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -149,11 +151,16 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
         if (status.verification_status === 'rejected' && status.rejection_reason) {
           setRejectionReason(status.rejection_reason.trim());
+          setIsResubmissionFlow(true);
         } else {
           setRejectionReason('');
+          setIsResubmissionFlow(false);
         }
       } catch {
-        if (isMounted) setRejectionReason('');
+        if (isMounted) {
+          setRejectionReason('');
+          setIsResubmissionFlow(false);
+        }
       }
     };
 
@@ -218,36 +225,69 @@ export const ProviderOnboardingStep1: React.FC = () => {
     if (activeTarget === 'id_back_image') setActiveTarget('selfie_image');
   };
 
-  const syncProviderSession = () => {
-    const stored = authService.getStoredUser();
-    if (!stored || stored.role !== 'provider') return;
+  const syncProviderSession = async () => {
+    try {
+      const latest = await authService.getProfile();
+      if (latest.role !== 'provider') return;
 
-    const verificationStatus: User['verificationStatus'] =
-      stored.verification_status === 'verified'
-        ? 'verified'
-        : stored.verification_status === 'rejected'
-          ? 'rejected'
-          : stored.verification_status === 're-verification-requested'
-            ? 're-verification-requested'
-            : 'pending';
+      const verificationStatus: User['verificationStatus'] =
+        latest.verification_status === 'verified'
+          ? 'verified'
+          : latest.verification_status === 'rejected'
+            ? 'rejected'
+            : latest.verification_status === 're-verification-requested'
+              ? 're-verification-requested'
+              : 'pending';
 
-    const user: User = {
-      id: String(stored.id),
-      email: stored.email || `${stored.phone_number}@onetouch.local`,
-      phone: stored.phone_number,
-      role: 'provider',
-      createdAt: new Date().toISOString(),
-      verificationStatus,
-      providerUid: stored.provider_uid,
-    };
+      const user: User = {
+        id: String(latest.id),
+        email: latest.email || `${latest.phone_number}@onetouch.local`,
+        phone: latest.phone_number,
+        role: 'provider',
+        createdAt: new Date().toISOString(),
+        verificationStatus,
+        providerUid: latest.provider_uid,
+      };
 
-    storage.set(STORAGE_KEYS.currentUser, user);
-    useAuthStore.setState({
-      currentUser: user,
-      isAuthenticated: true,
-      clientProfile: null,
-      providerProfile: null,
-    });
+      localStorage.setItem('user', JSON.stringify(latest));
+      storage.set(STORAGE_KEYS.currentUser, user);
+      useAuthStore.setState({
+        currentUser: user,
+        isAuthenticated: true,
+        clientProfile: null,
+        providerProfile: null,
+      });
+    } catch {
+      const stored = authService.getStoredUser();
+      if (!stored || stored.role !== 'provider') return;
+
+      const verificationStatus: User['verificationStatus'] =
+        stored.verification_status === 'verified'
+          ? 'verified'
+          : stored.verification_status === 'rejected'
+            ? 'rejected'
+            : stored.verification_status === 're-verification-requested'
+              ? 're-verification-requested'
+              : 'pending';
+
+      const user: User = {
+        id: String(stored.id),
+        email: stored.email || `${stored.phone_number}@onetouch.local`,
+        phone: stored.phone_number,
+        role: 'provider',
+        createdAt: new Date().toISOString(),
+        verificationStatus,
+        providerUid: stored.provider_uid,
+      };
+
+      storage.set(STORAGE_KEYS.currentUser, user);
+      useAuthStore.setState({
+        currentUser: user,
+        isAuthenticated: true,
+        clientProfile: null,
+        providerProfile: null,
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -272,7 +312,11 @@ export const ProviderOnboardingStep1: React.FC = () => {
         color: 'green',
       });
 
-      syncProviderSession();
+      if (isResubmissionFlow) {
+        sessionStorage.setItem(RESUBMIT_SUCCESS_FLAG, '1');
+      }
+
+      await syncProviderSession();
       navigate(ROUTES.providerDashboard);
     } catch (err: any) {
       const message =
