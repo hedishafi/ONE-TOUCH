@@ -1,0 +1,61 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'accounts/admin/manual_verification.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="mv-page">
+  <div class="mv-header-row">
+    <h1>{{ title }}</h1>
+    <div class="mv-actions">
+      <a class="button" href="{{ queue_url }}">Open Queue</a>
+      <a class="button" href="{% url 'admin:accounts_providermanualverification_changelist' %}">Open Django List</a>
+    </div>
+  </div>
+
+  <div class="mv-kpis mv-kpis-3">
+    <div class="mv-kpi"><div class="mv-kpi-label">Total</div><div class="mv-kpi-value">{{ total_submissions }}</div></div>
+    <div class="mv-kpi"><div class="mv-kpi-label">Pending</div><div class="mv-kpi-value">{{ pending_count }}</div></div>
+    <div class="mv-kpi"><div class="mv-kpi-label">Approved</div><div class="mv-kpi-value">{{ approved_count }}</div></div>
+    <div class="mv-kpi"><div class="mv-kpi-label">Rejected</div><div class="mv-kpi-value">{{ rejected_count }}</div></div>
+  </div>
+
+  <div class="mv-chart-wrap">
+    <canvas id="submissionChart" height="120"></canvas>
+  </div>
+</div>
+
+<script>
+  const labels = {{ chart_labels_json|safe }};
+  const data = {{ chart_data_json|safe }};
+  const ctx = document.getElementById('submissionChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Daily submissions',
+          data,
+          fill: true,
+          tension: 0.3,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.12)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+      }
+    });
+  }
+</script>
+{% endblock %}

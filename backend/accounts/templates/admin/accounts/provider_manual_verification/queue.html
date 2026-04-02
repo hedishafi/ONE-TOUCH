@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'accounts/admin/manual_verification.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script defer src="{% static 'accounts/admin/ai_helper.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="mv-page" data-ai-helper-url="{{ ai_helper_url }}">
+  <div class="mv-header-row">
+    <h1>{{ title }}</h1>
+    <div class="mv-actions">
+      <a class="button" href="{{ analytics_url }}">View Analytics</a>
+      <a class="button" href="{% url 'admin:accounts_providermanualverification_changelist' %}">Open Django List</a>
+    </div>
+  </div>
+
+  <div class="mv-kpis">
+    <div class="mv-kpi">
+      <div class="mv-kpi-label">Pending submissions</div>
+      <div class="mv-kpi-value">{{ pending_count }}</div>
+    </div>
+  </div>
+
+  <div class="mv-ai-panel">
+    <h2>AI Helper</h2>
+    <p>Use this helper to draft clear moderation guidance and rejection messages.</p>
+    <div class="mv-ai-input-row">
+      <input id="mv-ai-prompt" type="text" placeholder="Example: write a clear rejection reason for blurry ID" />
+      <button id="mv-ai-run" type="button" class="button">Generate</button>
+    </div>
+    <textarea id="mv-ai-output" rows="3" readonly placeholder="AI suggestion appears here"></textarea>
+  </div>
+
+  <table class="mv-table">
+    <thead>
+      <tr>
+        <th>Provider</th>
+        <th>Phone</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th>Preview</th>
+        <th>Review</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in page_obj.object_list %}
+      <tr>
+        <td>{{ item.provider.username|default:item.provider.phone_number }}</td>
+        <td>{{ item.provider.phone_number }}</td>
+        <td><span class="mv-status mv-status-{{ item.status }}">{{ item.status|title }}</span></td>
+        <td>{{ item.submitted_at }}</td>
+        <td>
+          <div class="mv-preview-links">
+            {% if item.id_front_image %}<a target="_blank" href="{{ item.id_front_image.url }}">ID Front</a>{% endif %}
+            {% if item.id_back_image %}<a target="_blank" href="{{ item.id_back_image.url }}">ID Back</a>{% endif %}
+            {% if item.selfie_image %}<a target="_blank" href="{{ item.selfie_image.url }}">Selfie</a>{% endif %}
+          </div>
+        </td>
+        <td>
+          <form method="post" action="{% url 'admin:accounts_providermanualverification_review' item.id %}" class="mv-review-form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" name="action" value="approve" class="button default">Approve</button>
+            <input type="text" name="rejection_reason" placeholder="Rejection reason (required for reject)">
+            <button type="submit" name="action" value="reject" class="button">Reject</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">No verification submissions yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+  <div class="mv-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
