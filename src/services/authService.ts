@@ -121,13 +121,15 @@ export const signupVerify = async (payload: {
   });
 
   const { accessToken, refreshToken } = extractTokens(data);
-  if (!accessToken || !refreshToken) {
-    throw new Error('Authentication tokens were not returned by the server.');
+  if (!accessToken) {
+    throw new Error('Access token was not returned by the server.');
   }
 
   // Store tokens and user info
   localStorage.setItem('access_token', accessToken);
-  localStorage.setItem('refresh_token', refreshToken);
+  if (refreshToken) {
+    localStorage.setItem('refresh_token', refreshToken);
+  }
   localStorage.setItem('user', JSON.stringify(data.user));
   localStorage.setItem('user_id', String(data.user.id));
 
@@ -151,13 +153,15 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
   const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
 
   const { accessToken, refreshToken } = extractTokens(data);
-  if (!accessToken || !refreshToken) {
-    throw new Error('Authentication tokens were not returned by the server.');
+  if (!accessToken) {
+    throw new Error('Access token was not returned by the server.');
   }
 
   // Store tokens and user info
   localStorage.setItem('access_token', accessToken);
-  localStorage.setItem('refresh_token', refreshToken);
+  if (refreshToken) {
+    localStorage.setItem('refresh_token', refreshToken);
+  }
   localStorage.setItem('user', JSON.stringify(data.user));
   localStorage.setItem('user_id', String(data.user.id));
 
@@ -212,5 +216,5 @@ export const getStoredUser = (): UserProfile | null => {
  * Check if user has valid tokens
  */
 export const hasValidTokens = (): boolean => {
-  return !!localStorage.getItem('access_token') && !!localStorage.getItem('refresh_token');
+  return !!localStorage.getItem('access_token');
 };

@@ -12,9 +12,12 @@ from django.utils.text import slugify
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshView
 
@@ -228,6 +231,26 @@ def _otp_response(code: str) -> dict:
 	if settings.DEBUG:
 		payload['otp_code'] = code   # ← remove / replace with real SMS in production
 	return payload
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+	response.set_cookie(
+		key=settings.JWT_REFRESH_COOKIE_NAME,
+		value=refresh_token,
+		max_age=int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+		httponly=settings.JWT_REFRESH_COOKIE_HTTPONLY,
+		secure=settings.JWT_REFRESH_COOKIE_SECURE,
+		samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+		path=settings.JWT_REFRESH_COOKIE_PATH,
+	)
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+	response.delete_cookie(
+		key=settings.JWT_REFRESH_COOKIE_NAME,
+		path=settings.JWT_REFRESH_COOKIE_PATH,
+		samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+	)
 
 
 def _first_error_text(errors) -> str:
@@ -500,7 +523,10 @@ class SignupVerifyView(APIView):
 					wallet_balance=0.00,
 				)
 
-		return Response(_build_token_response(user), status=status.HTTP_201_CREATED)
+		payload = _build_token_response(user)
+		response = Response(payload, status=status.HTTP_201_CREATED)
+		_set_refresh_cookie(response, payload['refresh'])
+		return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -605,7 +631,10 @@ class LoginVerifyView(APIView):
 				status=status.HTTP_403_FORBIDDEN,
 			)
 
-		return Response(_build_token_response(user), status=status.HTTP_200_OK)
+		payload = _build_token_response(user)
+		response = Response(payload, status=status.HTTP_200_OK)
+		_set_refresh_cookie(response, payload['refresh'])
+		return response
 
 
 class ProviderOnboardingStatusView(APIView):
@@ -641,7 +670,22 @@ class TokenRefreshView(BaseTokenRefreshView):
 
 	@extend_schema(tags=['Auth'], summary='Refresh access token')
 	def post(self, request, *args, **kwargs):
-		return super().post(request, *args, **kwargs)
+		refresh_token = request.data.get('refresh') or request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+		if not refresh_token:
+			return Response({'detail': 'Refresh token missing. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+		serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+		try:
+			serializer.is_valid(raise_exception=True)
+		except (TokenError, ValidationError):
+			response = Response({'detail': 'Refresh token expired or invalid. Please log in again.'}, status=status.HTTP_401_UNAUTHORIZED)
+			_clear_refresh_cookie(response)
+			return response
+
+		data = serializer.validated_data
+		response = Response(data, status=status.HTTP_200_OK)
+		_set_refresh_cookie(response, data.get('refresh', refresh_token))
+		return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -659,20 +703,32 @@ class LogoutView(APIView):
 
 	@extend_schema(
 		tags=['Auth'],
-		request=inline_serializer('LogoutRequest', {}),
+		request=inline_serializer('LogoutRequest', {
+			'refresh': rest_framework_serializers.CharField(required=False),
+		}),
 		responses={
 			200: inline_serializer('LogoutResponse', {
 				'detail': rest_framework_serializers.CharField(),
 			}),
 		},
 		summary='Logout',
-		description='Logout endpoint. For JWT, the client should delete the access token from their device.',
+		description='Logout endpoint. Blacklists refresh token and clears refresh cookie.',
 	)
 	def post(self, request):
-		return Response(
-			{'detail': 'Successfully logged out. Please delete the access token from your device.'},
+		refresh_token = request.data.get('refresh') or request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+
+		if refresh_token:
+			try:
+				RefreshToken(refresh_token).blacklist()
+			except TokenError:
+				pass
+
+		response = Response(
+			{'detail': 'Successfully logged out.'},
 			status=status.HTTP_200_OK
 		)
+		_clear_refresh_cookie(response)
+		return response
 
 
 class UserProfileView(APIView):

@@ -8,6 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -40,18 +41,20 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
 
-        // Call refresh endpoint without JWT (it uses refresh token instead)
+        const refreshPayload = refreshToken ? { refresh: refreshToken } : {};
+
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/token/refresh/`,
-          { refresh: refreshToken }
+          refreshPayload,
+          { withCredentials: true }
         );
 
         // Update stored access token
         localStorage.setItem('access_token', data.access);
+        if (data.refresh) {
+          localStorage.setItem('refresh_token', data.refresh);
+        }
         api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
 
         // Retry original request with new token
