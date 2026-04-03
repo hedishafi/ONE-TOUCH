@@ -145,7 +145,7 @@ class SignupOTPRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError('Phone must be in Ethiopian format: +251XXXXXXXXX (9 digits after +251)')
 
         if User.objects.filter(phone_number=value).exists():
-            raise serializers.ValidationError('This phone number is already registered. Please log in.')
+            raise serializers.ValidationError('This phone number is already registered. Please log in instead.')
 
         if DeletedProviderRecord.objects.filter(phone_number=value).exists():
             raise serializers.ValidationError('This provider account was removed. Please contact admin support.')

@@ -180,6 +180,18 @@ def _otp_response(code: str) -> dict:
     return payload
 
 
+def _error_response(detail: str, *, http_status: int = status.HTTP_400_BAD_REQUEST, errors=None, extra: dict | None = None) -> Response:
+    payload = {
+        'error': detail,
+        'detail': detail,
+    }
+    if errors is not None:
+        payload['errors'] = errors
+    if extra:
+        payload.update(extra)
+    return Response(payload, status=http_status)
+
+
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     response.set_cookie(
         key=settings.JWT_REFRESH_COOKIE_NAME,
@@ -298,20 +310,24 @@ class SignupRequestOTPView(APIView):
         serializer = SignupOTPRequestSerializer(data=request.data)
         if not serializer.is_valid():
             detail = _first_error_text(serializer.errors)
-            payload = {'detail': detail, 'errors': serializer.errors}
+            extra = {}
             if 'already registered' in detail.lower():
-                payload['next_action'] = 'login'
-            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+                extra['next_action'] = 'login'
+            return _error_response(detail, http_status=status.HTTP_400_BAD_REQUEST, errors=serializer.errors, extra=extra)
 
         vd = serializer.validated_data
-        code = _issue_otp(
-            vd['phone_number'],
-            PhoneOTP.PURPOSE_REGISTER,
-            role=vd.get('role'),
-            username=vd.get('username', ''),
-            first_name=vd.get('first_name', ''),
-            last_name=vd.get('last_name', ''),
-        )
+        try:
+            code = _issue_otp(
+                vd['phone_number'],
+                PhoneOTP.PURPOSE_REGISTER,
+                role=vd.get('role'),
+                username=vd.get('username', ''),
+                first_name=vd.get('first_name', ''),
+                last_name=vd.get('last_name', ''),
+            )
+        except ValueError as exc:
+            return _error_response(str(exc), http_status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
         return Response(_otp_response(code), status=status.HTTP_200_OK)
 
 
@@ -338,7 +354,8 @@ class SignupVerifyView(APIView):
     )
     def post(self, request):
         serializer = SignupVerifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return _error_response(_first_error_text(serializer.errors), errors=serializer.errors)
         vd = serializer.validated_data
 
         phone_number = _normalize_phone_number(vd['phone_number'])
@@ -346,32 +363,26 @@ class SignupVerifyView(APIView):
 
         requested_role = request.data.get('role')
         if requested_role and requested_role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
-            return Response({'role': 'Must be "client" or "provider".'}, status=status.HTTP_400_BAD_REQUEST)
+            return _error_response('Must be "client" or "provider".', errors={'role': ['Must be "client" or "provider".']})
 
         try:
             otp = _verify_otp(phone_number, PhoneOTP.PURPOSE_REGISTER, otp_code)
         except ValueError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _error_response(str(exc))
 
         if otp.role and requested_role and requested_role != otp.role:
-            return Response(
-                {'detail': 'Role mismatch. Please verify using the same role selected when requesting OTP.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return _error_response('Role mismatch. Please verify using the same role selected when requesting OTP.')
 
         role = otp.role or requested_role or User.ROLE_CLIENT
         if role not in (User.ROLE_CLIENT, User.ROLE_PROVIDER):
-            return Response({'detail': 'Invalid role for signup verification.'}, status=status.HTTP_400_BAD_REQUEST)
+            return _error_response('Invalid role for signup verification.')
 
         username = request.data.get('username') or otp.username or phone_number
         first_name = request.data.get('first_name') or otp.first_name or ''
         last_name = request.data.get('last_name') or otp.last_name or ''
 
         if User.objects.filter(phone_number=phone_number).exists():
-            return Response(
-                {'detail': 'This phone number is already registered. Please log in.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return _error_response('This phone number is already registered. Please log in instead.')
 
         with transaction.atomic():
             user = User(
@@ -421,20 +432,20 @@ class LoginRequestOTPView(APIView):
         if raw_phone:
             normalized_phone = _normalize_phone_number(str(raw_phone))
             if DeletedProviderRecord.objects.filter(phone_number=normalized_phone).exists():
-                return Response(
-                    {'detail': 'This provider account was removed by admin. Please contact admin support.'},
-                    status=status.HTTP_403_FORBIDDEN,
+                return _error_response(
+                    'This provider account was removed by admin. Please contact admin support.',
+                    http_status=status.HTTP_403_FORBIDDEN,
                 )
 
         serializer = LoginOTPRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {'detail': _first_error_text(serializer.errors), 'errors': serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return _error_response(_first_error_text(serializer.errors), errors=serializer.errors)
 
         phone_number = serializer.validated_data['phone_number']
-        code = _issue_otp(phone_number, PhoneOTP.PURPOSE_LOGIN)
+        try:
+            code = _issue_otp(phone_number, PhoneOTP.PURPOSE_LOGIN)
+        except ValueError as exc:
+            return _error_response(str(exc), http_status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response(_otp_response(code), status=status.HTTP_200_OK)
 
 
@@ -455,32 +466,33 @@ class LoginVerifyView(APIView):
     )
     def post(self, request):
         serializer = LoginVerifySerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return _error_response(_first_error_text(serializer.errors), errors=serializer.errors)
         vd = serializer.validated_data
 
         phone_number = _normalize_phone_number(vd['phone_number'])
         otp_code = vd['otp_code']
 
         if DeletedProviderRecord.objects.filter(phone_number=phone_number).exists():
-            return Response(
-                {'detail': 'This provider account was removed by admin. Please contact admin support.'},
-                status=status.HTTP_403_FORBIDDEN,
+            return _error_response(
+                'This provider account was removed by admin. Please contact admin support.',
+                http_status=status.HTTP_403_FORBIDDEN,
             )
 
         try:
             _verify_otp(phone_number, PhoneOTP.PURPOSE_LOGIN, otp_code)
         except ValueError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return _error_response(str(exc))
 
         try:
             user = User.objects.get(phone_number=phone_number)
         except User.DoesNotExist:
-            return Response({'detail': 'No account found for this phone number.'}, status=status.HTTP_404_NOT_FOUND)
+            return _error_response('No account found for this phone number.', http_status=status.HTTP_404_NOT_FOUND)
 
         if not user.is_active:
-            return Response(
-                {'detail': 'This account is inactive. Please contact admin support.'},
-                status=status.HTTP_403_FORBIDDEN,
+            return _error_response(
+                'This account is inactive. Please contact admin support.',
+                http_status=status.HTTP_403_FORBIDDEN,
             )
 
         payload = _build_token_response(user)

@@ -1,4 +1,5 @@
 import api from './api';
+import axios from 'axios';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 export interface SignupOTPRequest {
@@ -85,6 +86,34 @@ const extractTokens = (data: AuthTokenResponse) => {
   return { accessToken, refreshToken };
 };
 
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    const data: any = error.response?.data;
+    const fieldErrors = data?.errors;
+    const firstFieldError =
+      fieldErrors && typeof fieldErrors === 'object'
+        ? Object.values(fieldErrors).flat().find(Boolean)
+        : undefined;
+
+    return (
+      data?.error ||
+      data?.detail ||
+      firstFieldError ||
+      data?.phone_number?.[0] ||
+      data?.otp_code?.[0] ||
+      data?.non_field_errors?.[0] ||
+      error.message ||
+      fallback
+    );
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 // ─── Signup ───────────────────────────────────────────────────────────────
 
 /**
@@ -92,11 +121,15 @@ const extractTokens = (data: AuthTokenResponse) => {
  */
 export const signupRequestOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
-  const { data } = await api.post<OTPResponse>('/auth/signup/otp/', {
-    phone_number: normalizedPhone,
-    role: payload.role ?? 'client',
-  });
-  return data;
+  try {
+    const { data } = await api.post<OTPResponse>('/auth/signup/otp/', {
+      phone_number: normalizedPhone,
+      role: payload.role ?? 'client',
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Failed to request signup OTP.'));
+  }
 };
 
 /**
@@ -112,29 +145,33 @@ export const signupVerify = async (payload: {
 }): Promise<AuthTokenResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
   const role = payload.role ?? 'client';
-  const { data } = await api.post<AuthTokenResponse>('/auth/signup/verify/', {
-    phone_number: normalizedPhone,
-    otp_code: payload.otp_code,
-    role,
-    first_name: payload.first_name ?? (role === 'provider' ? 'Provider' : 'Client'),
-    last_name: payload.last_name ?? 'User',
-    username: payload.username ?? `${role}_${Date.now()}`,
-  });
+  try {
+    const { data } = await api.post<AuthTokenResponse>('/auth/signup/verify/', {
+      phone_number: normalizedPhone,
+      otp_code: payload.otp_code,
+      role,
+      first_name: payload.first_name ?? (role === 'provider' ? 'Provider' : 'Client'),
+      last_name: payload.last_name ?? 'User',
+      username: payload.username ?? `${role}_${Date.now()}`,
+    });
 
-  const { accessToken, refreshToken } = extractTokens(data);
-  if (!accessToken) {
-    throw new Error('Access token was not returned by the server.');
+    const { accessToken, refreshToken } = extractTokens(data);
+    if (!accessToken) {
+      throw new Error('Access token was not returned by the server.');
+    }
+
+    // Store tokens and user info
+    localStorage.setItem('access_token', accessToken);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('user_id', String(data.user.id));
+
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Failed to verify signup OTP.'));
   }
-
-  // Store tokens and user info
-  localStorage.setItem('access_token', accessToken);
-  if (refreshToken) {
-    localStorage.setItem('refresh_token', refreshToken);
-  }
-  localStorage.setItem('user', JSON.stringify(data.user));
-  localStorage.setItem('user_id', String(data.user.id));
-
-  return data;
 };
 
 // ─── Login ───────────────────────────────────────────────────────────────
@@ -143,30 +180,38 @@ export const signupVerify = async (payload: {
  * Request OTP for login
  */
 export const loginRequestOTP = async (payload: LoginOTPRequest): Promise<OTPResponse> => {
-  const { data } = await api.post<OTPResponse>('/auth/login/otp/', payload);
-  return data;
+  try {
+    const { data } = await api.post<OTPResponse>('/auth/login/otp/', payload);
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Failed to request login OTP.'));
+  }
 };
 
 /**
  * Verify login OTP and get tokens
  */
 export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthTokenResponse> => {
-  const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
+  try {
+    const { data } = await api.post<AuthTokenResponse>('/auth/login/verify/', payload);
 
-  const { accessToken, refreshToken } = extractTokens(data);
-  if (!accessToken) {
-    throw new Error('Access token was not returned by the server.');
+    const { accessToken, refreshToken } = extractTokens(data);
+    if (!accessToken) {
+      throw new Error('Access token was not returned by the server.');
+    }
+
+    // Store tokens and user info
+    localStorage.setItem('access_token', accessToken);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem('user_id', String(data.user.id));
+
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Failed to verify login OTP.'));
   }
-
-  // Store tokens and user info
-  localStorage.setItem('access_token', accessToken);
-  if (refreshToken) {
-    localStorage.setItem('refresh_token', refreshToken);
-  }
-  localStorage.setItem('user', JSON.stringify(data.user));
-  localStorage.setItem('user_id', String(data.user.id));
-
-  return data;
 };
 
 /**
@@ -174,11 +219,15 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
  */
 export const signupResendOTP = async (payload: { phone: string; role?: 'client' | 'provider' }): Promise<OTPResponse> => {
   const normalizedPhone = payload.phone?.trim() || '';
-  const { data } = await api.post<OTPResponse>('/auth/signup/resend-otp/', {
-    phone_number: normalizedPhone,
-    role: payload.role ?? 'client',
-  });
-  return data;
+  try {
+    const { data } = await api.post<OTPResponse>('/auth/signup/resend-otp/', {
+      phone_number: normalizedPhone,
+      role: payload.role ?? 'client',
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'Failed to resend signup OTP.'));
+  }
 };
 
 // ─── Profile ─────────────────────────────────────────────────────────────

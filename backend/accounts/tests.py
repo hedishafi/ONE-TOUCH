@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -226,4 +227,30 @@ class AuthSecurityTests(APITestCase):
 		subservices_response = self.client.get(f'/api/v1/provider/service-categories/{category.id}/sub-services/')
 		self.assertEqual(subservices_response.status_code, status.HTTP_200_OK)
 		self.assertEqual(len(subservices_response.data.get('results', [])), 2)
+
+	def test_signup_otp_duplicate_phone_returns_structured_validation(self):
+		response = self.client.post(
+			'/api/v1/auth/signup/otp/',
+			{'phone_number': self.client_user.phone_number, 'role': 'client'},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn('error', response.data)
+		self.assertIn('detail', response.data)
+		self.assertIn('already registered', response.data['detail'].lower())
+		self.assertEqual(response.data.get('next_action'), 'login')
+
+	@patch('accounts.sms_service.send_otp_sms', return_value=False)
+	def test_login_otp_sms_failure_returns_structured_json(self, _mock_send_sms):
+		response = self.client.post(
+			'/api/v1/auth/login/otp/',
+			{'phone_number': self.client_user.phone_number},
+			format='json',
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+		self.assertIn('error', response.data)
+		self.assertIn('detail', response.data)
+		self.assertIn('failed to send otp', response.data['detail'].lower())
 

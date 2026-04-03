@@ -202,6 +202,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       onSuccess();
     } catch (err: any) {
       const message =
+        err?.message ||
         err.response?.data?.detail ||
         err.response?.data?.errors?.otp_code?.[0] ||
         err.response?.data?.non_field_errors?.[0] ||
@@ -233,7 +234,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
     } catch (err: any) {
       notifications.show({
         title: 'Resend Failed',
-        message: err.response?.data?.detail || 'Could not resend OTP',
+        message: err?.message || err.response?.data?.detail || 'Could not resend OTP',
         color: 'red',
       });
     }

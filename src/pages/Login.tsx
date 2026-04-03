@@ -153,6 +153,7 @@ export default function Login() {
     } catch (error: any) {
       setOtpVerifying(false);
       const apiMessage =
+        error?.message ||
         error?.response?.data?.detail ||
         error?.response?.data?.otp_code?.[0] ||
         '';
