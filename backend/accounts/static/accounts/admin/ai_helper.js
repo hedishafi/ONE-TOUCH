@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const promptInput = document.getElementById('mv-ai-prompt');
   const output = document.getElementById('mv-ai-output');
   const run = document.getElementById('mv-ai-run');
-  if (!url || !promptInput || !output || !run) return;
+  if (!url) return;
 
   const getCsrfToken = () => (
     document.querySelector('[name=csrfmiddlewaretoken]')?.value
@@ -27,25 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
     return response.json();
   };
 
-  run.addEventListener('click', async () => {
-    const prompt = (promptInput.value || '').trim();
-    if (!prompt) {
-      output.value = 'Enter a prompt first.';
-      return;
-    }
+  if (promptInput && output && run) {
+    run.addEventListener('click', async () => {
+      const prompt = (promptInput.value || '').trim();
+      if (!prompt) {
+        output.value = 'Enter a prompt first.';
+        return;
+      }
 
-    run.disabled = true;
-    output.value = 'Generating suggestion...';
+      run.disabled = true;
+      output.value = 'Generating suggestion...';
 
-    try {
-      const data = await postForm({ prompt });
-      output.value = data.response || data.detail || 'No response.';
-    } catch (_) {
-      output.value = 'Failed to generate suggestion. Try again.';
-    } finally {
-      run.disabled = false;
-    }
-  });
+      try {
+        const data = await postForm({ prompt });
+        output.value = data.response || data.detail || 'No response.';
+      } catch (_) {
+        output.value = 'Failed to generate suggestion. Try again.';
+      } finally {
+        run.disabled = false;
+      }
+    });
+  }
 
   page.querySelectorAll('.mv-review-form').forEach((form) => {
     const textarea = form.querySelector('.mv-reason-input');

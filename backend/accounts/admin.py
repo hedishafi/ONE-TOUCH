@@ -26,7 +26,7 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('display_user', 'phone_number', 'provider_uid', 'role', 'verification_status', 'is_on_trial', 'date_joined')
+    list_display = ('display_user', 'phone_number', 'provider_uid', 'role', 'verification_status_display', 'is_on_trial_display', 'date_joined')
     list_filter = ('role', 'verification_status', 'is_on_trial', 'is_staff')
     search_fields = ('phone_number', 'provider_uid', 'first_name', 'last_name', 'email')
     ordering = ('-date_joined',)
@@ -53,6 +53,18 @@ class UserAdmin(BaseUserAdmin):
             return obj.phone_number
         return obj.email or 'User'
     display_user.short_description = 'User'
+
+    def verification_status_display(self, obj):
+        if obj.role == User.ROLE_CLIENT:
+            return '—'
+        return obj.verification_status
+    verification_status_display.short_description = 'Verification status'
+
+    def is_on_trial_display(self, obj):
+        if obj.role == User.ROLE_CLIENT:
+            return '—'
+        return obj.is_on_trial
+    is_on_trial_display.short_description = 'Is on trial'
 
 
 @admin.register(ProviderProfile)
@@ -113,7 +125,7 @@ class ProviderServiceAdmin(admin.ModelAdmin):
 @admin.register(ProviderManualVerification)
 class ProviderManualVerificationAdmin(admin.ModelAdmin):
     change_list_template = 'admin/accounts/providermanualverification/change_list.html'
-    list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_by', 'reviewed_at')
+    list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
     search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
     readonly_fields = ('reviewed_at', 'submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
