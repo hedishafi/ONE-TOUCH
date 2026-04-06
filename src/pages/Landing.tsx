@@ -923,4 +923,5 @@ export function Landing() {
       </Box>
     </>
   );
+
 }
