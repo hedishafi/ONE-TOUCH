@@ -107,4 +107,4 @@ class ServiceViewSet(viewsets.ModelViewSet):
 	def get_permissions(self):
 		if self.action in ['list', 'retrieve']:
 			return [AllowAny()]
-		return [IsAuthenticated(), CanManageService()]
+		return [IsAuthenticated(), IsProviderOrAdmin(), CanManageService()]
