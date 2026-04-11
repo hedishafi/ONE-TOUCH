@@ -2,11 +2,7 @@ name: Frontend CI
 
 on:
   push:
-    paths:
-      - "frontend/**"
   pull_request:
-    paths:
-      - "frontend/**"
   workflow_dispatch:
 
 permissions:
@@ -21,11 +17,6 @@ jobs:
     name: Lint, Test, Build (Frontend)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
-    defaults:
-      run:
-        working-directory: frontend
-        shell: bash
 
     env:
       CI: "true"
