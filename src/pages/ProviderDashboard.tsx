@@ -25,7 +25,7 @@ import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo, formatProviderTier } from '../utils/formatting';
 import { COLORS, ROUTES, PROVIDER_TIER_COLORS } from '../utils/constants';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import type { WalletTransaction, ProviderProfile, PricingModel } from '../types';
+import type { WalletTransaction, ProviderProfile, PricingModel, JobStatus } from '../types';
 import type { NavItem } from '../types/nav';
 
 const PROVIDER_NAV: NavItem[] = [
@@ -559,7 +559,7 @@ export function ActiveJobs() {
             {Object.entries(grouped).filter(([, items]) => items.length > 0).map(([status, items]) => (
               <Stack key={status} gap="sm">
                 <Group gap="xs">
-                  <StatusBadge status={status as any} />
+                  <StatusBadge status={status as JobStatus} />
                   <Text size="sm" c="dimmed">({items.length})</Text>
                 </Group>
                 {items.map(job => (

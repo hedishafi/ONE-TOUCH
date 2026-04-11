@@ -33,7 +33,7 @@ export function CallModal({ opened, onClose, onJobCreated }: CallModalProps) {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [opened, callProviderId]);
+  }, [opened, callProviderId, setCallStatus]);
 
   // Tick timer when connected
   useEffect(() => {
@@ -45,7 +45,7 @@ export function CallModal({ opened, onClose, onJobCreated }: CallModalProps) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [callStatus]);
+  }, [callStatus, tickCall]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
