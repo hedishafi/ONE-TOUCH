@@ -39,6 +39,17 @@ function useCountdown(start: number) {
   return { seconds, begin };
 }
 
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null) {
+    const maybe = err as {
+      response?: { data?: { detail?: string } };
+      message?: string;
+    };
+    return maybe.response?.data?.detail || maybe.message || fallback;
+  }
+  return fallback;
+};
+
 // ─── Step 2 – Phone OTP Verification ──────────────────────────────────────────
 function StepPhoneOTP({
   idResult,
@@ -93,9 +104,9 @@ function StepPhoneOTP({
         setVerifying(false);
         setError('Failed to create account. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setVerifying(false);
-      const errorMessage = err?.response?.data?.detail || 'Failed to verify OTP. Please try again.';
+      const errorMessage = getErrorMessage(err, 'Failed to verify OTP. Please try again.');
       setError(errorMessage);
     }
   };

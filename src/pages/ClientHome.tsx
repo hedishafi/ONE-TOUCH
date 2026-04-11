@@ -24,6 +24,7 @@ import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
+import type { AppNotification, Job } from '../types';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -213,13 +214,15 @@ export function ClientHome() {
     const prov=selectedProv??foundProviders[0]??foundProv;
     setFoundProv(prov);
     const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
-    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
+    const jobPayload: Omit<Job, 'id' | 'createdAt'> = {clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
       subcategoryId:'sub-001',description:desc,estimatedPrice:prov.priceMin,
       status:'pending_agreement',commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
-      createdAt:new Date().toISOString()} as any);
-    addNotification({id:`n-${Date.now()}`,userId:'provider-001',type:'new_job' as any,
-      title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()});
+      isRepeatBooking:false};
+    createJob(jobPayload);
+    const notificationPayload: AppNotification = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
+      title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
+    addNotification(notificationPayload);
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
@@ -228,7 +231,7 @@ export function ClientHome() {
     setDeclineStage('asking');
     setDeclineOpen(true);
   }
-  function pickReason(_reason:string){
+  function pickReason(){
     setDeclineStage('confirmed');
     declineTimer.current=setTimeout(()=>{
       setDeclineOpen(false);
@@ -261,11 +264,12 @@ export function ClientHome() {
     if(!currentUser)return;
     const prov=cSelectedProv??cProviders[0]??PROVIDER_POOL[0];
     const cat=MOCK_CATEGORIES.find(c=>c.name===cCat);
-    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
+    const jobPayload: Omit<Job, 'id' | 'createdAt'> = {clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
       subcategoryId:'sub-001',description:`${cCat} service request`,
       estimatedPrice:prov.priceMin,status:'pending_agreement',commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location'},
-      createdAt:new Date().toISOString()} as any);
+      isRepeatBooking:false};
+    createJob(jobPayload);
     closeCall();
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
