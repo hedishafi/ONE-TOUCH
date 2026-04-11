@@ -26,17 +26,21 @@ import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 // import { ChapaModal } from '../components/ChapaModal';
-import type { ProviderProfile } from '../types';
+import type { ProviderProfile, AppNotification, User } from '../types';
+
+type LeafletIconDefaultPrototype = {
+  _getIconUrl?: unknown;
+};
 
 // Fix Leaflet icons
 try {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  delete (L.Icon.Default.prototype as LeafletIconDefaultPrototype)._getIconUrl;
   L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
     iconUrl:        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
     shadowUrl:      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   });
-} catch (_) { /* already patched */ }
+} catch { /* already patched */ }
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -285,7 +289,7 @@ export function ProviderHome() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id, currentUser?.role]);
+  }, [currentUser]);
 
   const visible   = DEMO.filter(r=>!dismissed.has(r.id)&&online);
   const myJobs    = jobs.filter(j=>j.providerId===currentUser?.id);
@@ -306,7 +310,6 @@ export function ProviderHome() {
     setOnline(v); updateProviderOnlineStatus(v);
     notifications.show({title:v?'You are Online':'You are Offline',
       message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[isRestricted, isUnderReview, updateProviderOnlineStatus]);
 
   const accept = useCallback((req:Req) => {
@@ -337,13 +340,14 @@ export function ProviderHome() {
 
   function finalize(req:Req) {
     setDismissed(s=>new Set([...s,req.id]));
-    const all = storage.get<any[]>(STORAGE_KEYS.users,[]);
+    const all = storage.get<User[]>(STORAGE_KEYS.users,[]);
     const cl  = all.find(u=>u.id===req.clientId)??all.find(u=>u.role==='client');
     const ph  = cl?.phone??'+251-912-345-678';
     setRevealed({req,phone:ph}); setRevOpen(true);
-    addNotification({id:`n-${Date.now()}`,userId:req.clientId,type:'job_update' as any,
+    const notificationPayload: AppNotification = {id:`n-${Date.now()}`,userId:req.clientId,type:'job_update',
       title:'Provider Confirmed!',message:`Provider accepted your ${catName(req.catId)} request.`,
-      isRead:false,createdAt:new Date().toISOString()});
+      isRead:false,createdAt:new Date().toISOString()};
+    addNotification(notificationPayload);
   }
 
   function decline(id:string) {
@@ -663,7 +667,7 @@ export function ProviderHome() {
                               disabled={isRestricted}
                               onClick={() => {
                                 try { accept(req); }
-                                catch(e){ notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
+                                catch { notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
                               }}>
                               {isFree ? 'Accept (Free Trial)' : 'Accept & Pay'}
                             </Button>

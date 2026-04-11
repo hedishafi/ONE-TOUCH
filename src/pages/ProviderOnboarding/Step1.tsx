@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -21,6 +21,36 @@ import { ROUTES } from '../../utils/constants';
 import { STORAGE_KEYS, storage } from '../../utils/storage';
 
 type CaptureTarget = 'id_front_image' | 'id_back_image' | 'selfie_image';
+
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null) {
+    const maybe = err as {
+      name?: string;
+      response?: {
+        data?: {
+          detail?: string;
+          id_front_image?: string[];
+          id_back_image?: string[];
+          selfie_image?: string[];
+          error?: string;
+        };
+      };
+      message?: string;
+    };
+
+    return (
+      maybe.response?.data?.detail ||
+      maybe.response?.data?.id_front_image?.[0] ||
+      maybe.response?.data?.id_back_image?.[0] ||
+      maybe.response?.data?.selfie_image?.[0] ||
+      maybe.response?.data?.error ||
+      maybe.message ||
+      fallback
+    );
+  }
+
+  return fallback;
+};
 
 const TARGET_LABELS: Record<CaptureTarget, string> = {
   id_front_image: 'ID Front',
@@ -58,14 +88,14 @@ export const ProviderOnboardingStep1: React.FC = () => {
     };
   }, [previewFront, previewBack, previewSelfie]);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-  };
+  }, []);
 
-  const startCamera = async (target: CaptureTarget) => {
+  const startCamera = useCallback(async (target: CaptureTarget) => {
     try {
       setCameraLoading(true);
       setError(null);
@@ -126,20 +156,23 @@ export const ProviderOnboardingStep1: React.FC = () => {
         await videoRef.current.play();
         setCameraReady(true);
       }
-    } catch (err: any) {
-      const reason = err?.name ? ` (${err.name})` : '';
+    } catch (err: unknown) {
+      const reason =
+        typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string'
+          ? ` (${err.name})`
+          : '';
       setError(`Unable to access camera${reason}. Please allow camera permission and try again.`);
     } finally {
       setCameraLoading(false);
     }
-  };
+  }, [stopCamera]);
 
   useEffect(() => {
     startCamera(activeTarget);
     return () => {
       stopCamera();
     };
-  }, [activeTarget]);
+  }, [activeTarget, startCamera, stopCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -318,14 +351,8 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
       await syncProviderSession();
       navigate(ROUTES.providerDashboard);
-    } catch (err: any) {
-      const message =
-        err?.response?.data?.detail ||
-        err?.response?.data?.id_front_image?.[0] ||
-        err?.response?.data?.id_back_image?.[0] ||
-        err?.response?.data?.selfie_image?.[0] ||
-        err?.response?.data?.error ||
-        'Failed to submit verification images.';
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Failed to submit verification images.');
       setError(message);
       notifications.show({
         title: 'Submission Failed',

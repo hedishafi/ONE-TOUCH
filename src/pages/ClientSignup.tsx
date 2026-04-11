@@ -5,7 +5,7 @@
  *
  * No biometric face scan. No password entry. Frictionless and fast.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Center, Group, PinInput,
   Progress, Stack, Text, Alert, Anchor,
@@ -27,14 +27,14 @@ import {
 function useCountdown(start: number) {
   const [seconds, setSeconds] = useState(0);
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
-  const begin = () => {
+  const begin = useCallback(() => {
     setSeconds(start);
     if (ref.current) clearInterval(ref.current);
     ref.current = setInterval(() => setSeconds(s => {
       if (s <= 1) { clearInterval(ref.current!); return 0; }
       return s - 1;
     }), 1000);
-  };
+  }, [start]);
   useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
   return { seconds, begin };
 }
@@ -69,7 +69,7 @@ function StepPhoneOTP({
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;
 
-  useEffect(() => { begin(); }, []); // start countdown on mount
+  useEffect(() => { begin(); }, [begin]); // start countdown on mount
 
   const handleOtpChange = (val: string) => {
     setOtp(val);
