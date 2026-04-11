@@ -2,7 +2,11 @@ name: Frontend CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +18,7 @@ concurrency:
 
 jobs:
   quality-and-build:
-    name: Lint, Test, Build (Frontend)
+    name: frontend-ci
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -38,7 +42,6 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
-        continue-on-error: true
 
       - name: Run tests (if configured)
         run: |
