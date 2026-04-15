@@ -41,10 +41,11 @@ class UserAdmin(BaseUserAdmin):
                 'provider_uid',
                 'is_on_trial',
                 'trial_ends_at',
-            )
+            ),
+            'description': 'Note: Verification status is automatically managed by Provider Manual Verification. To approve/reject providers, use the Provider Manual Verification admin.'
         }),
     )
-    readonly_fields = ('provider_uid',)
+    readonly_fields = ('provider_uid', 'verification_status')
 
     def display_user(self, obj):
         """Display user's full name or fallback to phone/email"""
@@ -339,25 +340,21 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             return JsonResponse({'detail': 'Method not allowed.'}, status=405)
 
         mode = (request.POST.get('mode') or '').strip().lower()
+        
         if mode == 'rejection_reason':
-            document_issue = (request.POST.get('document_issue') or '').strip()
-            identity_issue = (request.POST.get('identity_issue') or '').strip()
-            additional_note = (request.POST.get('additional_note') or '').strip()
-
-            reason_parts = []
-            if document_issue:
-                reason_parts.append(f'{document_issue}.')
-            else:
-                reason_parts.append('The submitted identity documents are not clear enough for verification.')
-
-            if identity_issue:
-                reason_parts.append(f'{identity_issue}.')
-
-            reason_parts.append('Please upload clear, unedited photos of both sides of your ID and a well-lit selfie that matches the ID details.')
-            if additional_note:
-                reason_parts.append(additional_note)
-
-            return JsonResponse({'response': ' '.join(reason_parts)}, status=200)
+            # Get admin's input
+            admin_input = (request.POST.get('admin_input') or '').strip()
+            
+            if not admin_input:
+                return JsonResponse({'detail': 'Please provide a reason to expand.'}, status=400)
+            
+            # Generate multiple professional variations
+            variations = self._generate_rejection_variations(admin_input)
+            
+            return JsonResponse({
+                'variations': variations,
+                'count': len(variations)
+            }, status=200)
 
         prompt = (request.POST.get('prompt') or '').strip()
         if not prompt:
@@ -372,6 +369,81 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             suggestion = 'AI helper suggestion: prioritize image clarity, identity consistency across documents, and complete rejection reasons for faster re-submission.'
 
         return JsonResponse({'response': suggestion}, status=200)
+
+    def _generate_rejection_variations(self, admin_input: str) -> list:
+        """
+        Generate multiple professional variations of rejection reasons.
+        Expands short admin input into formal, well-written explanations.
+        """
+        admin_lower = admin_input.lower()
+        variations = []
+        
+        # Analyze the input to determine the issue type
+        is_blurry = any(word in admin_lower for word in ['blur', 'blurry', 'unclear', 'not clear', 'quality'])
+        is_lighting = any(word in admin_lower for word in ['dark', 'light', 'lighting', 'shadow', 'glare'])
+        is_cropped = any(word in admin_lower for word in ['crop', 'cut', 'partial', 'incomplete', 'missing'])
+        is_mismatch = any(word in admin_lower for word in ['match', 'different', 'mismatch', 'not same', 'inconsistent'])
+        is_edited = any(word in admin_lower for word in ['edit', 'filter', 'photoshop', 'modified', 'altered'])
+        is_expired = any(word in admin_lower for word in ['expire', 'old', 'outdated', 'invalid'])
+        
+        # Generate context-aware variations
+        if is_blurry:
+            variations.extend([
+                f"{admin_input}. The submitted images are not clear enough for verification. Please capture new photos in good lighting with a steady hand, ensuring all text and details are sharp and readable.",
+                f"{admin_input}. We cannot verify your identity due to image quality issues. Please retake the photos ensuring your camera is focused and all information on the ID is clearly visible.",
+                f"{admin_input}. The image quality does not meet our verification standards. Please submit new, high-resolution photos where all text, dates, and facial features are crisp and legible."
+            ])
+        
+        if is_lighting:
+            variations.extend([
+                f"{admin_input}. Poor lighting conditions make it difficult to verify your documents. Please retake the photos in a well-lit area, avoiding shadows, glare, or reflections on the ID.",
+                f"{admin_input}. The lighting in your photos obscures important details. Please capture new images in natural daylight or bright indoor lighting, ensuring the entire ID is evenly lit.",
+                f"{admin_input}. We cannot process your verification due to lighting issues. Please photograph your ID in good lighting conditions without flash glare or dark shadows."
+            ])
+        
+        if is_cropped:
+            variations.extend([
+                f"{admin_input}. Parts of your ID are cut off or missing from the frame. Please retake the photos ensuring the entire ID card is visible within the frame, including all four corners.",
+                f"{admin_input}. The submitted images are incomplete. Please capture new photos showing your full ID card from edge to edge, with no parts cropped out.",
+                f"{admin_input}. We need to see your complete ID for verification. Please retake the photos ensuring the entire document is captured within the frame without any edges cut off."
+            ])
+        
+        if is_mismatch:
+            variations.extend([
+                f"{admin_input}. The information or photo on your ID does not match your selfie. Please ensure you are submitting your own valid ID and a current selfie that clearly shows your face.",
+                f"{admin_input}. We cannot verify the consistency between your ID and selfie. Please resubmit with a clear selfie that matches the photo on your identification document.",
+                f"{admin_input}. There are discrepancies between your submitted documents. Please provide a valid ID and a well-lit selfie where your facial features clearly match the ID photo."
+            ])
+        
+        if is_edited:
+            variations.extend([
+                f"{admin_input}. The submitted images appear to have been edited or filtered. Please provide original, unedited photos of your ID and selfie for verification.",
+                f"{admin_input}. We detected modifications to your submitted images. Please resubmit original, unaltered photos taken directly with your camera without any editing or filters.",
+                f"{admin_input}. Your documents cannot be verified due to suspected editing. Please capture new, authentic photos without using any photo editing tools or filters."
+            ])
+        
+        if is_expired:
+            variations.extend([
+                f"{admin_input}. The ID you submitted has expired or is no longer valid. Please provide a current, valid government-issued identification document.",
+                f"{admin_input}. We cannot accept expired identification. Please resubmit with a valid, unexpired ID that is currently recognized by government authorities.",
+                f"{admin_input}. Your identification document is not current. Please provide a valid ID that has not passed its expiration date."
+            ])
+        
+        # If no specific issue detected, generate general variations
+        if not variations:
+            variations = [
+                f"{admin_input}. Please review the requirements and resubmit clear, unedited photos of both sides of your ID and a well-lit selfie that matches your ID photo.",
+                f"{admin_input}. To proceed with verification, please provide high-quality images where all details are clearly visible and your selfie matches the photo on your ID.",
+                f"{admin_input}. We need clearer documentation to verify your identity. Please capture new photos in good lighting, ensuring all information is readable and your selfie clearly shows your face."
+            ]
+        
+        # Add a general professional variation
+        variations.append(
+            f"{admin_input}. For successful verification, please ensure: (1) All photos are clear and well-lit, (2) Your entire ID is visible in the frame, (3) Your selfie clearly shows your face and matches your ID photo, (4) No filters or editing have been applied."
+        )
+        
+        # Return up to 4 variations
+        return variations[:4]
 
     def provider_identity(self, obj):
         full_name = obj.provider.get_full_name().strip()
@@ -481,6 +553,42 @@ class UserRegistrationNotificationAdmin(admin.ModelAdmin):
     readonly_fields = ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
     ordering = ('-registration_time',)
     actions = ['mark_as_reviewed']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'api/unreviewed/',
+                self.admin_site.admin_view(self.unreviewed_notifications_api),
+                name='accounts_userregistrationnotification_api_unreviewed',
+            ),
+        ]
+        return custom_urls + urls
+
+    def unreviewed_notifications_api(self, request):
+        """API endpoint for fetching unreviewed notifications"""
+        from django.utils.timesince import timesince
+        
+        notifications = UserRegistrationNotification.objects.filter(
+            reviewed=False
+        ).select_related('user').order_by('-registration_time')[:10]
+        
+        data = {
+            'count': UserRegistrationNotification.objects.filter(reviewed=False).count(),
+            'notifications': [
+                {
+                    'id': notif.id,
+                    'user_name': notif.user_name,
+                    'phone_number': notif.phone_number,
+                    'role': notif.role,
+                    'provider_uid': notif.provider_uid,
+                    'time_ago': timesince(notif.registration_time) + ' ago',
+                }
+                for notif in notifications
+            ]
+        }
+        
+        return JsonResponse(data)
 
     fieldsets = (
         ('User Information', {

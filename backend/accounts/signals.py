@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
-from .models import DeletedProviderRecord, User, UserRegistrationNotification
+from .models import DeletedProviderRecord, User, UserRegistrationNotification, ProviderManualVerification
 
 
 @receiver(pre_delete, sender=User)
@@ -101,3 +101,25 @@ Please review and approve this user in the admin panel.
 	except Exception:
 		# Fail silently to avoid breaking user registration
 		pass
+
+
+@receiver(post_save, sender=ProviderManualVerification)
+def sync_provider_verification_status(sender, instance: ProviderManualVerification, **kwargs):
+	"""
+	Automatically sync User verification status when ProviderManualVerification changes.
+	This makes ProviderManualVerification the single source of truth.
+	"""
+	if instance.status == ProviderManualVerification.STATUS_APPROVED:
+		if instance.provider.verification_status != User.STATUS_VERIFIED:
+			instance.provider.verification_status = User.STATUS_VERIFIED
+			instance.provider.save(update_fields=['verification_status'])
+	
+	elif instance.status == ProviderManualVerification.STATUS_REJECTED:
+		if instance.provider.verification_status != User.STATUS_REJECTED:
+			instance.provider.verification_status = User.STATUS_REJECTED
+			instance.provider.save(update_fields=['verification_status'])
+	
+	elif instance.status == ProviderManualVerification.STATUS_PENDING:
+		if instance.provider.verification_status != User.STATUS_PENDING:
+			instance.provider.verification_status = User.STATUS_PENDING
+			instance.provider.save(update_fields=['verification_status'])
