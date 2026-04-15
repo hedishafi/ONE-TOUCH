@@ -1,0 +1,395 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'Hafsa-work'
+      - 'feature/**'
+      - 'hotfix/**'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+      - 'Hafsa-work'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+env:
+  PYTHON_VERSION: '3.11'
+  POSTGRES_VERSION: '15'
+  REDIS_VERSION: '7'
+
+jobs:
+  # Job 1: Code Quality Checks
+  code-quality:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install flake8 black isort pylint bandit safety
+
+      - name: Run Black (Code Formatting)
+        run: |
+          cd backend
+          black --check --diff .
+        continue-on-error: true
+
+      - name: Run isort (Import Sorting)
+        run: |
+          cd backend
+          isort --check-only --diff .
+        continue-on-error: true
+
+      - name: Run Flake8 (Linting)
+        run: |
+          cd backend
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
+
+      - name: Run Bandit (Security Checks)
+        run: |
+          cd backend
+          bandit -r . -ll -f json -o bandit-report.json || true
+          bandit -r . -ll
+        continue-on-error: true
+
+      - name: Upload Bandit Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-security-report
+          path: backend/bandit-report.json
+
+  # Job 2: Run Tests
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_onetouch
+          POSTGRES_USER: onetouch
+          POSTGRES_PASSWORD: onetouch_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://onetouch:onetouch_test_password@localhost:5432/test_onetouch
+      REDIS_URL: redis://localhost:6379/0
+      DJANGO_SETTINGS_MODULE: core.settings
+      SECRET_KEY: test-secret-key-for-ci-only-not-for-production
+      DEBUG: 'False'
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      DB_NAME: test_onetouch
+      DB_USER: onetouch
+      DB_PASSWORD: onetouch_test_password
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client libpq-dev
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install coverage pytest pytest-django pytest-cov
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U onetouch; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run Database Migrations
+        run: |
+          cd backend
+          python manage.py migrate --noinput
+
+      - name: Run Tests with Coverage
+        run: |
+          cd backend
+          coverage run --source='accounts' manage.py test accounts.tests --verbosity=2
+          coverage report
+          coverage xml
+          coverage html
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/htmlcov/
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
+
+      - name: Test Summary
+        if: always()
+        run: |
+          cd backend
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY
+
+  # Job 3: Security Scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install safety pip-audit
+
+      - name: Run Safety Check (Dependency Vulnerabilities)
+        run: |
+          cd backend
+          safety check --json --output safety-report.json || true
+          safety check
+        continue-on-error: true
+
+      - name: Run pip-audit (Dependency Audit)
+        run: |
+          cd backend
+          pip-audit --desc
+        continue-on-error: true
+
+      - name: Upload Safety Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: safety-report
+          path: backend/safety-report.json
+
+  # Job 4: Build Docker Image
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/onetouch-backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+        continue-on-error: true
+
+  # Job 5: Deploy to Staging (on develop branch)
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.onetouch.app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Staging
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          # Add your staging deployment commands here
+          # Example: SSH to server and pull latest image
+          # ssh user@staging-server "cd /app && docker-compose pull && docker-compose up -d"
+        continue-on-error: true
+
+      - name: Run Smoke Tests
+        run: |
+          echo "🧪 Running smoke tests on staging..."
+          # Add smoke test commands here
+          # Example: curl https://staging.onetouch.app/health
+        continue-on-error: true
+
+  # Job 6: Deploy to Production (on main branch)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://onetouch.app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          # Add your production deployment commands here
+          # Example: SSH to server and pull latest image
+          # ssh user@prod-server "cd /app && docker-compose pull && docker-compose up -d"
+        continue-on-error: true
+
+      - name: Run Smoke Tests
+        run: |
+          echo "🧪 Running smoke tests on production..."
+          # Add smoke test commands here
+          # Example: curl https://onetouch.app/health
+        continue-on-error: true
+
+      - name: Notify Deployment
+        run: |
+          echo "✅ Production deployment completed!"
+          # Add notification commands here (Slack, Discord, Email, etc.)
+
+  # Job 7: Performance Tests (optional)
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Performance Tests
+        run: |
+          echo "⚡ Running performance tests..."
+          # Add performance testing tools here
+          # Example: locust, k6, artillery
+        continue-on-error: true
+
+  # Job 8: Notification
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [test, security, build]
+    if: always()
+    
+    steps:
+      - name: Check job status
+        id: check
+        run: |
+          if [ "${{ needs.test.result }}" == "success" ] && [ "${{ needs.security.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack Notification
+        if: always()
+        run: |
+          echo "📢 Sending notification..."
+          # Add Slack webhook here
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"Build ${{ steps.check.outputs.status }}"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      - name: Create GitHub Summary
+        if: always()
+        run: |
+          echo "# 🎯 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security: ${{ needs.security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "## Author: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

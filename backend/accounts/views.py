@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model
 from django.middleware.csrf import get_token
 from django.db import transaction
 from django.utils import timezone
-from django.utils.text import slugify
 from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
 from rest_framework.exceptions import ValidationError
@@ -672,18 +671,9 @@ class ProviderProfileSetupView(APIView):
         serializer.is_valid(raise_exception=True)
         vd = serializer.validated_data
 
-        def _ensure_unique_slug(model_cls, base_name: str) -> str:
-            base_slug = slugify(base_name) or 'item'
-            slug = base_slug
-            counter = 1
-            while model_cls.objects.filter(slug=slug).exists():
-                slug = f'{base_slug}-{counter}'
-                counter += 1
-            return slug
-
         full_name = vd['full_name']
-        category_name = vd['service_category']
-        sub_service_names = vd['sub_services']
+        service_category = vd['service_category_obj']
+        sub_service_objects = vd['sub_service_objects']
 
         name_parts = full_name.split()
         request.user.first_name = name_parts[0] if name_parts else ''
@@ -698,26 +688,6 @@ class ProviderProfileSetupView(APIView):
             provider_profile.profile_picture = vd['profile_picture']
         provider_profile.profile_completed = True
         provider_profile.save()
-
-        service_category = ServiceCategory.objects.filter(name__iexact=category_name).first()
-        if not service_category:
-            service_category = ServiceCategory.objects.create(
-                name=category_name,
-                slug=_ensure_unique_slug(ServiceCategory, category_name),
-                is_active=True,
-            )
-
-        sub_service_objects = []
-        for sub_name in sub_service_names:
-            sub_service = SubService.objects.filter(category=service_category, name__iexact=sub_name).first()
-            if not sub_service:
-                sub_service = SubService.objects.create(
-                    category=service_category,
-                    name=sub_name,
-                    slug=_ensure_unique_slug(SubService, sub_name),
-                    is_active=True,
-                )
-            sub_service_objects.append(sub_service)
 
         provider_service, _ = ProviderService.objects.get_or_create(provider=provider_profile)
         provider_service.primary_service = service_category
