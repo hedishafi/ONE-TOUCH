@@ -27,13 +27,14 @@ interface RoleChangeRequest {
   status: 'pending' | 'approved' | 'rejected';
   reason: string;
   admin_notes: string;
+  rejection_message: string;
   created_at: string;
   reviewed_at: string | null;
 }
 
 export const RoleChangeRequestPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuthStore();
+  const { currentUser, logout } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [requests, setRequests] = useState<RoleChangeRequest[]>([]);
@@ -46,6 +47,12 @@ export const RoleChangeRequestPage: React.FC = () => {
 
   // Check if there's a pending request
   const hasPendingRequest = requests.some(req => req.status === 'pending');
+  
+  // Check if there's an approved request that hasn't been acted upon yet
+  // Only show if the approved role matches the CURRENT role (meaning they haven't logged in with new role yet)
+  const approvedRequest = requests.find(
+    req => req.status === 'approved' && req.requested_role !== currentRole
+  );
 
   useEffect(() => {
     loadRequests();
@@ -131,6 +138,34 @@ export const RoleChangeRequestPage: React.FC = () => {
     return role === 'provider' ? 'Service Provider' : 'Client';
   };
 
+  const handleContinueAsNewRole = async () => {
+    if (!approvedRequest) return;
+    
+    const newRole = approvedRequest.requested_role;
+    
+    // Different messages based on the new role
+    if (newRole === 'provider') {
+      notifications.show({
+        title: 'Role Changed to Service Provider',
+        message: 'Please log in again and complete the provider onboarding process (profile setup, identity verification, etc.)',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+        autoClose: 8000,
+      });
+    } else {
+      notifications.show({
+        title: 'Role Changed to Client',
+        message: 'Please log in again to access your client dashboard.',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+    }
+    
+    // Log out and redirect to login
+    await logout();
+    navigate('/login');
+  };
+
   if (loading) {
     return (
       <Container size="md" py="xl">
@@ -171,6 +206,41 @@ export const RoleChangeRequestPage: React.FC = () => {
           {hasPendingRequest && (
             <Alert icon={<IconAlertCircle size={16} />} color="orange" title="Pending Request">
               You already have a pending role change request. Please wait for admin review.
+            </Alert>
+          )}
+          
+          {/* Show approved request alert with action button */}
+          {approvedRequest && (
+            <Alert icon={<IconCheck size={16} />} color="green" title="Request Approved!">
+              <Text size="sm" mb="md">
+                Your role change request has been approved! You are now registered as a{' '}
+                <strong>{getRoleLabel(approvedRequest.requested_role)}</strong>.
+              </Text>
+              {approvedRequest.requested_role === 'provider' ? (
+                <>
+                  <Text size="sm" mb="md">
+                    Click the button below to log out and log back in. You will then need to complete the provider onboarding process:
+                  </Text>
+                  <Text size="sm" mb="md" component="ul" style={{ paddingLeft: 20 }}>
+                    <li>Profile Setup (bio, services, pricing)</li>
+                    <li>Identity Verification (ID upload, selfie)</li>
+                    <li>Service Selection</li>
+                  </Text>
+                </>
+              ) : (
+                <Text size="sm" mb="md">
+                  Click the button below to log out and log back in with your new client role.
+                </Text>
+              )}
+              <Button
+                onClick={handleContinueAsNewRole}
+                color="green"
+                leftSection={<IconArrowRight size={16} />}
+              >
+                {approvedRequest.requested_role === 'provider' 
+                  ? 'Sign Up as Service Provider' 
+                  : 'Continue as Client'}
+              </Button>
             </Alert>
           )}
 
@@ -233,6 +303,20 @@ export const RoleChangeRequestPage: React.FC = () => {
 
                     <Text size="sm" mb="xs" fw={500}>Reason:</Text>
                     <Text size="sm" c="dimmed" mb="sm">{request.reason}</Text>
+
+                    {request.status === 'rejected' && request.rejection_message && (
+                      <Alert icon={<IconX size={16} />} color="red" title="Rejection Reason" mb="sm">
+                        <Text size="sm">{request.rejection_message}</Text>
+                      </Alert>
+                    )}
+
+                    {request.status === 'approved' && (
+                      <Alert icon={<IconCheck size={16} />} color="green" mb="sm">
+                        <Text size="sm">
+                          Your request was approved. You are now a {getRoleLabel(request.requested_role)}.
+                        </Text>
+                      </Alert>
+                    )}
 
                     {request.admin_notes && (
                       <>

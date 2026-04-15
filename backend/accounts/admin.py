@@ -196,6 +196,7 @@ class ProviderServiceAdmin(admin.ModelAdmin):
 @admin.register(ProviderManualVerification)
 class ProviderManualVerificationAdmin(admin.ModelAdmin):
     change_list_template = 'admin/accounts/providermanualverification/change_list.html'
+    change_form_template = 'admin/accounts/providermanualverification/change_form.html'
     list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
     search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
@@ -203,6 +204,7 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
     fields = (
         'provider',
         'status',
+        'admin_hint',
         'rejection_reason',
         'reviewed_at',
         'id_front_image',
@@ -225,6 +227,17 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
         if obj.status in {ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED}:
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
+            
+            # If rejected, generate AI message if admin_hint provided
+            if obj.status == ProviderManualVerification.STATUS_REJECTED:
+                if obj.admin_hint and not obj.rejection_reason:
+                    from .ai_service import generate_rejection_message
+                    obj.rejection_reason = generate_rejection_message(obj.admin_hint, 'verification')
+                
+                if not obj.rejection_reason:
+                    from .ai_service import get_default_message
+                    obj.rejection_reason = get_default_message('verification')
+        
         super().save_model(request, obj, form, change)
 
     def get_urls(self):
@@ -249,6 +262,11 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
                 'ai-helper/',
                 self.admin_site.admin_view(self.ai_helper_view),
                 name='accounts_providermanualverification_ai_helper',
+            ),
+            path(
+                'api/generate-rejection/',
+                self.admin_site.admin_view(self.generate_rejection_api),
+                name='accounts_providermanualverification_generate_rejection',
             ),
         ]
         return custom_urls + urls
@@ -389,6 +407,24 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             suggestion = 'AI helper suggestion: prioritize image clarity, identity consistency across documents, and complete rejection reasons for faster re-submission.'
 
         return JsonResponse({'response': suggestion}, status=200)
+
+    def generate_rejection_api(self, request):
+        """API endpoint for generating AI rejection message variations"""
+        if request.method != 'POST':
+            return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+        admin_input = (request.POST.get('admin_input') or '').strip()
+        
+        if not admin_input:
+            return JsonResponse({'detail': 'Please provide a reason to expand.'}, status=400)
+        
+        from .ai_service import generate_multiple_variations
+        variations = generate_multiple_variations(admin_input, context='verification', count=4)
+        
+        return JsonResponse({
+            'variations': variations,
+            'count': len(variations)
+        }, status=200)
 
     def _generate_rejection_variations(self, admin_input: str) -> list:
         """
@@ -668,6 +704,7 @@ class UserRegistrationNotificationAdmin(admin.ModelAdmin):
 
 @admin.register(RoleChangeRequest)
 class RoleChangeRequestAdmin(admin.ModelAdmin):
+    change_form_template = 'admin/accounts/rolechangerequest/change_form.html'
     list_display = ('user_display', 'phone_number_display', 'current_role', 'requested_role', 'status_badge', 'created_at', 'reviewed_at')
     list_filter = ('status', 'current_role', 'requested_role', 'created_at')
     search_fields = ('user__phone_number', 'user__first_name', 'user__last_name', 'user__email', 'reason', 'admin_notes')
@@ -680,9 +717,38 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
             'fields': ('user', 'current_role', 'requested_role', 'reason', 'created_at')
         }),
         ('Review', {
-            'fields': ('status', 'admin_notes', 'reviewed_by', 'reviewed_at', 'updated_at')
+            'fields': ('status', 'admin_notes', 'admin_hint', 'rejection_message', 'reviewed_by', 'reviewed_at', 'updated_at')
         }),
     )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'api/generate-rejection/',
+                self.admin_site.admin_view(self.generate_rejection_api),
+                name='accounts_rolechangerequest_generate_rejection',
+            ),
+        ]
+        return custom_urls + urls
+
+    def generate_rejection_api(self, request):
+        """API endpoint for generating AI rejection message variations"""
+        if request.method != 'POST':
+            return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+        admin_input = (request.POST.get('admin_input') or '').strip()
+        
+        if not admin_input:
+            return JsonResponse({'detail': 'Please provide a reason to expand.'}, status=400)
+        
+        from .ai_service import generate_multiple_variations
+        variations = generate_multiple_variations(admin_input, context='role_change', count=4)
+        
+        return JsonResponse({
+            'variations': variations,
+            'count': len(variations)
+        }, status=200)
 
     def user_display(self, obj):
         """Display user's name or phone"""
@@ -731,15 +797,46 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
                         user.is_on_trial = False
                         user.trial_ends_at = None
                     
-                    # If changing to provider, generate provider UID
-                    if obj.requested_role == User.ROLE_PROVIDER and not user.provider_uid:
-                        user.provider_uid = User.generate_provider_uid()
+                    # If changing to provider, generate provider UID and set pending verification
+                    if obj.requested_role == User.ROLE_PROVIDER:
+                        if not user.provider_uid:
+                            user.provider_uid = User.generate_provider_uid()
+                        user.verification_status = User.STATUS_PENDING
+                        user.is_on_trial = True
+                        from datetime import timedelta
+                        user.trial_ends_at = timezone.now() + timedelta(days=14)
+                        
+                        # Reset provider profile if it exists, or it will be created during onboarding
+                        try:
+                            profile = user.provider_profile
+                            # Reset profile completion status to force onboarding
+                            profile.profile_completed = False
+                            profile.save(update_fields=['profile_completed'])
+                        except ProviderProfile.DoesNotExist:
+                            # Profile will be created during onboarding
+                            pass
                     
                     user.save()
                     
                     messages.success(
                         request,
-                        f'Role change approved. User {user.phone_number} is now a {obj.requested_role}.'
+                        f'Role change approved. User {user.phone_number} is now a {obj.requested_role}. '
+                        f'{"They must complete provider onboarding (profile setup, identity verification, etc.)." if obj.requested_role == User.ROLE_PROVIDER else "They can access client features."}'
+                    )
+                
+                # If rejected, generate AI message if admin_hint provided
+                elif obj.status == RoleChangeRequest.STATUS_REJECTED:
+                    if obj.admin_hint and not obj.rejection_message:
+                        from .ai_service import generate_rejection_message
+                        obj.rejection_message = generate_rejection_message(obj.admin_hint, 'role_change')
+                    
+                    if not obj.rejection_message:
+                        from .ai_service import get_default_message
+                        obj.rejection_message = get_default_message('role_change')
+                    
+                    messages.warning(
+                        request,
+                        f'Role change rejected for user {obj.user.phone_number}.'
                     )
         
         super().save_model(request, obj, form, change)
@@ -764,8 +861,21 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
                 user.is_on_trial = False
                 user.trial_ends_at = None
             
-            if role_request.requested_role == User.ROLE_PROVIDER and not user.provider_uid:
-                user.provider_uid = User.generate_provider_uid()
+            if role_request.requested_role == User.ROLE_PROVIDER:
+                if not user.provider_uid:
+                    user.provider_uid = User.generate_provider_uid()
+                user.verification_status = User.STATUS_PENDING
+                user.is_on_trial = True
+                from datetime import timedelta
+                user.trial_ends_at = timezone.now() + timedelta(days=14)
+                
+                # Reset provider profile if it exists
+                try:
+                    profile = user.provider_profile
+                    profile.profile_completed = False
+                    profile.save(update_fields=['profile_completed'])
+                except ProviderProfile.DoesNotExist:
+                    pass
             
             user.save()
             count += 1

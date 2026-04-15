@@ -908,6 +908,7 @@ class RoleChangeRequestView(APIView):
                                 'status': rest_framework_serializers.CharField(),
                                 'reason': rest_framework_serializers.CharField(),
                                 'admin_notes': rest_framework_serializers.CharField(allow_blank=True),
+                                'rejection_message': rest_framework_serializers.CharField(allow_blank=True),
                                 'created_at': rest_framework_serializers.DateTimeField(),
                                 'reviewed_at': rest_framework_serializers.DateTimeField(allow_null=True),
                             },
@@ -933,6 +934,7 @@ class RoleChangeRequestView(APIView):
                         'status': req.status,
                         'reason': req.reason,
                         'admin_notes': req.admin_notes,
+                        'rejection_message': req.rejection_message,
                         'created_at': req.created_at.isoformat(),
                         'reviewed_at': req.reviewed_at.isoformat() if req.reviewed_at else None,
                     }

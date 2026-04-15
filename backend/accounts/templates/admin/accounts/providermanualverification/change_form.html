@@ -5,7 +5,7 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'accounts/admin/manual_verification.css' %}">
 <style>
-  .role-change-card {
+  .verification-card {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border: 2px solid #dee2e6;
     border-radius: 12px;
@@ -14,7 +14,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
   
-  .role-change-header {
+  .verification-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -23,7 +23,7 @@
     border-bottom: 2px solid #dee2e6;
   }
   
-  .role-change-title {
+  .verification-title {
     font-size: 20px;
     font-weight: 700;
     color: #212529;
@@ -53,7 +53,7 @@
     color: #721c24;
   }
   
-  .role-change-info {
+  .verification-info {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
@@ -82,32 +82,33 @@
     color: #212529;
   }
   
-  .role-arrow {
-    display: inline-block;
-    margin: 0 12px;
-    font-size: 20px;
-    color: #417690;
-  }
-  
-  .reason-box {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
+  .documents-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
     margin-top: 20px;
+  }
+  
+  .document-item {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
     border: 1px solid #dee2e6;
+    text-align: center;
   }
   
-  .reason-label {
-    font-size: 14px;
+  .document-label {
+    font-size: 12px;
     font-weight: 700;
-    color: #212529;
-    margin-bottom: 12px;
+    color: #6c757d;
+    margin-bottom: 8px;
   }
   
-  .reason-text {
-    font-size: 14px;
-    color: #495057;
-    line-height: 1.6;
+  .document-item img {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
   }
   
   .ai-rejection-section {
@@ -168,7 +169,7 @@
 {% block extrahead %}
 {{ block.super }}
 <script>
-  window.GENERATE_REJECTION_URL = "{% url 'admin:accounts_rolechangerequest_generate_rejection' %}";
+  window.GENERATE_REJECTION_URL = "{% url 'admin:accounts_providermanualverification_generate_rejection' %}";
 </script>
 <script defer src="{% static 'accounts/admin/rejection_modal.js' %}"></script>
 {% endblock %}
@@ -177,55 +178,75 @@
 {{ block.super }}
 
 {% if original %}
-<div class="role-change-card">
-  <div class="role-change-header">
-    <h2 class="role-change-title">Role Change Request Details</h2>
+<div class="verification-card">
+  <div class="verification-header">
+    <h2 class="verification-title">Provider Verification Details</h2>
     <span class="status-badge {{ original.status }}">{{ original.get_status_display }}</span>
   </div>
   
-  <div class="role-change-info">
+  <div class="verification-info">
     <div class="info-item">
-      <div class="info-label">User</div>
-      <div class="info-value">{{ original.user.get_full_name|default:original.user.phone_number }}</div>
+      <div class="info-label">Provider</div>
+      <div class="info-value">{{ original.provider.get_full_name|default:original.provider.phone_number }}</div>
     </div>
     
     <div class="info-item">
       <div class="info-label">Phone Number</div>
-      <div class="info-value">{{ original.user.phone_number }}</div>
+      <div class="info-value">{{ original.provider.phone_number }}</div>
     </div>
     
     <div class="info-item">
-      <div class="info-label">Role Change</div>
-      <div class="info-value">
-        {{ original.get_current_role_display }}
-        <span class="role-arrow">→</span>
-        {{ original.get_requested_role_display }}
-      </div>
+      <div class="info-label">Provider UID</div>
+      <div class="info-value">{{ original.provider.provider_uid|default:"—" }}</div>
     </div>
     
     <div class="info-item">
-      <div class="info-label">Requested On</div>
-      <div class="info-value">{{ original.created_at|date:"M d, Y H:i" }}</div>
+      <div class="info-label">Submitted On</div>
+      <div class="info-value">{{ original.submitted_at|date:"M d, Y H:i" }}</div>
     </div>
   </div>
   
-  <div class="reason-box">
-    <div class="reason-label">📝 Reason for Role Change</div>
-    <div class="reason-text">{{ original.reason|linebreaks }}</div>
+  <div class="documents-preview">
+    {% if original.id_front_image %}
+    <div class="document-item">
+      <div class="document-label">ID Front</div>
+      <a href="{{ original.id_front_image.url }}" target="_blank">
+        <img src="{{ original.id_front_image.url }}" alt="ID Front">
+      </a>
+    </div>
+    {% endif %}
+    
+    {% if original.id_back_image %}
+    <div class="document-item">
+      <div class="document-label">ID Back</div>
+      <a href="{{ original.id_back_image.url }}" target="_blank">
+        <img src="{{ original.id_back_image.url }}" alt="ID Back">
+      </a>
+    </div>
+    {% endif %}
+    
+    {% if original.selfie_image %}
+    <div class="document-item">
+      <div class="document-label">Selfie</div>
+      <a href="{{ original.selfie_image.url }}" target="_blank">
+        <img src="{{ original.selfie_image.url }}" alt="Selfie">
+      </a>
+    </div>
+    {% endif %}
   </div>
   
   {% if original.status == 'pending' %}
   <div class="ai-rejection-section">
     <div class="ai-rejection-label">🤖 AI-Assisted Rejection (Optional)</div>
     <div class="ai-rejection-help">
-      Enter a short hint (e.g., "insufficient documentation", "policy violation") and click Generate to create professional rejection messages.
+      Enter a short hint (e.g., "blurry image", "ID expired") and click Generate to create professional rejection messages.
       The hint is internal only - users will see the AI-generated message.
     </div>
     <textarea 
       id="admin-hint-input" 
       class="ai-rejection-input" 
       rows="2" 
-      placeholder="e.g., insufficient documentation, policy violation, duplicate request"
+      placeholder="e.g., blurry front image, ID expired, selfie doesn't match"
     ></textarea>
     <button type="button" id="generate-rejection-btn" class="ai-generate-btn">
       Generate Rejection Variations
@@ -234,9 +255,9 @@
   {% endif %}
   
   {% if original.reviewed_at %}
-  <div class="reason-box" style="margin-top: 20px;">
-    <div class="reason-label">👤 Review Information</div>
-    <div class="reason-text">
+  <div class="ai-rejection-section" style="margin-top: 20px;">
+    <div class="ai-rejection-label">👤 Review Information</div>
+    <div style="font-size: 14px; color: #495057; line-height: 1.6;">
       <strong>Reviewed by:</strong> {{ original.reviewed_by.get_full_name|default:original.reviewed_by.username }}<br>
       <strong>Reviewed at:</strong> {{ original.reviewed_at|date:"M d, Y H:i" }}
     </div>

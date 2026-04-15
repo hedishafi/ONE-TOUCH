@@ -305,7 +305,8 @@ class ProviderManualVerification(models.Model):
     selfie_image = models.FileField(upload_to='provider_verification/selfie/')
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    rejection_reason = models.TextField(blank=True)
+    admin_hint = models.TextField(blank=True, help_text='Internal admin hint (not shown to user)')
+    rejection_reason = models.TextField(blank=True, help_text='AI-generated rejection message shown to user')
 
     reviewed_by = models.ForeignKey(
         User,
@@ -419,6 +420,8 @@ class RoleChangeRequest(models.Model):
     reason = models.TextField(help_text='User\'s reason for requesting role change')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     admin_notes = models.TextField(blank=True, help_text='Admin notes about this request')
+    admin_hint = models.TextField(blank=True, help_text='Internal admin hint (not shown to user)')
+    rejection_message = models.TextField(blank=True, help_text='AI-generated rejection message shown to user')
     
     reviewed_by = models.ForeignKey(
         User,
