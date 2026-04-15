@@ -95,7 +95,8 @@ class ProviderProfileAdminTests(AdminTestBase):
 
     def test_list_display_includes_required_fields(self):
         expected_fields = [
-            'user',
+            'provider_name_display',  # Changed from 'user'
+            'provider_uid_display',  # Added
             'is_available',
             'avg_rating',
             'total_jobs',

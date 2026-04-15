@@ -179,7 +179,8 @@ class ProviderServiceAdminTests(AdminTestBase):
 
     def test_list_display_includes_required_fields(self):
         expected_fields = [
-            'provider',
+            'provider_name_display',  # Changed from 'provider'
+            'provider_uid_display',  # Added
             'primary_service',
             'subservice_count',
             'created_at',

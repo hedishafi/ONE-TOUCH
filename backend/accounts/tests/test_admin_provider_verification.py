@@ -277,15 +277,17 @@ class ProviderManualVerificationAdminTests(AdminTestBase):
 
         response = self.client.post(url, {
             'mode': 'rejection_reason',
-            'document_issue': 'ID front image is blurry',
-            'identity_issue': 'Name does not match',
-            'additional_note': 'Please resubmit',
+            'admin_input': 'ID front image is blurry',
         })
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIn('response', data)
-        self.assertIn('blurry', data['response'].lower())
+        self.assertIn('variations', data)
+        self.assertIn('count', data)
+        self.assertGreater(data['count'], 0)
+        self.assertIsInstance(data['variations'], list)
+        # Check that at least one variation contains the input
+        self.assertTrue(any('blurry' in v.lower() for v in data['variations']))
 
     def test_ai_helper_requires_post_method(self):
         self.login_admin()

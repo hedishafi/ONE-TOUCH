@@ -125,14 +125,15 @@ class UserAdminTests(AdminTestBase):
         display = self.user_admin.is_on_trial_display(self.provider_user)
         self.assertIn(display, [True, False])
 
-    def test_provider_uid_is_readonly(self):
+    def test_provider_uid_and_verification_status_are_readonly(self):
         self.assertIn('provider_uid', self.user_admin.readonly_fields)
+        self.assertIn('verification_status', self.user_admin.readonly_fields)
 
     def test_admin_list_display_includes_required_fields(self):
         expected_fields = [
             'display_user',
             'phone_number',
-            'provider_uid',
+            'provider_uid_display',  # Changed from 'provider_uid'
             'role',
             'verification_status_display',
             'is_on_trial_display',

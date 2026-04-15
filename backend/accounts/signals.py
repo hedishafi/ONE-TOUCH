@@ -109,17 +109,26 @@ def sync_provider_verification_status(sender, instance: ProviderManualVerificati
 	Automatically sync User verification status when ProviderManualVerification changes.
 	This makes ProviderManualVerification the single source of truth.
 	"""
-	if instance.status == ProviderManualVerification.STATUS_APPROVED:
-		if instance.provider.verification_status != User.STATUS_VERIFIED:
-			instance.provider.verification_status = User.STATUS_VERIFIED
-			instance.provider.save(update_fields=['verification_status'])
+	# Prevent infinite loops by checking if we're already in a save operation
+	if kwargs.get('raw', False):
+		return
 	
-	elif instance.status == ProviderManualVerification.STATUS_REJECTED:
-		if instance.provider.verification_status != User.STATUS_REJECTED:
-			instance.provider.verification_status = User.STATUS_REJECTED
-			instance.provider.save(update_fields=['verification_status'])
+	# Get the current status
+	current_status = instance.status
+	provider = instance.provider
 	
-	elif instance.status == ProviderManualVerification.STATUS_PENDING:
-		if instance.provider.verification_status != User.STATUS_PENDING:
-			instance.provider.verification_status = User.STATUS_PENDING
-			instance.provider.save(update_fields=['verification_status'])
+	# Only update if status actually changed
+	if current_status == ProviderManualVerification.STATUS_APPROVED:
+		if provider.verification_status != User.STATUS_VERIFIED:
+			provider.verification_status = User.STATUS_VERIFIED
+			provider.save(update_fields=['verification_status'])
+	
+	elif current_status == ProviderManualVerification.STATUS_REJECTED:
+		if provider.verification_status != User.STATUS_REJECTED:
+			provider.verification_status = User.STATUS_REJECTED
+			provider.save(update_fields=['verification_status'])
+	
+	elif current_status == ProviderManualVerification.STATUS_PENDING:
+		if provider.verification_status != User.STATUS_PENDING:
+			provider.verification_status = User.STATUS_PENDING
+			provider.save(update_fields=['verification_status'])
