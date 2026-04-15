@@ -18,6 +18,7 @@ from .models import (
     ProviderProfile,
     ProviderManualVerification,
     ProviderService,
+    RoleChangeRequest,
     ServiceCategory,
     SubService,
     User,
@@ -31,6 +32,7 @@ class UserAdmin(BaseUserAdmin):
     list_filter = ('role', 'verification_status', 'is_on_trial', 'is_staff')
     search_fields = ('phone_number', 'provider_uid', 'first_name', 'last_name', 'email')
     ordering = ('-date_joined',)
+    actions = ['reset_phone_number']
 
     fieldsets = BaseUserAdmin.fieldsets + (
         ('OneTouch Fields', {
@@ -77,6 +79,24 @@ class UserAdmin(BaseUserAdmin):
             return '—'
         return obj.is_on_trial
     is_on_trial_display.short_description = 'Is on trial'
+
+    def reset_phone_number(self, request, queryset):
+        """
+        Admin action to reset phone numbers, allowing re-registration.
+        This removes the phone number from deleted provider records.
+        """
+        count = 0
+        for user in queryset:
+            # Remove from deleted provider records if exists
+            DeletedProviderRecord.objects.filter(phone_number=user.phone_number).delete()
+            count += 1
+        
+        self.message_user(
+            request,
+            f'Successfully reset {count} phone number(s). These phone numbers can now be used for re-registration.',
+            messages.SUCCESS
+        )
+    reset_phone_number.short_description = 'Reset phone number (allow re-registration)'
 
 
 @admin.register(ProviderProfile)
@@ -644,3 +664,121 @@ class UserRegistrationNotificationAdmin(admin.ModelAdmin):
         )
         self.message_user(request, f'{updated} notification(s) marked as reviewed.')
     mark_as_reviewed.short_description = 'Mark selected as reviewed'
+
+
+@admin.register(RoleChangeRequest)
+class RoleChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ('user_display', 'phone_number_display', 'current_role', 'requested_role', 'status_badge', 'created_at', 'reviewed_at')
+    list_filter = ('status', 'current_role', 'requested_role', 'created_at')
+    search_fields = ('user__phone_number', 'user__first_name', 'user__last_name', 'user__email', 'reason', 'admin_notes')
+    readonly_fields = ('user', 'current_role', 'requested_role', 'reason', 'created_at', 'updated_at', 'reviewed_by', 'reviewed_at')
+    ordering = ('-created_at',)
+    actions = ['approve_role_change', 'reject_role_change']
+
+    fieldsets = (
+        ('Request Information', {
+            'fields': ('user', 'current_role', 'requested_role', 'reason', 'created_at')
+        }),
+        ('Review', {
+            'fields': ('status', 'admin_notes', 'reviewed_by', 'reviewed_at', 'updated_at')
+        }),
+    )
+
+    def user_display(self, obj):
+        """Display user's name or phone"""
+        full_name = obj.user.get_full_name().strip()
+        if full_name:
+            return full_name
+        return obj.user.phone_number or obj.user.username
+    user_display.short_description = 'User'
+
+    def phone_number_display(self, obj):
+        """Display phone number"""
+        return obj.user.phone_number
+    phone_number_display.short_description = 'Phone Number'
+
+    def status_badge(self, obj):
+        """Display status with color coding"""
+        colors = {
+            'pending': 'orange',
+            'approved': 'green',
+            'rejected': 'red',
+        }
+        color = colors.get(obj.status, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">● {}</span>',
+            color,
+            obj.get_status_display()
+        )
+    status_badge.short_description = 'Status'
+
+    def save_model(self, request, obj, form, change):
+        """Auto-set reviewed_by and reviewed_at when status changes"""
+        if change and 'status' in form.changed_data:
+            if obj.status in [RoleChangeRequest.STATUS_APPROVED, RoleChangeRequest.STATUS_REJECTED]:
+                obj.reviewed_by = request.user
+                obj.reviewed_at = timezone.now()
+                
+                # If approved, change the user's role
+                if obj.status == RoleChangeRequest.STATUS_APPROVED:
+                    user = obj.user
+                    old_role = user.role
+                    user.role = obj.requested_role
+                    
+                    # If changing from provider to client, reset provider-specific fields
+                    if old_role == User.ROLE_PROVIDER and obj.requested_role == User.ROLE_CLIENT:
+                        user.verification_status = User.STATUS_PENDING
+                        user.is_on_trial = False
+                        user.trial_ends_at = None
+                    
+                    # If changing to provider, generate provider UID
+                    if obj.requested_role == User.ROLE_PROVIDER and not user.provider_uid:
+                        user.provider_uid = User.generate_provider_uid()
+                    
+                    user.save()
+                    
+                    messages.success(
+                        request,
+                        f'Role change approved. User {user.phone_number} is now a {obj.requested_role}.'
+                    )
+        
+        super().save_model(request, obj, form, change)
+
+    def approve_role_change(self, request, queryset):
+        """Bulk action to approve role change requests"""
+        count = 0
+        for role_request in queryset.filter(status=RoleChangeRequest.STATUS_PENDING):
+            role_request.status = RoleChangeRequest.STATUS_APPROVED
+            role_request.reviewed_by = request.user
+            role_request.reviewed_at = timezone.now()
+            role_request.save()
+            
+            # Change user's role
+            user = role_request.user
+            old_role = user.role
+            user.role = role_request.requested_role
+            
+            # Handle role-specific logic
+            if old_role == User.ROLE_PROVIDER and role_request.requested_role == User.ROLE_CLIENT:
+                user.verification_status = User.STATUS_PENDING
+                user.is_on_trial = False
+                user.trial_ends_at = None
+            
+            if role_request.requested_role == User.ROLE_PROVIDER and not user.provider_uid:
+                user.provider_uid = User.generate_provider_uid()
+            
+            user.save()
+            count += 1
+        
+        self.message_user(request, f'{count} role change request(s) approved.', messages.SUCCESS)
+    approve_role_change.short_description = 'Approve selected role change requests'
+
+    def reject_role_change(self, request, queryset):
+        """Bulk action to reject role change requests"""
+        count = queryset.filter(status=RoleChangeRequest.STATUS_PENDING).update(
+            status=RoleChangeRequest.STATUS_REJECTED,
+            reviewed_by=request.user,
+            reviewed_at=timezone.now()
+        )
+        self.message_user(request, f'{count} role change request(s) rejected.', messages.WARNING)
+    reject_role_change.short_description = 'Reject selected role change requests'

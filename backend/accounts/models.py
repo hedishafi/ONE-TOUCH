@@ -390,3 +390,52 @@ class ProviderService(models.Model):
     def __str__(self):
         return f'{self.provider.user.username} — {self.primary_service.name}'
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ROLE CHANGE REQUEST (for providers requesting to change role)
+# ─────────────────────────────────────────────────────────────────────────────
+class RoleChangeRequest(models.Model):
+    """
+    Allows service providers to request a role change (e.g., provider to client).
+    Admin reviews and approves/rejects the request.
+    """
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='role_change_requests',
+        help_text='User requesting the role change'
+    )
+    current_role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    requested_role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    reason = models.TextField(help_text='User\'s reason for requesting role change')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    admin_notes = models.TextField(blank=True, help_text='Admin notes about this request')
+    
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_role_changes'
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Role Change Request'
+        verbose_name_plural = 'Role Change Requests'
+
+    def __str__(self):
+        return f'{self.user.phone_number}: {self.current_role} → {self.requested_role} ({self.status})'
+

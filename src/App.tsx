@@ -49,6 +49,9 @@ import {
   ProviderLoyalty,
 } from './pages/ProviderDashboard';
 
+// Settings pages
+import { RoleChangeRequestPage } from './pages/Settings/RoleChangeRequest';
+
 // Provider Onboarding
 import { ProviderOnboardingStep1 } from './pages/ProviderOnboarding/Step1';
 import { ProviderOnboardingStep3OTPVerify } from './pages/ProviderOnboarding/Step3OTPVerify';
@@ -114,6 +117,7 @@ function App() {
           <Route path="saved" element={<SavedProviders />} />
           <Route path="wallet" element={<ClientWallet />} />
           <Route path="loyalty" element={<ClientLoyalty />} />
+          <Route path="settings/role-change" element={<RoleChangeRequestPage />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 
@@ -128,6 +132,7 @@ function App() {
           <Route path="profile" element={<ProviderProfile />} />
           <Route path="wallet" element={<ProviderWallet />} />
           <Route path="loyalty" element={<ProviderLoyalty />} />
+          <Route path="settings/role-change" element={<RoleChangeRequestPage />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 

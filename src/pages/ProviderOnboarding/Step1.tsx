@@ -174,7 +174,9 @@ export const ProviderOnboardingStep1: React.FC = () => {
         } else if (errorName === 'TypeError') {
           friendlyMessage = 'Camera access is not supported in this browser. Please use Chrome, Safari, or Firefox.';
         } else if (errorName === 'AbortError') {
-          friendlyMessage = 'Camera initialization was interrupted. Please try again.';
+          // Don't show error for AbortError - it's usually just switching cameras
+          console.log('Camera initialization aborted (likely switching cameras)');
+          return; // Exit without setting error
         } else {
           friendlyMessage = 'Unable to access camera. Please check your browser settings and ensure camera permission is granted.';
         }
@@ -182,18 +184,21 @@ export const ProviderOnboardingStep1: React.FC = () => {
         friendlyMessage = 'Unable to access camera. Please check your browser settings and ensure camera permission is granted.';
       }
       
-      setError(friendlyMessage);
+      if (friendlyMessage) {
+        setError(friendlyMessage);
+      }
     } finally {
       setCameraLoading(false);
     }
   }, [stopCamera]);
 
   useEffect(() => {
-    // Don't auto-start camera - only start when user clicks capture button
+    // Start camera automatically when component mounts or activeTarget changes
+    startCamera(activeTarget);
     return () => {
       stopCamera();
     };
-  }, [stopCamera]);
+  }, [activeTarget, startCamera, stopCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -420,45 +425,27 @@ export const ProviderOnboardingStep1: React.FC = () => {
           <Paper withBorder p="md" radius="md">
             <Stack gap="sm">
               <Text fw={600}>Live Camera — {TARGET_LABELS[activeTarget]}</Text>
-              {!streamRef.current ? (
-                <Center style={{ minHeight: 280, background: '#f8f9fa', borderRadius: 8, border: '2px dashed #dee2e6' }}>
-                  <Stack align="center" gap="sm">
-                    <IconCamera size={48} color="#868e96" />
-                    <Text size="sm" c="dimmed">Camera not started</Text>
-                    <Button 
-                      leftSection={<IconCamera size={16} />} 
-                      onClick={() => startCamera(activeTarget)}
-                      loading={cameraLoading}
-                    >
-                      Start Camera
-                    </Button>
-                  </Stack>
-                </Center>
-              ) : (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ width: '100%', minHeight: 280, background: '#000', borderRadius: 8 }}
-                  />
-                  <canvas ref={canvasRef} style={{ display: 'none' }} />
-                  <Group>
-                    <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
-                      Capture
-                    </Button>
-                    <Button
-                      variant="default"
-                      leftSection={<IconRefresh size={16} />}
-                      onClick={() => startCamera(activeTarget)}
-                      disabled={loading || cameraLoading}
-                    >
-                      Restart Camera
-                    </Button>
-                  </Group>
-                </>
-              )}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', minHeight: 280, background: '#000', borderRadius: 8 }}
+              />
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <Group>
+                <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
+                  Capture
+                </Button>
+                <Button
+                  variant="default"
+                  leftSection={<IconRefresh size={16} />}
+                  onClick={() => startCamera(activeTarget)}
+                  disabled={loading || cameraLoading}
+                >
+                  Restart Camera
+                </Button>
+              </Group>
             </Stack>
           </Paper>
 

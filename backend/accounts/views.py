@@ -801,3 +801,143 @@ class SubServiceListView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class RoleChangeRequestView(APIView):
+    """
+    API endpoint for users to request a role change.
+    Admin reviews and approves/rejects via Django Admin.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['User'],
+        request=inline_serializer(
+            'RoleChangeRequestInput',
+            {
+                'requested_role': rest_framework_serializers.ChoiceField(choices=['client', 'provider']),
+                'reason': rest_framework_serializers.CharField(min_length=10, max_length=1000),
+            },
+        ),
+        responses={
+            201: inline_serializer(
+                'RoleChangeRequestResponse',
+                {
+                    'id': rest_framework_serializers.IntegerField(),
+                    'current_role': rest_framework_serializers.CharField(),
+                    'requested_role': rest_framework_serializers.CharField(),
+                    'status': rest_framework_serializers.CharField(),
+                    'reason': rest_framework_serializers.CharField(),
+                    'created_at': rest_framework_serializers.DateTimeField(),
+                    'message': rest_framework_serializers.CharField(),
+                },
+            ),
+            400: OpenApiResponse(description='Validation error or invalid request'),
+        },
+        summary='Request a role change (requires admin approval)',
+    )
+    def post(self, request):
+        from .models import RoleChangeRequest
+        
+        requested_role = request.data.get('requested_role', '').strip()
+        reason = request.data.get('reason', '').strip()
+        
+        # Validation
+        if not requested_role:
+            return _error_response('requested_role is required.')
+        
+        if requested_role not in [User.ROLE_CLIENT, User.ROLE_PROVIDER]:
+            return _error_response('requested_role must be either "client" or "provider".')
+        
+        if requested_role == request.user.role:
+            return _error_response('You are already in the requested role.')
+        
+        if not reason or len(reason) < 10:
+            return _error_response('Please provide a detailed reason (at least 10 characters).')
+        
+        if len(reason) > 1000:
+            return _error_response('Reason is too long (maximum 1000 characters).')
+        
+        # Check for pending requests
+        pending_request = RoleChangeRequest.objects.filter(
+            user=request.user,
+            status=RoleChangeRequest.STATUS_PENDING
+        ).first()
+        
+        if pending_request:
+            return _error_response(
+                'You already have a pending role change request. Please wait for admin review.',
+                http_status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create the request
+        role_change_request = RoleChangeRequest.objects.create(
+            user=request.user,
+            current_role=request.user.role,
+            requested_role=requested_role,
+            reason=reason,
+            status=RoleChangeRequest.STATUS_PENDING
+        )
+        
+        return Response(
+            {
+                'id': role_change_request.id,
+                'current_role': role_change_request.current_role,
+                'requested_role': role_change_request.requested_role,
+                'status': role_change_request.status,
+                'reason': role_change_request.reason,
+                'created_at': role_change_request.created_at.isoformat(),
+                'message': 'Role change request submitted successfully. Admin will review your request.',
+            },
+            status=status.HTTP_201_CREATED
+        )
+    
+    @extend_schema(
+        tags=['User'],
+        responses={
+            200: inline_serializer(
+                'RoleChangeRequestListResponse',
+                {
+                    'requests': rest_framework_serializers.ListField(
+                        child=inline_serializer(
+                            'RoleChangeRequestItem',
+                            {
+                                'id': rest_framework_serializers.IntegerField(),
+                                'current_role': rest_framework_serializers.CharField(),
+                                'requested_role': rest_framework_serializers.CharField(),
+                                'status': rest_framework_serializers.CharField(),
+                                'reason': rest_framework_serializers.CharField(),
+                                'admin_notes': rest_framework_serializers.CharField(allow_blank=True),
+                                'created_at': rest_framework_serializers.DateTimeField(),
+                                'reviewed_at': rest_framework_serializers.DateTimeField(allow_null=True),
+                            },
+                        )
+                    )
+                },
+            )
+        },
+        summary='Get my role change requests',
+    )
+    def get(self, request):
+        from .models import RoleChangeRequest
+        
+        requests = RoleChangeRequest.objects.filter(user=request.user).order_by('-created_at')
+        
+        return Response(
+            {
+                'requests': [
+                    {
+                        'id': req.id,
+                        'current_role': req.current_role,
+                        'requested_role': req.requested_role,
+                        'status': req.status,
+                        'reason': req.reason,
+                        'admin_notes': req.admin_notes,
+                        'created_at': req.created_at.isoformat(),
+                        'reviewed_at': req.reviewed_at.isoformat() if req.reviewed_at else None,
+                    }
+                    for req in requests
+                ]
+            },
+            status=status.HTTP_200_OK
+        )

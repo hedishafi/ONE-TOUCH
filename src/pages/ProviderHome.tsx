@@ -184,6 +184,7 @@ const NAV = [
   {label:'Services & Subservices',       icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
   {label:'Wallet / Commission Overview', icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
   {label:'Earnings',                     icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
+  {label:'Request Role Change',          icon:<IconShieldCheck  size={16}/>, r:'/provider/settings/role-change'},
 ];
 
 export function ProviderHome() {

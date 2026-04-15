@@ -4,15 +4,15 @@
 {% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
 {% block branding %}
-<h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></h1>
-{% endblock %}
-
-{% block userlinks %}
-<div class="admin-userlinks-container">
-  <!-- Notification Bell -->
+<div class="branding-container">
+  <h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a>
+  </h1>
+  
+  <!-- Notification Bell in Header -->
   <div class="admin-notification-bell" id="notification-bell">
-    <a href="{% url 'admin:accounts_userregistrationnotification_changelist' %}?reviewed__exact=0" class="notification-bell-link">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <a href="#" class="notification-bell-link" id="notification-bell-link">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
       </svg>
@@ -28,22 +28,44 @@
       </div>
     </div>
   </div>
-  
-  {{ block.super }}
 </div>
 {% endblock %}
 
 {% block extrastyle %}
 {{ block.super }}
 <style>
-  .admin-userlinks-container {
+  /* ========== Branding Container with Notification ========== */
+  .branding-container {
     display: flex;
     align-items: center;
-    gap: 15px;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #417690 0%, #2c5364 100%);
+    border-bottom: 3px solid #1a3a47;
   }
   
+  #site-name {
+    margin: 0;
+    flex: 1;
+  }
+  
+  #site-name a {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 600;
+    text-decoration: none;
+    letter-spacing: 0.5px;
+  }
+  
+  #site-name a:hover {
+    color: #e0f2f7;
+  }
+  
+  /* ========== Notification Bell ========== */
   .admin-notification-bell {
     position: relative;
+    display: inline-block;
+    margin-left: 20px;
   }
   
   .notification-bell-link {
@@ -51,83 +73,132 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: #f8f9fa;
-    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
     cursor: pointer;
+    text-decoration: none;
+    border: 2px solid rgba(255, 255, 255, 0.2);
   }
   
   .notification-bell-link:hover {
-    background: #e9ecef;
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: scale(1.05);
   }
   
   .notification-bell-link svg {
-    color: #495057;
+    color: #ffffff;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
   }
   
   .notification-count {
     position: absolute;
     top: -4px;
     right: -4px;
-    background: #dc3545;
+    background: linear-gradient(135deg, #ff4757 0%, #dc3545 100%);
     color: white;
-    border-radius: 10px;
-    padding: 2px 6px;
+    border-radius: 12px;
+    padding: 3px 7px;
     font-size: 11px;
     font-weight: 700;
-    min-width: 18px;
+    min-width: 20px;
     text-align: center;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
+    animation: pulse 2s infinite;
   }
   
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+  
+  /* ========== Notification Dropdown ========== */
   .notification-dropdown {
     position: absolute;
-    top: 45px;
+    top: 55px;
     right: 0;
-    width: 360px;
-    max-height: 480px;
+    width: 380px;
+    max-height: 500px;
     background: white;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
     overflow: hidden;
+    animation: slideDown 0.3s ease;
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   
   .notification-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid #dee2e6;
-    background: #f8f9fa;
+    padding: 14px 18px;
+    border-bottom: 2px solid #e9ecef;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   }
   
   .notification-header h3 {
     margin: 0;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
     color: #212529;
   }
   
   .view-all-link {
-    font-size: 12px;
-    color: #0d6efd;
+    font-size: 13px;
+    color: #417690;
     text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
   }
   
   .view-all-link:hover {
+    color: #2c5364;
     text-decoration: underline;
   }
   
   .notification-list {
-    max-height: 400px;
+    max-height: 420px;
     overflow-y: auto;
   }
   
+  .notification-list::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .notification-list::-webkit-scrollbar-track {
+    background: #f1f3f5;
+  }
+  
+  .notification-list::-webkit-scrollbar-thumb {
+    background: #adb5bd;
+    border-radius: 4px;
+  }
+  
+  .notification-list::-webkit-scrollbar-thumb:hover {
+    background: #868e96;
+  }
+  
   .notification-item {
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-bottom: 1px solid #f1f3f5;
     transition: background 0.2s ease;
     cursor: pointer;
@@ -137,26 +208,32 @@
     background: #f8f9fa;
   }
   
+  .notification-item:last-child {
+    border-bottom: none;
+  }
+  
   .notification-item-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
   
   .notification-item-name {
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
     color: #212529;
+    flex: 1;
   }
   
   .notification-item-role {
     display: inline-block;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 12px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
+    margin-left: 8px;
   }
   
   .notification-item-role.client {
@@ -170,30 +247,80 @@
   }
   
   .notification-item-details {
-    font-size: 12px;
+    font-size: 13px;
     color: #6c757d;
     margin-top: 4px;
   }
   
   .notification-item-time {
-    font-size: 11px;
+    font-size: 12px;
     color: #adb5bd;
-    margin-top: 4px;
+    margin-top: 6px;
+    font-style: italic;
   }
   
   .notification-loading,
   .notification-empty {
-    padding: 24px;
+    padding: 32px;
     text-align: center;
     color: #6c757d;
-    font-size: 13px;
+    font-size: 14px;
   }
   
   .notification-error {
-    padding: 16px;
+    padding: 20px;
     text-align: center;
     color: #dc3545;
-    font-size: 13px;
+    font-size: 14px;
+  }
+  
+  /* ========== Enhanced Admin UI ========== */
+  #header {
+    background: linear-gradient(135deg, #417690 0%, #2c5364 100%);
+    color: #ffffff;
+  }
+  
+  .module h2, .module caption, .inline-group h2 {
+    background: linear-gradient(135deg, #417690 0%, #2c5364 100%);
+    color: #ffffff;
+  }
+  
+  .button, input[type=submit], input[type=button], .submit-row input, button {
+    background: linear-gradient(135deg, #417690 0%, #2c5364 100%);
+    border: none;
+    transition: all 0.3s ease;
+  }
+  
+  .button:hover, input[type=submit]:hover, input[type=button]:hover, .submit-row input:hover, button:hover {
+    background: linear-gradient(135deg, #2c5364 0%, #1a3a47 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(65, 118, 144, 0.3);
+  }
+  
+  a:link, a:visited {
+    color: #417690;
+  }
+  
+  a:hover {
+    color: #2c5364;
+  }
+  
+  /* ========== Responsive Design ========== */
+  @media (max-width: 768px) {
+    .branding-container {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .admin-notification-bell {
+      margin-left: 0;
+      margin-top: 10px;
+    }
+    
+    .notification-dropdown {
+      width: 320px;
+      right: -20px;
+    }
   }
 </style>
 {% endblock %}
@@ -203,6 +330,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const bell = document.getElementById('notification-bell');
+  const bellLink = document.getElementById('notification-bell-link');
   const dropdown = document.getElementById('notification-dropdown');
   const countBadge = document.getElementById('notification-count');
   const notificationList = document.getElementById('notification-list');
@@ -210,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let isOpen = false;
   
   // Toggle dropdown
-  bell.querySelector('.notification-bell-link').addEventListener('click', function(e) {
+  bellLink.addEventListener('click', function(e) {
     e.preventDefault();
     isOpen = !isOpen;
     dropdown.style.display = isOpen ? 'block' : 'none';
@@ -237,6 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         renderNotifications(data.notifications);
       })
       .catch(error => {
+        console.error('Failed to load notifications:', error);
         notificationList.innerHTML = '<div class="notification-error">Failed to load notifications</div>';
       });
   }
@@ -263,23 +392,16 @@ document.addEventListener('DOMContentLoaded', function() {
           <span class="notification-item-role ${notif.role}">${notif.role}</span>
         </div>
         <div class="notification-item-details">
-          ${notif.phone_number}
+          📱 ${notif.phone_number}
           ${notif.provider_uid ? ` • UID: ${notif.provider_uid}` : ''}
         </div>
-        <div class="notification-item-time">${notif.time_ago}</div>
+        <div class="notification-item-time">🕒 ${notif.time_ago}</div>
       </div>
     `).join('');
   }
   
   // Load count on page load
-  fetch('/admin/accounts/userregistrationnotification/api/unreviewed/')
-    .then(response => response.json())
-    .then(data => {
-      updateNotificationCount(data.count);
-    })
-    .catch(error => {
-      console.error('Failed to load notification count:', error);
-    });
+  loadNotifications();
   
   // Refresh count every 30 seconds
   setInterval(function() {

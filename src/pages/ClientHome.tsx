@@ -13,7 +13,7 @@ import {
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
-  IconMessage,
+  IconMessage, IconShieldCheck,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
 import L from 'leaflet';
@@ -137,6 +137,7 @@ const NAV=[
   {label:'Saved',   icon:<IconHeart        size={16}/>,r:ROUTES.clientSaved},
   {label:'Wallet',  icon:<IconWallet       size={16}/>,r:ROUTES.clientWallet},
   {label:'Loyalty', icon:<IconStar         size={16}/>,r:ROUTES.clientLoyalty},
+  {label:'Request Role Change', icon:<IconShieldCheck size={16}/>,r:'/client/settings/role-change'},
 ];
 
 export function ClientHome() {
