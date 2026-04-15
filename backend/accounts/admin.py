@@ -21,12 +21,13 @@ from .models import (
     ServiceCategory,
     SubService,
     User,
+    UserRegistrationNotification,
 )
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('display_user', 'phone_number', 'provider_uid', 'role', 'verification_status_display', 'is_on_trial_display', 'date_joined')
+    list_display = ('display_user', 'phone_number', 'provider_uid_display', 'role', 'verification_status_display', 'is_on_trial_display', 'date_joined')
     list_filter = ('role', 'verification_status', 'is_on_trial', 'is_staff')
     search_fields = ('phone_number', 'provider_uid', 'first_name', 'last_name', 'email')
     ordering = ('-date_joined',)
@@ -46,6 +47,7 @@ class UserAdmin(BaseUserAdmin):
     readonly_fields = ('provider_uid',)
 
     def display_user(self, obj):
+        """Display user's full name or fallback to phone/email"""
         full_name = obj.get_full_name().strip()
         if full_name:
             return full_name
@@ -54,13 +56,22 @@ class UserAdmin(BaseUserAdmin):
         return obj.email or 'User'
     display_user.short_description = 'User'
 
+    def provider_uid_display(self, obj):
+        """Display clean 6-digit UID for providers only"""
+        if obj.role == User.ROLE_PROVIDER:
+            return obj.provider_uid or '—'
+        return '—'
+    provider_uid_display.short_description = 'Provider UID'
+
     def verification_status_display(self, obj):
+        """Show verification status only for providers"""
         if obj.role == User.ROLE_CLIENT:
             return '—'
         return obj.verification_status
     verification_status_display.short_description = 'Verification status'
 
     def is_on_trial_display(self, obj):
+        """Show trial status only for providers"""
         if obj.role == User.ROLE_CLIENT:
             return '—'
         return obj.is_on_trial
@@ -69,10 +80,29 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
+    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
     list_filter = ('is_available',)
-    search_fields = ('user__username', 'user__phone_number', 'address')
+    search_fields = ('user__username', 'user__phone_number', 'user__first_name', 'user__last_name', 'user__provider_uid', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Ensure only providers appear in the user dropdown"""
+        if db_field.name == 'user':
+            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def provider_name_display(self, obj):
+        """Display provider's actual name"""
+        full_name = obj.user.get_full_name().strip()
+        if full_name:
+            return full_name
+        return obj.user.phone_number or obj.user.username
+    provider_name_display.short_description = 'Provider Name'
+
+    def provider_uid_display(self, obj):
+        """Display clean 6-digit UID"""
+        return obj.user.provider_uid or '—'
+    provider_uid_display.short_description = 'Provider UID'
 
     def commission_amount_display(self, obj):
         val = obj.commission_amount
@@ -113,9 +143,29 @@ class SubServiceAdmin(admin.ModelAdmin):
 
 @admin.register(ProviderService)
 class ProviderServiceAdmin(admin.ModelAdmin):
-    list_display = ('provider', 'primary_service', 'subservice_count', 'created_at')
+    list_display = ('provider_name_display', 'provider_uid_display', 'primary_service', 'subservice_count', 'created_at')
     list_filter = ('primary_service',)
-    search_fields = ('provider__user__username', 'primary_service__name')
+    search_fields = ('provider__user__username', 'provider__user__phone_number', 'provider__user__first_name', 'provider__user__last_name', 'provider__user__provider_uid', 'primary_service__name')
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Ensure only providers appear in dropdowns"""
+        if db_field.name == 'provider':
+            # Filter to show only ProviderProfile instances (which are already provider-only)
+            kwargs['queryset'] = ProviderProfile.objects.select_related('user').filter(user__role=User.ROLE_PROVIDER)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def provider_name_display(self, obj):
+        """Display provider's actual name"""
+        full_name = obj.provider.user.get_full_name().strip()
+        if full_name:
+            return full_name
+        return obj.provider.user.phone_number or obj.provider.user.username
+    provider_name_display.short_description = 'Provider Name'
+
+    def provider_uid_display(self, obj):
+        """Display clean 6-digit UID"""
+        return obj.provider.user.provider_uid or '—'
+    provider_uid_display.short_description = 'Provider UID'
 
     def subservice_count(self, obj):
         return obj.subservices.count()
@@ -421,3 +471,68 @@ class DeletedProviderRecordAdmin(admin.ModelAdmin):
     list_display = ('phone_number', 'provider_uid', 'deleted_at')
     search_fields = ('phone_number', 'provider_uid')
     ordering = ('-deleted_at',)
+
+
+@admin.register(UserRegistrationNotification)
+class UserRegistrationNotificationAdmin(admin.ModelAdmin):
+    list_display = ('user_name_display', 'phone_number', 'role_display', 'provider_uid_display', 'registration_time', 'reviewed_status')
+    list_filter = ('role', 'reviewed', 'registration_time')
+    search_fields = ('user_name', 'phone_number', 'provider_uid', 'user__first_name', 'user__last_name')
+    readonly_fields = ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
+    ordering = ('-registration_time',)
+    actions = ['mark_as_reviewed']
+
+    fieldsets = (
+        ('User Information', {
+            'fields': ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
+        }),
+        ('Review Status', {
+            'fields': ('reviewed', 'reviewed_at', 'reviewed_by', 'notes')
+        }),
+    )
+
+    def user_name_display(self, obj):
+        """Display user's name or phone number"""
+        return obj.user_name or obj.phone_number
+    user_name_display.short_description = 'User Name'
+
+    def role_display(self, obj):
+        """Display role in a user-friendly format"""
+        role_map = {
+            'client': 'Client',
+            'provider': 'Provider',
+            'admin': 'Admin',
+        }
+        return role_map.get(obj.role, obj.role)
+    role_display.short_description = 'Role'
+
+    def provider_uid_display(self, obj):
+        """Display provider UID or N/A for clients"""
+        if obj.role == 'provider' and obj.provider_uid:
+            return obj.provider_uid
+        return '—'
+    provider_uid_display.short_description = 'Provider UID'
+
+    def reviewed_status(self, obj):
+        """Display reviewed status with icon"""
+        if obj.reviewed:
+            return format_html('<span style="color: green;">✓ Reviewed</span>')
+        return format_html('<span style="color: orange;">⏳ Pending</span>')
+    reviewed_status.short_description = 'Status'
+
+    def save_model(self, request, obj, form, change):
+        """Auto-set reviewed_by and reviewed_at when marking as reviewed"""
+        if obj.reviewed and not obj.reviewed_at:
+            obj.reviewed_at = timezone.now()
+            obj.reviewed_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def mark_as_reviewed(self, request, queryset):
+        """Bulk action to mark notifications as reviewed"""
+        updated = queryset.update(
+            reviewed=True,
+            reviewed_at=timezone.now(),
+            reviewed_by=request.user
+        )
+        self.message_user(request, f'{updated} notification(s) marked as reviewed.')
+    mark_as_reviewed.short_description = 'Mark selected as reviewed'
