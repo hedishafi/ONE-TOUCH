@@ -84,6 +84,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     generateButton.addEventListener('click', async () => {
+      const currentValue = (textarea.value || '').trim();
+      
+      if (!currentValue) {
+        textarea.classList.add('mv-input-error');
+        error.textContent = 'Please enter a short reason first (e.g., "blurry image" or "ID expired"), then click Generate AI Reason to expand it.';
+        textarea.focus();
+        return;
+      }
+
       generateButton.disabled = true;
       const previousLabel = generateButton.textContent;
       generateButton.textContent = 'Generating...';
@@ -91,28 +100,85 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const data = await postForm({
           mode: 'rejection_reason',
-          document_issue: 'Some submitted images are unclear or partially cropped',
-          identity_issue: 'The selfie and ID details cannot be confidently matched',
-          additional_note: 'Please re-submit clear files under good lighting without glare or blur.',
+          admin_input: currentValue,
         });
 
-        const generated = (data.response || '').trim();
-        if (!generated) {
-          throw new Error('No generated reason returned');
+        const variations = data.variations || [];
+        if (variations.length === 0) {
+          throw new Error('No variations generated');
         }
 
-        textarea.value = generated;
-        clearError();
-        textarea.classList.add('mv-input-ai-filled');
-        setTimeout(() => textarea.classList.remove('mv-input-ai-filled'), 1200);
-        textarea.focus();
+        // Show variations in a modal or selection UI
+        showVariationsModal(textarea, variations, clearError);
+        
       } catch (_) {
         textarea.classList.add('mv-input-error');
-        error.textContent = 'Could not generate a reason. Please try again.';
+        error.textContent = 'Could not generate reasons. Please ensure you entered a short description first.';
       } finally {
         generateButton.disabled = false;
         generateButton.textContent = previousLabel;
       }
     });
   });
+
+  function showVariationsModal(textarea, variations, clearError) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'mv-modal-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'mv-modal';
+    
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'mv-modal-header';
+    modalHeader.innerHTML = '<h3>Select a Rejection Reason</h3><p>Choose the most appropriate variation or edit as needed:</p>';
+    
+    const modalBody = document.createElement('div');
+    modalBody.className = 'mv-modal-body';
+    
+    variations.forEach((variation, index) => {
+      const option = document.createElement('div');
+      option.className = 'mv-variation-option';
+      option.innerHTML = `
+        <div class="mv-variation-number">Option ${index + 1}</div>
+        <div class="mv-variation-text">${variation}</div>
+        <button type="button" class="button mv-button-select" data-index="${index}">Use This</button>
+      `;
+      modalBody.appendChild(option);
+    });
+    
+    const modalFooter = document.createElement('div');
+    modalFooter.className = 'mv-modal-footer';
+    modalFooter.innerHTML = '<button type="button" class="button mv-button-cancel">Cancel</button>';
+    
+    modal.appendChild(modalHeader);
+    modal.appendChild(modalBody);
+    modal.appendChild(modalFooter);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    
+    // Handle selection
+    modalBody.querySelectorAll('.mv-button-select').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const index = parseInt(btn.getAttribute('data-index'));
+        textarea.value = variations[index];
+        clearError();
+        textarea.classList.add('mv-input-ai-filled');
+        setTimeout(() => textarea.classList.remove('mv-input-ai-filled'), 1200);
+        document.body.removeChild(overlay);
+      });
+    });
+    
+    // Handle cancel
+    modalFooter.querySelector('.mv-button-cancel').addEventListener('click', () => {
+      document.body.removeChild(overlay);
+    });
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+      }
+    });
+  }
 });

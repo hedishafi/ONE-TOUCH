@@ -6,6 +6,8 @@ from .models import (
     DeletedProviderRecord,
     ProviderManualVerification,
     ProviderProfile,
+    ServiceCategory,
+    SubService,
 )
 
 
@@ -219,6 +221,34 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['price_min'] > attrs['price_max']:
             raise serializers.ValidationError({'price_max': 'price_max must be greater than or equal to price_min.'})
+
+        category_name = attrs['service_category']
+        category = ServiceCategory.objects.filter(name__iexact=category_name, is_active=True).first()
+        if not category:
+            raise serializers.ValidationError({'service_category': 'Invalid service category. Please choose from available categories.'})
+
+        resolved_sub_services = []
+        invalid_sub_services = []
+        for sub_service_name in attrs['sub_services']:
+            sub_service = SubService.objects.filter(
+                category=category,
+                name__iexact=sub_service_name,
+                is_active=True,
+            ).first()
+            if not sub_service:
+                invalid_sub_services.append(sub_service_name)
+                continue
+            resolved_sub_services.append(sub_service)
+
+        if invalid_sub_services:
+            raise serializers.ValidationError(
+                {'sub_services': f'Invalid sub services for selected category: {", ".join(invalid_sub_services)}'}
+            )
+
+        attrs['service_category_obj'] = category
+        attrs['sub_service_objects'] = resolved_sub_services
+        attrs['service_category'] = category.name
+        attrs['sub_services'] = [item.name for item in resolved_sub_services]
         return attrs
 
 

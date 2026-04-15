@@ -157,22 +157,43 @@ export const ProviderOnboardingStep1: React.FC = () => {
         setCameraReady(true);
       }
     } catch (err: unknown) {
-      const reason =
-        typeof err === 'object' && err !== null && 'name' in err && typeof err.name === 'string'
-          ? ` (${err.name})`
-          : '';
-      setError(`Unable to access camera${reason}. Please allow camera permission and try again.`);
+      // User-friendly error messages without technical jargon
+      let friendlyMessage = '';
+      
+      if (typeof err === 'object' && err !== null && 'name' in err) {
+        const errorName = (err as { name: string }).name;
+        
+        if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+          friendlyMessage = 'Camera access was denied. Please enable camera permission in your browser settings and try again.';
+        } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+          friendlyMessage = 'No camera found on your device. Please connect a camera and try again.';
+        } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
+          friendlyMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+        } else if (errorName === 'OverconstrainedError' || errorName === 'ConstraintNotSatisfiedError') {
+          friendlyMessage = 'Camera does not meet the required specifications. Please try with a different camera.';
+        } else if (errorName === 'TypeError') {
+          friendlyMessage = 'Camera access is not supported in this browser. Please use Chrome, Safari, or Firefox.';
+        } else if (errorName === 'AbortError') {
+          friendlyMessage = 'Camera initialization was interrupted. Please try again.';
+        } else {
+          friendlyMessage = 'Unable to access camera. Please check your browser settings and ensure camera permission is granted.';
+        }
+      } else {
+        friendlyMessage = 'Unable to access camera. Please check your browser settings and ensure camera permission is granted.';
+      }
+      
+      setError(friendlyMessage);
     } finally {
       setCameraLoading(false);
     }
   }, [stopCamera]);
 
   useEffect(() => {
-    startCamera(activeTarget);
+    // Don't auto-start camera - only start when user clicks capture button
     return () => {
       stopCamera();
     };
-  }, [activeTarget, startCamera, stopCamera]);
+  }, [stopCamera]);
 
   useEffect(() => {
     let isMounted = true;
@@ -399,27 +420,45 @@ export const ProviderOnboardingStep1: React.FC = () => {
           <Paper withBorder p="md" radius="md">
             <Stack gap="sm">
               <Text fw={600}>Live Camera — {TARGET_LABELS[activeTarget]}</Text>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{ width: '100%', minHeight: 280, background: '#000', borderRadius: 8 }}
-              />
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-              <Group>
-                <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
-                  Capture
-                </Button>
-                <Button
-                  variant="default"
-                  leftSection={<IconRefresh size={16} />}
-                  onClick={() => startCamera(activeTarget)}
-                  disabled={loading || cameraLoading}
-                >
-                  Restart Camera
-                </Button>
-              </Group>
+              {!streamRef.current ? (
+                <Center style={{ minHeight: 280, background: '#f8f9fa', borderRadius: 8, border: '2px dashed #dee2e6' }}>
+                  <Stack align="center" gap="sm">
+                    <IconCamera size={48} color="#868e96" />
+                    <Text size="sm" c="dimmed">Camera not started</Text>
+                    <Button 
+                      leftSection={<IconCamera size={16} />} 
+                      onClick={() => startCamera(activeTarget)}
+                      loading={cameraLoading}
+                    >
+                      Start Camera
+                    </Button>
+                  </Stack>
+                </Center>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{ width: '100%', minHeight: 280, background: '#000', borderRadius: 8 }}
+                  />
+                  <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  <Group>
+                    <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
+                      Capture
+                    </Button>
+                    <Button
+                      variant="default"
+                      leftSection={<IconRefresh size={16} />}
+                      onClick={() => startCamera(activeTarget)}
+                      disabled={loading || cameraLoading}
+                    >
+                      Restart Camera
+                    </Button>
+                  </Group>
+                </>
+              )}
             </Stack>
           </Paper>
 

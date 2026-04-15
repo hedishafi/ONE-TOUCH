@@ -88,6 +88,37 @@ class DeletedProviderRecord(models.Model):
         return f'{self.phone_number} (deleted provider)'
 
 
+class UserRegistrationNotification(models.Model):
+    """
+    Track new user registrations for admin review.
+    Provides a dedicated admin interface for reviewing new signups.
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='registration_notification')
+    user_name = models.CharField(max_length=255, blank=True)
+    phone_number = models.CharField(max_length=30)
+    role = models.CharField(max_length=20)
+    provider_uid = models.CharField(max_length=6, blank=True)
+    registration_time = models.DateTimeField(auto_now_add=True)
+    reviewed = models.BooleanField(default=False, help_text='Mark as reviewed after admin checks the user')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_registrations'
+    )
+    notes = models.TextField(blank=True, help_text='Admin notes about this registration')
+
+    class Meta:
+        ordering = ['-registration_time']
+        verbose_name = 'User Registration Notification'
+        verbose_name_plural = 'User Registration Notifications'
+
+    def __str__(self):
+        return f'{self.user_name or self.phone_number} ({self.role}) - {self.registration_time.strftime("%Y-%m-%d %H:%M")}'
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PROVIDER PROFILE  (created only when user.role == 'provider')
 # ─────────────────────────────────────────────────────────────────────────────
