@@ -28,6 +28,7 @@ class User(AbstractUser):
 
     phone_number        = models.CharField(max_length=30, unique=True)
     role                = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_CLIENT)
+    approved_roles      = models.JSONField(default=list, help_text='List of all approved roles for this user (e.g., ["client", "provider"])')
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     provider_uid        = models.CharField(max_length=6, unique=True, null=True, blank=True, db_index=True)
 
@@ -50,6 +51,25 @@ class User(AbstractUser):
     @property
     def is_client(self):
         return self.role == self.ROLE_CLIENT
+    
+    @property
+    def can_switch_roles(self):
+        """True if user has multiple approved roles"""
+        return len(self.approved_roles) > 1
+    
+    def get_available_roles(self):
+        """Get list of roles user can switch to (excluding current role)"""
+        return [r for r in self.approved_roles if r != self.role]
+    
+    def add_approved_role(self, role):
+        """Add a role to approved_roles if not already present"""
+        if role not in self.approved_roles:
+            self.approved_roles.append(role)
+            self.save(update_fields=['approved_roles'])
+    
+    def can_switch_to_role(self, role):
+        """Check if user can switch to a specific role"""
+        return role in self.approved_roles and role != self.role
 
     @property
     def trial_is_active(self):
@@ -66,8 +86,16 @@ class User(AbstractUser):
                 return candidate
 
     def save(self, *args, **kwargs):
+        # Initialize approved_roles with current role if empty
+        if not self.approved_roles:
+            self.approved_roles = [self.role]
+        elif self.role not in self.approved_roles:
+            self.approved_roles.append(self.role)
+        
+        # Generate provider UID if needed
         if self.role == self.ROLE_PROVIDER and not self.provider_uid:
             self.provider_uid = self.generate_provider_uid()
+        
         super().save(*args, **kwargs)
 
     def __str__(self):

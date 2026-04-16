@@ -50,6 +50,7 @@ class ClientAuthProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'approved_roles',
             'date_joined',
         ]
         read_only_fields = fields
@@ -64,6 +65,7 @@ class ProviderAuthProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'approved_roles',
             'provider_uid',
             'verification_status',
             'is_on_trial',
@@ -76,8 +78,8 @@ class ProviderAuthProfileSerializer(serializers.ModelSerializer):
 class ClientMinimalUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'phone_number', 'role']
-        read_only_fields = ['id', 'role']
+        fields = ['id', 'phone_number', 'role', 'approved_roles']
+        read_only_fields = ['id', 'role', 'approved_roles']
 
 
 class ProviderFullUserSerializer(serializers.ModelSerializer):
@@ -87,6 +89,7 @@ class ProviderFullUserSerializer(serializers.ModelSerializer):
             'id',
             'phone_number',
             'role',
+            'approved_roles',
             'provider_uid',
             'verification_status',
             'is_on_trial',
@@ -95,6 +98,7 @@ class ProviderFullUserSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id',
             'role',
+            'approved_roles',
             'verification_status',
             'is_on_trial',
             'trial_ends_at',

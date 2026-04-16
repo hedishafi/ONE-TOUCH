@@ -27,6 +27,8 @@ import * as authService from '../services/authService';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile, AppNotification, User } from '../types';
+import { RoleSwitcher } from '../components/RoleSwitcher';
+import { useRoleUpdateChecker } from '../hooks/useRoleUpdateChecker';
 
 type LeafletIconDefaultPrototype = {
   _getIconUrl?: unknown;
@@ -193,6 +195,9 @@ export function ProviderHome() {
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
   const {unreadCount, fetchNotifications, addNotification} = useNotificationStore();
+  
+  // Check for role updates periodically
+  useRoleUpdateChecker();
 
   const [profile,   setProfile]   = useState<ProviderProfile|null>(authProf);
   const [online,    setOnline]    = useState(authProf?.isOnline ?? false);
@@ -412,6 +417,17 @@ export function ProviderHome() {
           </Group>
         </Box>
         <Divider/>
+        
+        {/* Role Switcher - Only show if user has multiple roles */}
+        {currentUser?.approved_roles && currentUser.approved_roles.length > 1 && (
+          <>
+            <Box p="md">
+              <RoleSwitcher variant="button" />
+            </Box>
+            <Divider/>
+          </>
+        )}
+        
         <Stack gap={2} p="sm" style={{flex:1}}>
           {currentUser?.role === 'provider' && NAV.map(n=>(
             <Box key={n.label} p={10}

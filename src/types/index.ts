@@ -8,6 +8,7 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  approved_roles?: UserRole[];
   createdAt: string;
   verificationStatus: VerificationStatus;
   providerUid?: string;

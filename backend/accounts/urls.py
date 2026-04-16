@@ -14,6 +14,7 @@ from .views import (
     ProviderManualVerificationUploadView,
     ProviderOnboardingStatusView,
     RoleChangeRequestView,
+    RoleSwitchView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -42,4 +43,7 @@ urlpatterns = [
     
     # ── Role Change Request ────────────────────────────────────────────────────
     path('user/role-change-request/', RoleChangeRequestView.as_view(), name='role-change-request'),
+    
+    # ── Role Switching ──────────────────────────────────────────────────────────
+    path('user/role-switch/', RoleSwitchView.as_view(), name='role-switch'),
 ]

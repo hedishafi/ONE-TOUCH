@@ -785,43 +785,40 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
                 obj.reviewed_by = request.user
                 obj.reviewed_at = timezone.now()
                 
-                # If approved, change the user's role
+                # If approved, add the requested role to approved_roles
                 if obj.status == RoleChangeRequest.STATUS_APPROVED:
                     user = obj.user
-                    old_role = user.role
-                    user.role = obj.requested_role
+                    requested_role = obj.requested_role
                     
-                    # If changing from provider to client, reset provider-specific fields
-                    if old_role == User.ROLE_PROVIDER and obj.requested_role == User.ROLE_CLIENT:
-                        user.verification_status = User.STATUS_PENDING
-                        user.is_on_trial = False
-                        user.trial_ends_at = None
+                    # Add the requested role to approved_roles
+                    if requested_role not in user.approved_roles:
+                        user.approved_roles.append(requested_role)
                     
-                    # If changing to provider, generate provider UID and set pending verification
-                    if obj.requested_role == User.ROLE_PROVIDER:
+                    # If changing to provider, set up provider-specific fields
+                    if requested_role == User.ROLE_PROVIDER:
                         if not user.provider_uid:
                             user.provider_uid = User.generate_provider_uid()
-                        user.verification_status = User.STATUS_PENDING
-                        user.is_on_trial = True
-                        from datetime import timedelta
-                        user.trial_ends_at = timezone.now() + timedelta(days=14)
                         
-                        # Reset provider profile if it exists, or it will be created during onboarding
+                        # Only set trial if user doesn't already have provider role active
+                        if user.role != User.ROLE_PROVIDER:
+                            user.is_on_trial = True
+                            from datetime import timedelta
+                            user.trial_ends_at = timezone.now() + timedelta(days=14)
+                        
+                        # Reset provider profile if it exists
                         try:
                             profile = user.provider_profile
-                            # Reset profile completion status to force onboarding
                             profile.profile_completed = False
                             profile.save(update_fields=['profile_completed'])
                         except ProviderProfile.DoesNotExist:
-                            # Profile will be created during onboarding
                             pass
                     
                     user.save()
                     
                     messages.success(
                         request,
-                        f'Role change approved. User {user.phone_number} is now a {obj.requested_role}. '
-                        f'{"They must complete provider onboarding (profile setup, identity verification, etc.)." if obj.requested_role == User.ROLE_PROVIDER else "They can access client features."}'
+                        f'Role change approved. User {user.phone_number} now has access to {obj.get_requested_role_display()} role. '
+                        f'They can switch between roles using the role switcher in the sidebar.'
                     )
                 
                 # If rejected, generate AI message if admin_hint provided

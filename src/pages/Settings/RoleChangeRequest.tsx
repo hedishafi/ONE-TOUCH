@@ -9,16 +9,18 @@ import {
   Stack,
   Group,
   Alert,
-  Badge,
   Card,
   Loader,
   Center,
+  ActionIcon,
+  Tooltip,
 } from '@mantine/core';
-import { IconAlertCircle, IconCheck, IconX, IconArrowRight } from '@tabler/icons-react';
+import { IconAlertCircle, IconCheck, IconX, IconArrowRight, IconSwitchHorizontal, IconRefresh } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
+import { useRoleUpdateChecker } from '../../hooks/useRoleUpdateChecker';
 
 interface RoleChangeRequest {
   id: number;
@@ -26,18 +28,20 @@ interface RoleChangeRequest {
   requested_role: string;
   status: 'pending' | 'approved' | 'rejected';
   reason: string;
-  admin_notes: string;
   rejection_message: string;
   created_at: string;
-  reviewed_at: string | null;
 }
 
 export const RoleChangeRequestPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuthStore();
+  const { currentUser } = useAuthStore();
+  
+  // Check for role updates periodically
+  useRoleUpdateChecker();
+  
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [requests, setRequests] = useState<RoleChangeRequest[]>([]);
+  const [pendingRequest, setPendingRequest] = useState<RoleChangeRequest | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
@@ -45,28 +49,37 @@ export const RoleChangeRequestPage: React.FC = () => {
   const currentRole = currentUser?.role || 'client';
   const requestedRole = currentRole === 'provider' ? 'client' : 'provider';
 
-  // Check if there's a pending request
-  const hasPendingRequest = requests.some(req => req.status === 'pending');
-  
-  // Check if there's an approved request that hasn't been acted upon yet
-  // Only show if the approved role matches the CURRENT role (meaning they haven't logged in with new role yet)
-  const approvedRequest = requests.find(
-    req => req.status === 'approved' && req.requested_role !== currentRole
-  );
+  // Check if user already has multiple roles
+  const hasMultipleRoles = (currentUser?.approved_roles?.length ?? 0) > 1;
 
   useEffect(() => {
-    loadRequests();
+    loadPendingRequest();
   }, []);
 
-  const loadRequests = async () => {
+  const loadPendingRequest = async () => {
     try {
       setLoading(true);
+      
+      // First, refresh the user profile to get latest approved_roles
+      try {
+        const profileResponse = await api.get('/auth/profile/');
+        const { setCurrentUser } = useAuthStore.getState();
+        setCurrentUser(profileResponse.data);
+      } catch (err) {
+        console.error('Failed to refresh profile:', err);
+      }
+      
+      // Then load the request status
       const response = await api.get('/user/role-change-request/');
-      console.log('Loaded requests:', response.data);
-      setRequests(response.data.requests || []);
+      const requests = response.data.requests || [];
+      
+      // Only get the most recent pending or rejected request
+      const pending = requests.find((req: RoleChangeRequest) => req.status === 'pending');
+      const rejected = requests.find((req: RoleChangeRequest) => req.status === 'rejected');
+      
+      setPendingRequest(pending || rejected || null);
     } catch (err: any) {
       console.error('Failed to load requests:', err);
-      console.error('Error response:', err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -87,17 +100,10 @@ export const RoleChangeRequestPage: React.FC = () => {
       setSubmitting(true);
       setError('');
       
-      console.log('Submitting role change request:', {
+      await api.post('/user/role-change-request/', {
         requested_role: requestedRole,
         reason: reason.trim()
       });
-      
-      const response = await api.post('/user/role-change-request/', {
-        requested_role: requestedRole,
-        reason: reason.trim()
-      });
-
-      console.log('Response:', response.data);
 
       notifications.show({
         title: 'Request Submitted',
@@ -107,12 +113,9 @@ export const RoleChangeRequestPage: React.FC = () => {
       });
 
       setReason('');
-      loadRequests();
+      loadPendingRequest();
     } catch (err: any) {
-      console.error('Error submitting role change:', err);
-      console.error('Error response:', err.response?.data);
-      
-      const errorMsg = err.response?.data?.error || err.response?.data?.detail || err.message || 'Failed to submit request';
+      const errorMsg = err.response?.data?.error || err.response?.data?.detail || 'Failed to submit request';
       setError(errorMsg);
       notifications.show({
         title: 'Submission Failed',
@@ -125,45 +128,8 @@ export const RoleChangeRequestPage: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'orange';
-      case 'approved': return 'green';
-      case 'rejected': return 'red';
-      default: return 'gray';
-    }
-  };
-
   const getRoleLabel = (role: string) => {
     return role === 'provider' ? 'Service Provider' : 'Client';
-  };
-
-  const handleContinueAsNewRole = async () => {
-    if (!approvedRequest) return;
-    
-    const newRole = approvedRequest.requested_role;
-    
-    // Different messages based on the new role
-    if (newRole === 'provider') {
-      notifications.show({
-        title: 'Role Changed to Service Provider',
-        message: 'Please log in again and complete the provider onboarding process (profile setup, identity verification, etc.)',
-        color: 'green',
-        icon: <IconCheck size={16} />,
-        autoClose: 8000,
-      });
-    } else {
-      notifications.show({
-        title: 'Role Changed to Client',
-        message: 'Please log in again to access your client dashboard.',
-        color: 'green',
-        icon: <IconCheck size={16} />,
-      });
-    }
-    
-    // Log out and redirect to login
-    await logout();
-    navigate('/login');
   };
 
   if (loading) {
@@ -180,79 +146,109 @@ export const RoleChangeRequestPage: React.FC = () => {
     <Container size="md" py="xl">
       <Paper p="xl" radius="md" withBorder>
         <Stack gap="lg">
-          <div>
-            <Title order={2}>Role Change Request</Title>
-            <Text c="dimmed" size="sm" mt="xs">
-              Request to change your account role. Admin will review and approve/reject your request.
-            </Text>
-          </div>
-
-          {/* Current Role Info */}
-          <Card withBorder padding="md" radius="md" style={{ background: '#f8f9fa' }}>
-            <Group justify="space-between" align="center">
-              <div>
-                <Text size="sm" c="dimmed">Current Role</Text>
-                <Text size="lg" fw={600}>{getRoleLabel(currentRole)}</Text>
-              </div>
-              <IconArrowRight size={24} color="#868e96" />
-              <div>
-                <Text size="sm" c="dimmed">Requested Role</Text>
-                <Text size="lg" fw={600} c="blue">{getRoleLabel(requestedRole)}</Text>
-              </div>
-            </Group>
-          </Card>
-
-          {/* Show pending request alert */}
-          {hasPendingRequest && (
-            <Alert icon={<IconAlertCircle size={16} />} color="orange" title="Pending Request">
-              You already have a pending role change request. Please wait for admin review.
-            </Alert>
-          )}
-          
-          {/* Show approved request alert with action button */}
-          {approvedRequest && (
-            <Alert icon={<IconCheck size={16} />} color="green" title="Request Approved!">
-              <Text size="sm" mb="md">
-                Your role change request has been approved! You are now registered as a{' '}
-                <strong>{getRoleLabel(approvedRequest.requested_role)}</strong>.
+          <Group justify="space-between" align="center">
+            <div>
+              <Title order={2}>Role Management</Title>
+              <Text c="dimmed" size="sm" mt="xs">
+                {hasMultipleRoles 
+                  ? 'You have access to multiple roles. Use the role switcher in the sidebar to switch between them.'
+                  : 'Request to add an additional role to your account.'}
               </Text>
-              {approvedRequest.requested_role === 'provider' ? (
-                <>
-                  <Text size="sm" mb="md">
-                    Click the button below to log out and log back in. You will then need to complete the provider onboarding process:
-                  </Text>
-                  <Text size="sm" mb="md" component="ul" style={{ paddingLeft: 20 }}>
-                    <li>Profile Setup (bio, services, pricing)</li>
-                    <li>Identity Verification (ID upload, selfie)</li>
-                    <li>Service Selection</li>
-                  </Text>
-                </>
-              ) : (
-                <Text size="sm" mb="md">
-                  Click the button below to log out and log back in with your new client role.
-                </Text>
-              )}
+            </div>
+            <Tooltip label="Refresh status">
+              <ActionIcon 
+                variant="light" 
+                size="lg" 
+                onClick={loadPendingRequest}
+                loading={loading}
+              >
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+
+          {/* Show role switcher info for users with multiple roles */}
+          {hasMultipleRoles && (
+            <Alert icon={<IconSwitchHorizontal size={16} />} color="green" title="Multiple Roles Active">
+              <Text size="sm" mb="sm">
+                You currently have access to both <strong>Client</strong> and <strong>Service Provider</strong> roles.
+              </Text>
+              <Text size="sm" mb="sm">
+                Use the <strong>Role Switcher</strong> in the sidebar to instantly switch between your roles without logging out.
+              </Text>
+              <Text size="sm" mb="md">
+                Your current active role: <strong>{getRoleLabel(currentRole)}</strong>
+              </Text>
               <Button
-                onClick={handleContinueAsNewRole}
+                onClick={() => navigate(currentRole === 'client' ? '/client/dashboard' : '/provider/dashboard')}
+                variant="light"
                 color="green"
                 leftSection={<IconArrowRight size={16} />}
               >
-                {approvedRequest.requested_role === 'provider' 
-                  ? 'Sign Up as Service Provider' 
-                  : 'Continue as Client'}
+                Go to Dashboard
               </Button>
             </Alert>
           )}
 
-          {/* Request Form */}
-          {!hasPendingRequest && (
+          {/* Current Role Info - Only show if user doesn't have multiple roles */}
+          {!hasMultipleRoles && (
+            <Card withBorder padding="md" radius="md" style={{ background: '#f8f9fa' }}>
+              <Group justify="space-between" align="center">
+                <div>
+                  <Text size="sm" c="dimmed">Current Role</Text>
+                  <Text size="lg" fw={600}>{getRoleLabel(currentRole)}</Text>
+                </div>
+                <IconArrowRight size={24} color="#868e96" />
+                <div>
+                  <Text size="sm" c="dimmed">Request Access To</Text>
+                  <Text size="lg" fw={600} c="blue">{getRoleLabel(requestedRole)}</Text>
+                </div>
+              </Group>
+            </Card>
+          )}
+
+          {/* Show pending request alert */}
+          {pendingRequest?.status === 'pending' && (
+            <Alert icon={<IconAlertCircle size={16} />} color="orange" title="Pending Request">
+              <Text size="sm" mb="xs">
+                You have a pending role change request to become a <strong>{getRoleLabel(pendingRequest.requested_role)}</strong>.
+              </Text>
+              <Text size="sm" c="dimmed">
+                Submitted: {new Date(pendingRequest.created_at).toLocaleDateString()}
+              </Text>
+              <Text size="sm" c="dimmed" mt="xs">
+                Please wait for admin review. Once approved, you'll be able to switch between roles using the role switcher in the sidebar.
+              </Text>
+            </Alert>
+          )}
+
+          {/* Show rejected request alert */}
+          {pendingRequest?.status === 'rejected' && (
+            <Alert icon={<IconX size={16} />} color="red" title="Request Rejected">
+              <Text size="sm" mb="xs">
+                Your previous role change request was rejected.
+              </Text>
+              {pendingRequest.rejection_message && (
+                <>
+                  <Text size="sm" fw={500} mb="xs">Reason:</Text>
+                  <Text size="sm" c="dimmed" mb="sm">{pendingRequest.rejection_message}</Text>
+                </>
+              )}
+              <Text size="sm">
+                You can submit a new request below.
+              </Text>
+            </Alert>
+          )}
+
+          {/* Request Form - Only show if user doesn't have multiple roles and no pending request */}
+          {!hasMultipleRoles && pendingRequest?.status !== 'pending' && (
             <>
               <div>
                 <Text size="sm" fw={500} mb="xs">
-                  Why do you want to change your role? *
+                  Why do you want to add the {getRoleLabel(requestedRole)} role? *
                 </Text>
                 <Textarea
-                  placeholder="Please explain why you want to change from a service provider to a client (or vice versa). Be specific about your reasons."
+                  placeholder={`Please explain why you want to add ${getRoleLabel(requestedRole)} access to your account. Be specific about your reasons.`}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   minRows={4}
@@ -278,62 +274,6 @@ export const RoleChangeRequestPage: React.FC = () => {
                 </Button>
               </Group>
             </>
-          )}
-
-          {/* Previous Requests */}
-          {requests.length > 0 && (
-            <div>
-              <Title order={4} mb="md">Request History</Title>
-              <Stack gap="md">
-                {requests.map((request) => (
-                  <Card key={request.id} withBorder padding="md" radius="md">
-                    <Group justify="space-between" mb="sm">
-                      <div>
-                        <Text size="sm" c="dimmed">
-                          {getRoleLabel(request.current_role)} → {getRoleLabel(request.requested_role)}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          Submitted: {new Date(request.created_at).toLocaleDateString()}
-                        </Text>
-                      </div>
-                      <Badge color={getStatusColor(request.status)} size="lg">
-                        {request.status.toUpperCase()}
-                      </Badge>
-                    </Group>
-
-                    <Text size="sm" mb="xs" fw={500}>Reason:</Text>
-                    <Text size="sm" c="dimmed" mb="sm">{request.reason}</Text>
-
-                    {request.status === 'rejected' && request.rejection_message && (
-                      <Alert icon={<IconX size={16} />} color="red" title="Rejection Reason" mb="sm">
-                        <Text size="sm">{request.rejection_message}</Text>
-                      </Alert>
-                    )}
-
-                    {request.status === 'approved' && (
-                      <Alert icon={<IconCheck size={16} />} color="green" mb="sm">
-                        <Text size="sm">
-                          Your request was approved. You are now a {getRoleLabel(request.requested_role)}.
-                        </Text>
-                      </Alert>
-                    )}
-
-                    {request.admin_notes && (
-                      <>
-                        <Text size="sm" mb="xs" fw={500} c="blue">Admin Notes:</Text>
-                        <Text size="sm" c="dimmed">{request.admin_notes}</Text>
-                      </>
-                    )}
-
-                    {request.reviewed_at && (
-                      <Text size="xs" c="dimmed" mt="sm">
-                        Reviewed: {new Date(request.reviewed_at).toLocaleDateString()}
-                      </Text>
-                    )}
-                  </Card>
-                ))}
-              </Stack>
-            </div>
           )}
         </Stack>
       </Paper>

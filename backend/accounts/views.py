@@ -943,3 +943,134 @@ class RoleChangeRequestView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class RoleSwitchView(APIView):
+    """
+    API endpoint for users to switch between their approved roles.
+    Only works if user has multiple approved roles.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['User'],
+        request=inline_serializer(
+            'RoleSwitchInput',
+            {
+                'role': rest_framework_serializers.ChoiceField(choices=['client', 'provider']),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                'RoleSwitchResponse',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'new_role': rest_framework_serializers.CharField(),
+                    'access': rest_framework_serializers.CharField(),
+                    'refresh': rest_framework_serializers.CharField(),
+                    'user': rest_framework_serializers.DictField(),
+                },
+            ),
+            400: OpenApiResponse(description='Invalid role or user cannot switch'),
+            403: OpenApiResponse(description='User does not have permission to switch to this role'),
+        },
+        summary='Switch between approved roles',
+    )
+    def post(self, request):
+        new_role = request.data.get('role', '').strip()
+        
+        # Validation
+        if not new_role:
+            return _error_response('role is required.')
+        
+        if new_role not in [User.ROLE_CLIENT, User.ROLE_PROVIDER]:
+            return _error_response('role must be either "client" or "provider".')
+        
+        user = request.user
+        
+        # Check if user can switch to this role
+        if not user.can_switch_to_role(new_role):
+            if new_role not in user.approved_roles:
+                return _error_response(
+                    f'You do not have permission to access the {new_role} role. Please submit a role change request.',
+                    http_status=status.HTTP_403_FORBIDDEN
+                )
+            if new_role == user.role:
+                return _error_response(
+                    f'You are already in the {new_role} role.',
+                    http_status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Switch the role
+        user.role = new_role
+        user.save(update_fields=['role'])
+        
+        # Generate new tokens with updated role
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        
+        # Prepare user data based on new role
+        if new_role == User.ROLE_CLIENT:
+            try:
+                client_profile = user.client_profile
+                user_data = ClientAuthProfileSerializer(user, context={'client_profile': client_profile}).data
+            except:
+                user_data = ClientMinimalUserSerializer(user).data
+        else:  # provider
+            try:
+                provider_profile = user.provider_profile
+                user_data = ProviderAuthProfileSerializer(user, context={'provider_profile': provider_profile}).data
+            except:
+                user_data = ProviderFullUserSerializer(user).data
+        
+        response = Response(
+            {
+                'message': f'Successfully switched to {new_role} role.',
+                'new_role': new_role,
+                'access': access_token,
+                'refresh': refresh_token,
+                'user': user_data,
+            },
+            status=status.HTTP_200_OK
+        )
+        
+        # Set refresh token in HTTP-only cookie
+        response.set_cookie(
+            key='refresh_token',
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            max_age=60 * 60 * 24 * 7,  # 7 days
+        )
+        
+        return response
+    
+    @extend_schema(
+        tags=['User'],
+        responses={
+            200: inline_serializer(
+                'AvailableRolesResponse',
+                {
+                    'current_role': rest_framework_serializers.CharField(),
+                    'approved_roles': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
+                    'available_roles': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
+                    'can_switch': rest_framework_serializers.BooleanField(),
+                },
+            )
+        },
+        summary='Get available roles for switching',
+    )
+    def get(self, request):
+        user = request.user
+        
+        return Response(
+            {
+                'current_role': user.role,
+                'approved_roles': user.approved_roles,
+                'available_roles': user.get_available_roles(),
+                'can_switch': user.can_switch_roles,
+            },
+            status=status.HTTP_200_OK
+        )

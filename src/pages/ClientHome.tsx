@@ -25,6 +25,8 @@ import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import type { AppNotification, Job } from '../types';
+import { RoleSwitcher } from '../components/RoleSwitcher';
+import { useRoleUpdateChecker } from '../hooks/useRoleUpdateChecker';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -145,6 +147,9 @@ export function ClientHome() {
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
+  
+  // Check for role updates periodically
+  useRoleUpdateChecker();
 
   const [sidebar,setSidebar]=useState(false);
   const [aOpen,setAOpen]=useState(false);
@@ -321,6 +326,17 @@ export function ClientHome() {
           </Group>
         </Box>
         <Divider/>
+        
+        {/* Role Switcher - Only show if user has multiple roles */}
+        {currentUser?.approved_roles && currentUser.approved_roles.length > 1 && (
+          <>
+            <Box p="md">
+              <RoleSwitcher variant="button" />
+            </Box>
+            <Divider/>
+          </>
+        )}
+        
         <Stack gap={2} p="sm" style={{flex:1}}>
           {NAV.map(n=>(
             <Box key={n.label} p={10}

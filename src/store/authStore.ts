@@ -49,6 +49,10 @@ interface AuthState {
   signup: (data: { email: string; password: string; phone: string; role: User['role'] }) => { success: boolean; userId?: string; error?: string };
   setUserRole: (role: 'client' | 'provider') => void;
   updateProviderOnlineStatus: (isOnline: boolean) => void;
+  setCurrentUser: (user: User) => void;
+  setTokens: (access: string, refresh: string) => void;
+  canSwitchRoles: () => boolean;
+  getAvailableRoles: () => string[];
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -224,5 +228,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set(state => ({
       providerProfile: state.providerProfile ? { ...state.providerProfile, isOnline } : null,
     }));
+  },
+
+  setCurrentUser: (user) => {
+    storage.set(STORAGE_KEYS.currentUser, user);
+    
+    const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
+    const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
+    
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      clientProfile: user.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
+      providerProfile: user.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
+    });
+  },
+
+  setTokens: (access, refresh) => {
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+  },
+
+  canSwitchRoles: () => {
+    const { currentUser } = get();
+    return (currentUser?.approved_roles?.length ?? 0) > 1;
+  },
+
+  getAvailableRoles: () => {
+    const { currentUser } = get();
+    if (!currentUser?.approved_roles) return [];
+    return currentUser.approved_roles.filter(role => role !== currentUser.role);
   },
 }));
