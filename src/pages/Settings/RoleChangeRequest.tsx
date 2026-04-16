@@ -154,19 +154,22 @@ export const RoleChangeRequestPage: React.FC = () => {
             </Tooltip>
           </Group>
 
-          {/* Show setup button for users with multiple roles who haven't completed onboarding */}
-          {hasMultipleRoles && currentRole === 'client' && (
-            <Alert icon={<IconSwitchHorizontal size={16} />} color="blue" title="Provider Role Approved">
+          {/* Show simple message for users with multiple roles */}
+          {hasMultipleRoles && (
+            <Alert icon={<IconSwitchHorizontal size={16} />} color="green" title="Multiple Roles Available">
               <Text size="sm" mb="md">
-                Your Service Provider role has been approved. Complete your provider account setup to start receiving job requests.
+                You now have access to both <strong>Client</strong> and <strong>Service Provider</strong> roles.
+              </Text>
+              <Text size="sm" mb="md">
+                Use the <strong>role switcher in the sidebar</strong> to navigate between your roles.
               </Text>
               <Button
-                onClick={() => navigate('/client/role-approved')}
+                onClick={() => navigate(currentRole === 'client' ? '/client/dashboard' : '/provider/dashboard')}
                 variant="filled"
-                color="blue"
+                color="green"
                 leftSection={<IconArrowRight size={16} />}
               >
-                Setup Provider Account
+                Go to Dashboard
               </Button>
             </Alert>
           )}

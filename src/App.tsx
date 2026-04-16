@@ -52,6 +52,7 @@ import {
 // Settings pages
 import { RoleChangeRequestPage } from './pages/Settings/RoleChangeRequest';
 import { RoleApprovalSuccess } from './pages/RoleApprovalSuccess';
+import { RoleSelection } from './pages/RoleSelection';
 
 // Provider Onboarding
 import { ProviderOnboardingStep1 } from './pages/ProviderOnboarding/Step1';
@@ -91,6 +92,7 @@ function App() {
         <Route path={ROUTES.aiBot} element={<AIHelpBot />} />
         <Route path={ROUTES.login} element={<Login />} />
         <Route path={ROUTES.signup} element={<Signup />} />
+        <Route path="/role-selection" element={<RoleSelection />} />
         <Route path="/signup/client" element={<ClientSignupSimple />} />
         <Route path={ROUTES.signupClient} element={<ClientSignupSimple />} />
         <Route path={ROUTES.signupProvider} element={<ProviderSignupSimple />} />

@@ -172,7 +172,12 @@ export default function Login() {
       });
 
       setOtpVerifying(false);
-      handleSuccess();
+      
+      // Pass tokens to handleSuccess for role selection
+      handleSuccess({
+        access: response.access,
+        refresh: response.refresh,
+      });
     } catch (error: unknown) {
       setOtpVerifying(false);
       const apiMessage = getErrorMessage(error, '');
@@ -224,7 +229,7 @@ export default function Login() {
   };
 
   // ─── Handle successful login ──────────────────────────────────────────────
-  const handleSuccess = async () => {
+  const handleSuccess = async (tokens?: { access: string; refresh: string }) => {
     const { currentUser } = useAuthStore.getState();
     
     if (!currentUser) {
@@ -233,24 +238,21 @@ export default function Login() {
     }
 
     const hasMultipleRoles = (currentUser.approved_roles?.length ?? 0) > 1;
-    const currentRole = currentUser.role;
 
-    // If user has multiple roles but is still on client role, show approval page
-    if (hasMultipleRoles && currentRole === 'client' && currentUser.approved_roles?.includes('provider')) {
-      notifications.show({
-        title: 'Welcome back!',
-        message: 'Your Service Provider role has been approved. Complete your setup to get started.',
-        color: 'teal',
+    // If user has multiple roles, show role selection page
+    if (hasMultipleRoles && tokens) {
+      navigate('/role-selection', { 
+        replace: true,
+        state: { access: tokens.access, refresh: tokens.refresh }
       });
-      navigate('/client/role-approved', { replace: true });
       return;
     }
 
+    const currentRole = currentUser.role;
+
     notifications.show({
       title: 'Welcome back!',
-      message: hasMultipleRoles 
-        ? `Signed in as ${currentRole === 'provider' ? 'Service Provider' : 'Client'}. Use the role switcher to change roles.`
-        : 'Signed in successfully.',
+      message: 'Signed in successfully.',
       color: 'teal',
     });
 
