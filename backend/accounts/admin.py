@@ -847,24 +847,23 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
             role_request.reviewed_at = timezone.now()
             role_request.save()
             
-            # Change user's role
             user = role_request.user
-            old_role = user.role
-            user.role = role_request.requested_role
+            requested_role = role_request.requested_role
             
-            # Handle role-specific logic
-            if old_role == User.ROLE_PROVIDER and role_request.requested_role == User.ROLE_CLIENT:
-                user.verification_status = User.STATUS_PENDING
-                user.is_on_trial = False
-                user.trial_ends_at = None
+            # Add the requested role to approved_roles (don't change current role)
+            if requested_role not in user.approved_roles:
+                user.approved_roles.append(requested_role)
             
-            if role_request.requested_role == User.ROLE_PROVIDER:
+            # If changing to provider, set up provider-specific fields
+            if requested_role == User.ROLE_PROVIDER:
                 if not user.provider_uid:
                     user.provider_uid = User.generate_provider_uid()
-                user.verification_status = User.STATUS_PENDING
-                user.is_on_trial = True
-                from datetime import timedelta
-                user.trial_ends_at = timezone.now() + timedelta(days=14)
+                
+                # Only set trial if user doesn't already have provider role active
+                if user.role != User.ROLE_PROVIDER:
+                    user.is_on_trial = True
+                    from datetime import timedelta
+                    user.trial_ends_at = timezone.now() + timedelta(days=14)
                 
                 # Reset provider profile if it exists
                 try:
@@ -877,7 +876,11 @@ class RoleChangeRequestAdmin(admin.ModelAdmin):
             user.save()
             count += 1
         
-        self.message_user(request, f'{count} role change request(s) approved.', messages.SUCCESS)
+        self.message_user(
+            request,
+            f'{count} role change request(s) approved. Users can now switch to their new roles using the role switcher.',
+            messages.SUCCESS
+        )
     approve_role_change.short_description = 'Approve selected role change requests'
 
     def reject_role_change(self, request, queryset):

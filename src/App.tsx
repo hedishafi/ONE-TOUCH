@@ -51,6 +51,7 @@ import {
 
 // Settings pages
 import { RoleChangeRequestPage } from './pages/Settings/RoleChangeRequest';
+import { RoleApprovalSuccess } from './pages/RoleApprovalSuccess';
 
 // Provider Onboarding
 import { ProviderOnboardingStep1 } from './pages/ProviderOnboarding/Step1';
@@ -118,6 +119,7 @@ function App() {
           <Route path="wallet" element={<ClientWallet />} />
           <Route path="loyalty" element={<ClientLoyalty />} />
           <Route path="settings/role-change" element={<RoleChangeRequestPage />} />
+          <Route path="role-approved" element={<RoleApprovalSuccess />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 

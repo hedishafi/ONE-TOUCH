@@ -179,14 +179,26 @@ export const RoleChangeRequestPage: React.FC = () => {
               <Text size="sm" mb="md">
                 Your current active role: <strong>{getRoleLabel(currentRole)}</strong>
               </Text>
-              <Button
-                onClick={() => navigate(currentRole === 'client' ? '/client/dashboard' : '/provider/dashboard')}
-                variant="light"
-                color="green"
-                leftSection={<IconArrowRight size={16} />}
-              >
-                Go to Dashboard
-              </Button>
+              <Group gap="xs">
+                <Button
+                  onClick={() => navigate(currentRole === 'client' ? '/client/dashboard' : '/provider/dashboard')}
+                  variant="light"
+                  color="green"
+                  leftSection={<IconArrowRight size={16} />}
+                >
+                  Go to Dashboard
+                </Button>
+                {currentRole === 'client' && (
+                  <Button
+                    onClick={() => navigate('/client/role-approved')}
+                    variant="outline"
+                    color="blue"
+                    leftSection={<IconSwitchHorizontal size={16} />}
+                  >
+                    Setup Provider Account
+                  </Button>
+                )}
+              </Group>
             </Alert>
           )}
 

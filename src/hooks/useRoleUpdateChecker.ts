@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { notifications } from '@mantine/notifications';
 import api from '../services/api';
 
 export const useRoleUpdateChecker = () => {
+  const navigate = useNavigate();
   const { currentUser, setCurrentUser, isAuthenticated } = useAuthStore();
   const previousApprovedRolesRef = useRef<string[] | null>(null);
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,12 +42,29 @@ export const useRoleUpdateChecker = () => {
           setCurrentUser(updatedUser);
 
           const roleLabel = newRoles[0] === 'provider' ? 'Service Provider' : 'Client';
-          notifications.show({
-            title: 'New Role Approved!',
-            message: `You now have access to the ${roleLabel} role. Use the role switcher in the sidebar to switch between roles.`,
-            color: 'green',
-            autoClose: 10000,
-          });
+          const roleType = newRoles[0];
+          
+          if (roleType === 'provider') {
+            // Show notification
+            notifications.show({
+              title: 'Role Approved!',
+              message: 'Your Service Provider role has been approved. Redirecting to setup...',
+              color: 'green',
+              autoClose: 3000,
+            });
+            
+            // Redirect to approval success page after a short delay
+            setTimeout(() => {
+              navigate('/client/role-approved', { replace: true });
+            }, 1000);
+          } else {
+            notifications.show({
+              title: 'Role Approved!',
+              message: `You now have access to the ${roleLabel} role. Use the role switcher in the sidebar to switch between roles.`,
+              color: 'green',
+              autoClose: 10000,
+            });
+          }
 
           previousApprovedRolesRef.current = newApprovedRoles;
         }

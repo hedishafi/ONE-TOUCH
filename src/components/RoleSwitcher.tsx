@@ -47,7 +47,6 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
     try {
       const response = await api.post('/user/role-switch/', { role: newRole });
 
-      // Update tokens
       if (response.data.access) {
         localStorage.setItem('access_token', response.data.access);
       }
@@ -55,24 +54,33 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
         localStorage.setItem('refresh_token', response.data.refresh);
       }
 
-      // Update auth store
       setTokens(response.data.access, response.data.refresh);
       setCurrentUser(response.data.user);
 
-      // Show success notification
+      const roleLabel = getRoleLabel(newRole);
       notifications.show({
         title: 'Role Switched',
-        message: `Successfully switched to ${getRoleLabel(newRole)}`,
+        message: `Successfully switched to ${roleLabel}`,
         color: 'green',
         icon: <IconSwitchHorizontal size={16} />,
+        autoClose: 3000,
       });
 
-      // Redirect to appropriate dashboard
       if (newRole === 'provider') {
-        // Check if provider needs to complete onboarding
         try {
           const statusResponse = await api.get('/provider/onboarding/status/');
-          navigate(statusResponse.data.next_route, { replace: true });
+          const status = statusResponse.data;
+          
+          if (status.next_step !== 'dashboard') {
+            notifications.show({
+              title: 'Complete Provider Setup',
+              message: 'Please complete your provider profile setup to access all provider features.',
+              color: 'blue',
+              autoClose: 8000,
+            });
+          }
+          
+          navigate(status.next_route, { replace: true });
         } catch {
           navigate('/provider/dashboard', { replace: true });
         }
@@ -86,6 +94,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
         title: 'Switch Failed',
         message: errorMsg,
         color: 'red',
+        autoClose: 5000,
       });
     } finally {
       setSwitching(false);
@@ -97,7 +106,12 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
 
   if (variant === 'compact') {
     return (
-      <Menu shadow="md" width={220} position="bottom-end">
+      <Menu 
+        shadow="md" 
+        width={220} 
+        position="bottom-end"
+        zIndex={1000}
+      >
         <Menu.Target>
           <UnstyledButton
             disabled={switching}
@@ -130,7 +144,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
           </UnstyledButton>
         </Menu.Target>
 
-        <Menu.Dropdown>
+        <Menu.Dropdown style={{ zIndex: 1000 }}>
           <Menu.Label>Switch Role</Menu.Label>
           {availableRoles.map((role) => {
             const RoleIcon = getRoleIcon(role);
@@ -163,7 +177,12 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
   }
 
   return (
-    <Menu shadow="md" width={260} position="bottom-start">
+    <Menu 
+      shadow="md" 
+      width={260} 
+      position="bottom-start"
+      zIndex={1000}
+    >
       <Menu.Target>
         <UnstyledButton
           disabled={switching}
@@ -206,7 +225,7 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({ variant = 'button' }
         </UnstyledButton>
       </Menu.Target>
 
-      <Menu.Dropdown>
+      <Menu.Dropdown style={{ zIndex: 1000 }}>
         <Menu.Label>
           <Group gap="xs">
             <IconSwitchHorizontal size={14} />

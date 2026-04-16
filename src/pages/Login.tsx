@@ -158,6 +158,7 @@ export default function Login() {
         email: response.user.email ?? '',
         phone: response.user.phone_number,
         role: response.user.role,
+        approved_roles: response.user.approved_roles ?? [response.user.role],
         createdAt: new Date().toISOString(),
         verificationStatus: (response.user.verification_status as 'pending' | 'verified' | 'rejected' | 're-verification-requested') ?? 'pending',
         providerUid: response.user.provider_uid,
@@ -225,20 +226,43 @@ export default function Login() {
   // ─── Handle successful login ──────────────────────────────────────────────
   const handleSuccess = async () => {
     const { currentUser } = useAuthStore.getState();
+    
+    if (!currentUser) {
+      navigate(ROUTES.landing, { replace: true });
+      return;
+    }
+
+    const hasMultipleRoles = (currentUser.approved_roles?.length ?? 0) > 1;
+    const currentRole = currentUser.role;
+
+    // If user has multiple roles but is still on client role, show approval page
+    if (hasMultipleRoles && currentRole === 'client' && currentUser.approved_roles?.includes('provider')) {
+      notifications.show({
+        title: 'Welcome back!',
+        message: 'Your Service Provider role has been approved. Complete your setup to get started.',
+        color: 'teal',
+      });
+      navigate('/client/role-approved', { replace: true });
+      return;
+    }
+
     notifications.show({
       title: 'Welcome back!',
-      message: 'Signed in successfully.',
+      message: hasMultipleRoles 
+        ? `Signed in as ${currentRole === 'provider' ? 'Service Provider' : 'Client'}. Use the role switcher to change roles.`
+        : 'Signed in successfully.',
       color: 'teal',
     });
 
-    if (currentUser?.role === 'client') {
+    if (currentRole === 'client') {
       navigate(ROUTES.clientDashboard, { replace: true });
       return;
     }
 
-    if (currentUser?.role === 'provider') {
+    if (currentRole === 'provider') {
       try {
         const status = await authService.getProviderOnboardingStatus();
+        
         if (status.verification_status === 'rejected' && status.rejection_reason) {
           notifications.show({
             title: 'Verification Update',
@@ -247,6 +271,16 @@ export default function Login() {
             autoClose: 8000,
           });
         }
+        
+        if (hasMultipleRoles && status.next_step !== 'dashboard') {
+          notifications.show({
+            title: 'Complete Provider Setup',
+            message: 'Please complete your provider profile setup to access provider features.',
+            color: 'blue',
+            autoClose: 8000,
+          });
+        }
+        
         navigate(status.next_route, { replace: true });
       } catch {
         navigate(ROUTES.providerDashboard, { replace: true });

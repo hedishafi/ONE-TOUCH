@@ -338,15 +338,24 @@ export function ClientHome() {
         )}
         
         <Stack gap={2} p="sm" style={{flex:1}}>
-          {NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
+          {NAV
+            .filter(n => {
+              // Hide "Request Role Change" if user already has multiple roles
+              if (n.label === 'Request Role Change' && currentUser?.approved_roles && currentUser.approved_roles.length > 1) {
+                return false;
+              }
+              return true;
+            })
+            .map(n=>(
+              <Box key={n.label} p={10}
+                onClick={()=>{setSidebar(false);nav(n.r);}}
+                style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
+                  fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
+                  cursor:'pointer'}}>
+                {n.icon} {n.label}
+              </Box>
+            ))
+          }
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
           <Box p={10}

@@ -231,16 +231,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setCurrentUser: (user) => {
-    storage.set(STORAGE_KEYS.currentUser, user);
+    const userWithApprovedRoles = {
+      ...user,
+      approved_roles: user.approved_roles ?? [user.role],
+    };
+    
+    storage.set(STORAGE_KEYS.currentUser, userWithApprovedRoles);
     
     const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
     const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
     
     set({
-      currentUser: user,
+      currentUser: userWithApprovedRoles,
       isAuthenticated: true,
-      clientProfile: user.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
-      providerProfile: user.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
+      clientProfile: userWithApprovedRoles.role === 'client' ? (clientProfiles.find(p => p.userId === userWithApprovedRoles.id) ?? null) : null,
+      providerProfile: userWithApprovedRoles.role === 'provider' ? (providerProfiles.find(p => p.userId === userWithApprovedRoles.id) ?? null) : null,
     });
   },
 
