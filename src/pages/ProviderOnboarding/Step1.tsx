@@ -289,63 +289,20 @@ export const ProviderOnboardingStep1: React.FC = () => {
       const latest = await authService.getProfile();
       if (latest.role !== 'provider') return;
 
-      const verificationStatus: User['verificationStatus'] =
-        latest.verification_status === 'verified'
-          ? 'verified'
-          : latest.verification_status === 'rejected'
-            ? 'rejected'
-            : latest.verification_status === 're-verification-requested'
-              ? 're-verification-requested'
-              : 'pending';
-
-      const user: User = {
-        id: String(latest.id),
-        email: latest.email || `${latest.phone_number}@onetouch.local`,
-        phone: latest.phone_number,
-        role: 'provider',
-        createdAt: new Date().toISOString(),
-        verificationStatus,
-        providerUid: latest.provider_uid,
-      };
-
-      localStorage.setItem('user', JSON.stringify(latest));
-      storage.set(STORAGE_KEYS.currentUser, user);
-      useAuthStore.setState({
-        currentUser: user,
-        isAuthenticated: true,
-        clientProfile: null,
-        providerProfile: null,
-      });
-    } catch {
+      // Use setCurrentUser from auth store to ensure proper field mapping
+      const { setCurrentUser } = useAuthStore.getState();
+      setCurrentUser(latest);
+      
+      console.log('[Step1] Updated currentUser after verification submission:', latest);
+    } catch (error) {
+      console.error('[Step1] Failed to sync provider session:', error);
+      
       const stored = authService.getStoredUser();
       if (!stored || stored.role !== 'provider') return;
 
-      const verificationStatus: User['verificationStatus'] =
-        stored.verification_status === 'verified'
-          ? 'verified'
-          : stored.verification_status === 'rejected'
-            ? 'rejected'
-            : stored.verification_status === 're-verification-requested'
-              ? 're-verification-requested'
-              : 'pending';
-
-      const user: User = {
-        id: String(stored.id),
-        email: stored.email || `${stored.phone_number}@onetouch.local`,
-        phone: stored.phone_number,
-        role: 'provider',
-        createdAt: new Date().toISOString(),
-        verificationStatus,
-        providerUid: stored.provider_uid,
-      };
-
-      storage.set(STORAGE_KEYS.currentUser, user);
-      useAuthStore.setState({
-        currentUser: user,
-        isAuthenticated: true,
-        clientProfile: null,
-        providerProfile: null,
-      });
+      // Use setCurrentUser from auth store to ensure proper field mapping
+      const { setCurrentUser } = useAuthStore.getState();
+      setCurrentUser(stored);
     }
   };
 
