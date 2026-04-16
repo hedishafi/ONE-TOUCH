@@ -83,6 +83,8 @@ export const RoleApprovalSuccess: React.FC = () => {
   };
 
   const handleStayAsClient = () => {
+    // User chooses to stay as client - don't enable role switching yet
+    // Role switcher will only appear after they start provider onboarding
     navigate('/client/dashboard', { replace: true });
   };
 

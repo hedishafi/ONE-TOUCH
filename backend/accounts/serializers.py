@@ -51,6 +51,7 @@ class ClientAuthProfileSerializer(serializers.ModelSerializer):
             'last_name',
             'role',
             'approved_roles',
+            'verification_status',
             'date_joined',
         ]
         read_only_fields = fields

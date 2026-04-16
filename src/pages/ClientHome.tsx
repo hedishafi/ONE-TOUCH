@@ -180,11 +180,42 @@ export function ClientHome() {
   const [declineStage,setDeclineStage]=useState<'asking'|'confirmed'>('asking');
   const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
+  // Track provider onboarding progress for role switcher visibility
+  const [providerOnboardingStarted, setProviderOnboardingStarted] = useState(() => {
+    // Initialize based on currentUser data
+    if (currentUser?.approved_roles?.includes('provider')) {
+      const status = currentUser?.verificationStatus;
+      return status === 'pending' || status === 'verified' || status === 'rejected';
+    }
+    return false;
+  });
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('[ClientHome] providerOnboardingStarted changed:', providerOnboardingStarted);
+    console.log('[ClientHome] currentUser:', {
+      approvedRoles: currentUser?.approved_roles,
+      verificationStatus: currentUser?.verificationStatus,
+      role: currentUser?.role,
+    });
+  }, [providerOnboardingStarted, currentUser]);
+
   const mapTile='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  // Check provider onboarding status whenever currentUser changes
+  useEffect(() => {
+    if (currentUser?.approved_roles?.includes('provider')) {
+      const status = currentUser?.verificationStatus;
+      const hasProgress = status === 'pending' || status === 'verified' || status === 'rejected';
+      console.log('[ClientHome] Updating providerOnboardingStarted:', hasProgress, 'status:', status);
+      setProviderOnboardingStarted(hasProgress);
+    }
+  }, [currentUser?.approved_roles, currentUser?.verificationStatus]);
 
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}
     fetchNotifications(currentUser.id);
+    
     return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(declineTimer.current)clearTimeout(declineTimer.current);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
@@ -327,21 +358,36 @@ export function ClientHome() {
         </Box>
         <Divider/>
         
-        {/* Role Switcher - Only show if user has multiple roles */}
-        {currentUser?.approved_roles && currentUser.approved_roles.length > 1 && (
-          <>
-            <Box p="md">
-              <RoleSwitcher variant="button" />
-            </Box>
-            <Divider/>
-          </>
-        )}
+        {/* Role Switcher - Only show if user has multiple roles AND provider onboarding has started */}
+        {(() => {
+          const hasMultipleRoles = currentUser?.approved_roles && currentUser.approved_roles.length > 1;
+          const shouldShow = hasMultipleRoles && providerOnboardingStarted;
+          
+          console.log('[ClientHome] Role Switcher Condition:', {
+            hasMultipleRoles,
+            providerOnboardingStarted,
+            shouldShow,
+            approvedRoles: currentUser?.approved_roles,
+          });
+          
+          return shouldShow ? (
+            <>
+              <Box p="md">
+                <RoleSwitcher variant="button" />
+              </Box>
+              <Divider/>
+            </>
+          ) : null;
+        })()}
         
         <Stack gap={2} p="sm" style={{flex:1}}>
           {NAV
             .filter(n => {
-              // Hide "Request Role Change" if user already has multiple roles
-              if (n.label === 'Request Role Change' && currentUser?.approved_roles && currentUser.approved_roles.length > 1) {
+              // Hide "Request Role Change" if user has multiple roles AND onboarding has started
+              if (n.label === 'Request Role Change' && 
+                  currentUser?.approved_roles && 
+                  currentUser.approved_roles.length > 1 && 
+                  providerOnboardingStarted) {
                 return false;
               }
               return true;

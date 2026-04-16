@@ -5,7 +5,6 @@ import {
   Title,
   Text,
   Button,
-  Textarea,
   Stack,
   Group,
   Alert,
@@ -42,7 +41,6 @@ export const RoleChangeRequestPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<RoleChangeRequest | null>(null);
-  const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
   // Determine what role to request
@@ -86,23 +84,13 @@ export const RoleChangeRequestPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!reason.trim() || reason.length < 10) {
-      setError('Please provide a detailed reason (at least 10 characters)');
-      return;
-    }
-
-    if (reason.length > 1000) {
-      setError('Reason is too long (maximum 1000 characters)');
-      return;
-    }
-
     try {
       setSubmitting(true);
       setError('');
       
       await api.post('/user/role-change-request/', {
         requested_role: requestedRole,
-        reason: reason.trim()
+        reason: 'User requested role change'
       });
 
       notifications.show({
@@ -112,7 +100,6 @@ export const RoleChangeRequestPage: React.FC = () => {
         icon: <IconCheck size={16} />,
       });
 
-      setReason('');
       loadPendingRequest();
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || err.response?.data?.detail || 'Failed to submit request';
@@ -167,38 +154,20 @@ export const RoleChangeRequestPage: React.FC = () => {
             </Tooltip>
           </Group>
 
-          {/* Show role switcher info for users with multiple roles */}
-          {hasMultipleRoles && (
-            <Alert icon={<IconSwitchHorizontal size={16} />} color="green" title="Multiple Roles Active">
-              <Text size="sm" mb="sm">
-                You currently have access to both <strong>Client</strong> and <strong>Service Provider</strong> roles.
-              </Text>
-              <Text size="sm" mb="sm">
-                Use the <strong>Role Switcher</strong> in the sidebar to instantly switch between your roles without logging out.
-              </Text>
+          {/* Show setup button for users with multiple roles who haven't completed onboarding */}
+          {hasMultipleRoles && currentRole === 'client' && (
+            <Alert icon={<IconSwitchHorizontal size={16} />} color="blue" title="Provider Role Approved">
               <Text size="sm" mb="md">
-                Your current active role: <strong>{getRoleLabel(currentRole)}</strong>
+                Your Service Provider role has been approved. Complete your provider account setup to start receiving job requests.
               </Text>
-              <Group gap="xs">
-                <Button
-                  onClick={() => navigate(currentRole === 'client' ? '/client/dashboard' : '/provider/dashboard')}
-                  variant="light"
-                  color="green"
-                  leftSection={<IconArrowRight size={16} />}
-                >
-                  Go to Dashboard
-                </Button>
-                {currentRole === 'client' && (
-                  <Button
-                    onClick={() => navigate('/client/role-approved')}
-                    variant="outline"
-                    color="blue"
-                    leftSection={<IconSwitchHorizontal size={16} />}
-                  >
-                    Setup Provider Account
-                  </Button>
-                )}
-              </Group>
+              <Button
+                onClick={() => navigate('/client/role-approved')}
+                variant="filled"
+                color="blue"
+                leftSection={<IconArrowRight size={16} />}
+              >
+                Setup Provider Account
+              </Button>
             </Alert>
           )}
 
@@ -255,23 +224,11 @@ export const RoleChangeRequestPage: React.FC = () => {
           {/* Request Form - Only show if user doesn't have multiple roles and no pending request */}
           {!hasMultipleRoles && pendingRequest?.status !== 'pending' && (
             <>
-              <div>
-                <Text size="sm" fw={500} mb="xs">
-                  Why do you want to add the {getRoleLabel(requestedRole)} role? *
-                </Text>
-                <Textarea
-                  placeholder={`Please explain why you want to add ${getRoleLabel(requestedRole)} access to your account. Be specific about your reasons.`}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  minRows={4}
-                  maxRows={8}
-                  error={error}
-                  disabled={submitting}
-                />
-                <Text size="xs" c="dimmed" mt="xs">
-                  {reason.length}/1000 characters (minimum 10 characters)
-                </Text>
-              </div>
+              {error && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" title="Error">
+                  {error}
+                </Alert>
+              )}
 
               <Group justify="flex-end">
                 <Button variant="default" onClick={() => navigate(-1)} disabled={submitting}>
@@ -280,7 +237,6 @@ export const RoleChangeRequestPage: React.FC = () => {
                 <Button
                   onClick={handleSubmit}
                   loading={submitting}
-                  disabled={reason.length < 10}
                 >
                   Submit Request
                 </Button>

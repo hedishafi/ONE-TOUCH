@@ -222,6 +222,9 @@ export function ProviderHome() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showResubmittedNotice, setShowResubmittedNotice] = useState(false);
 
+  // Track provider onboarding progress for role switcher visibility
+  const [providerOnboardingStarted, setProviderOnboardingStarted] = useState(false);
+
   const verificationStatus = currentUser?.verificationStatus ?? 'pending';
   const isVerified = verificationStatus === 'verified';
   const isUnderReview = verificationStatus === 'pending';
@@ -238,6 +241,40 @@ export function ProviderHome() {
     if (p) { setProfile(p); setOnline(p.isOnline); }
     setTrials(getTrials(currentUser.id));
     fetchNotifications(currentUser.id);
+    
+    // Check if provider onboarding has started (for role switcher visibility)
+    const checkProviderOnboarding = async () => {
+      if (currentUser.approved_roles?.includes('provider')) {
+        try {
+          // Check if user has provider profile or verification status
+          const profileResponse = await fetch('/api/v1/auth/profile/', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+          });
+          
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            
+            // Check verification status from user profile
+            const verificationStatus = profileData.verification_status;
+            
+            // Show switcher if verification is in any state except initial
+            const hasProgress = verificationStatus === 'pending' || 
+                               verificationStatus === 'verified' ||
+                               verificationStatus === 'rejected';
+            
+            setProviderOnboardingStarted(hasProgress);
+          }
+        } catch (error) {
+          console.error('Failed to check provider onboarding:', error);
+          // For providers, assume onboarding started if they're already in provider mode
+          setProviderOnboardingStarted(true);
+        }
+      }
+    };
+    
+    checkProviderOnboarding();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
 
@@ -418,8 +455,10 @@ export function ProviderHome() {
         </Box>
         <Divider/>
         
-        {/* Role Switcher - Only show if user has multiple roles */}
-        {currentUser?.approved_roles && currentUser.approved_roles.length > 1 && (
+        {/* Role Switcher - Only show if user has multiple roles AND provider onboarding has started */}
+        {currentUser?.approved_roles && 
+         currentUser.approved_roles.length > 1 && 
+         providerOnboardingStarted && (
           <>
             <Box p="md">
               <RoleSwitcher variant="button" />
@@ -431,8 +470,11 @@ export function ProviderHome() {
         <Stack gap={2} p="sm" style={{flex:1}}>
           {currentUser?.role === 'provider' && NAV
             .filter(n => {
-              // Hide "Request Role Change" if user already has multiple roles
-              if (n.label === 'Request Role Change' && currentUser?.approved_roles && currentUser.approved_roles.length > 1) {
+              // Hide "Request Role Change" if user has multiple roles AND onboarding has started
+              if (n.label === 'Request Role Change' && 
+                  currentUser?.approved_roles && 
+                  currentUser.approved_roles.length > 1 && 
+                  providerOnboardingStarted) {
                 return false;
               }
               return true;

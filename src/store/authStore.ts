@@ -234,6 +234,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const userWithApprovedRoles = {
       ...user,
       approved_roles: user.approved_roles ?? [user.role],
+      verificationStatus: user.verification_status || user.verificationStatus || 'pending',
     };
     
     storage.set(STORAGE_KEYS.currentUser, userWithApprovedRoles);
