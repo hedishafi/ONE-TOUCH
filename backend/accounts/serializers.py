@@ -164,7 +164,8 @@ class SignupVerifySerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
 
     def validate_phone_number(self, value: str) -> str:
-        return value.strip()
+        from .views import _normalize_phone_number
+        return _normalize_phone_number(value)
 
 
 class LoginOTPRequestSerializer(serializers.Serializer):

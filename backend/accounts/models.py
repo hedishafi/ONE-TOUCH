@@ -31,6 +31,10 @@ class User(AbstractUser):
     verification_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     provider_uid        = models.CharField(max_length=6, unique=True, null=True, blank=True, db_index=True)
 
+    # Multi-role system fields
+    has_provider_role = models.BooleanField(default=False, help_text='True if user has provider role')
+    provider_onboarding_completed = models.BooleanField(default=False, help_text='True if provider onboarding is complete')
+
     # Free-trial support: providers get trial_ends_at set on signup
     is_on_trial    = models.BooleanField(default=False)
     trial_ends_at  = models.DateTimeField(null=True, blank=True)
@@ -66,6 +70,9 @@ class User(AbstractUser):
                 return candidate
 
     def save(self, *args, **kwargs):
+        # Set has_provider_role based on role
+        self.has_provider_role = (self.role == self.ROLE_PROVIDER)
+        
         if self.role == self.ROLE_PROVIDER and not self.provider_uid:
             self.provider_uid = self.generate_provider_uid()
         super().save(*args, **kwargs)
