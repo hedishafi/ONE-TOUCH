@@ -196,7 +196,13 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
     )
     actions = ['approve_selected', 'reject_selected']
 
+    def get_queryset(self, request):
+        """Only show verifications for providers, not clients"""
+        qs = super().get_queryset(request)
+        return qs.filter(provider__role=User.ROLE_PROVIDER)
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Only show providers in the dropdown"""
         if db_field.name == 'provider':
             kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -545,16 +551,16 @@ class DeletedProviderRecordAdmin(admin.ModelAdmin):
     ordering = ('-deleted_at',)
 
 
-@admin.register(UserRegistrationNotification)
+# UserRegistrationNotification Admin - registered for API but hidden from sidebar
 class UserRegistrationNotificationAdmin(admin.ModelAdmin):
-    list_display = ('user_name_display', 'phone_number', 'role_display', 'provider_uid_display', 'registration_time', 'reviewed_status')
-    list_filter = ('role', 'reviewed', 'registration_time')
-    search_fields = ('user_name', 'phone_number', 'provider_uid', 'user__first_name', 'user__last_name')
-    readonly_fields = ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
-    ordering = ('-registration_time',)
-    actions = ['mark_as_reviewed']
-
+    """
+    This admin provides API endpoints for the notification bell
+    but is hidden from the admin sidebar.
+    """
+    
     def get_urls(self):
+        """Provide API endpoint for notification count"""
+        from django.urls import path
         urls = super().get_urls()
         custom_urls = [
             path(
@@ -578,69 +584,23 @@ class UserRegistrationNotificationAdmin(admin.ModelAdmin):
             'notifications': [
                 {
                     'id': notif.id,
-                    'user_name': notif.user_name,
+                    'user_id': notif.user.id,
+                    'user_name': notif.user_name or notif.user.get_full_name() or notif.phone_number,
                     'phone_number': notif.phone_number,
                     'role': notif.role,
-                    'provider_uid': notif.provider_uid,
-                    'time_ago': timesince(notif.registration_time) + ' ago',
+                    'provider_uid': notif.provider_uid if notif.role == 'provider' else '',
+                    'time_ago': timesince(notif.registration_time),
                 }
                 for notif in notifications
             ]
         }
         
         return JsonResponse(data)
+    
+    def has_module_permission(self, request):
+        """Hide from admin sidebar"""
+        return False
 
-    fieldsets = (
-        ('User Information', {
-            'fields': ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
-        }),
-        ('Review Status', {
-            'fields': ('reviewed', 'reviewed_at', 'reviewed_by', 'notes')
-        }),
-    )
 
-    def user_name_display(self, obj):
-        """Display user's name or phone number"""
-        return obj.user_name or obj.phone_number
-    user_name_display.short_description = 'User Name'
-
-    def role_display(self, obj):
-        """Display role in a user-friendly format"""
-        role_map = {
-            'client': 'Client',
-            'provider': 'Provider',
-            'admin': 'Admin',
-        }
-        return role_map.get(obj.role, obj.role)
-    role_display.short_description = 'Role'
-
-    def provider_uid_display(self, obj):
-        """Display provider UID or N/A for clients"""
-        if obj.role == 'provider' and obj.provider_uid:
-            return obj.provider_uid
-        return '—'
-    provider_uid_display.short_description = 'Provider UID'
-
-    def reviewed_status(self, obj):
-        """Display reviewed status with icon"""
-        if obj.reviewed:
-            return format_html('<span style="color: green;">✓ Reviewed</span>')
-        return format_html('<span style="color: orange;">⏳ Pending</span>')
-    reviewed_status.short_description = 'Status'
-
-    def save_model(self, request, obj, form, change):
-        """Auto-set reviewed_by and reviewed_at when marking as reviewed"""
-        if obj.reviewed and not obj.reviewed_at:
-            obj.reviewed_at = timezone.now()
-            obj.reviewed_by = request.user
-        super().save_model(request, obj, form, change)
-
-    def mark_as_reviewed(self, request, queryset):
-        """Bulk action to mark notifications as reviewed"""
-        updated = queryset.update(
-            reviewed=True,
-            reviewed_at=timezone.now(),
-            reviewed_by=request.user
-        )
-        self.message_user(request, f'{updated} notification(s) marked as reviewed.')
-    mark_as_reviewed.short_description = 'Mark selected as reviewed'
+# Register the admin to enable URL routing
+admin.site.register(UserRegistrationNotification, UserRegistrationNotificationAdmin)
