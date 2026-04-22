@@ -549,7 +549,7 @@ export function ActiveJobs() {
             {Object.entries(grouped).filter(([, items]) => items.length > 0).map(([status, items]) => (
               <Stack key={status} gap="sm">
                 <Group gap="xs">
-                  <StatusBadge status={status as any} />
+                  <StatusBadge status={status as JobStatus} />
                   <Text size="sm" c="dimmed">({items.length})</Text>
                 </Group>
                 {items.map(job => (

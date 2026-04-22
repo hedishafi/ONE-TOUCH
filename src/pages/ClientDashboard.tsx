@@ -30,7 +30,7 @@ import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
 import type { ProviderProfile, WalletTransaction } from '../types';
 
 // Fix Leaflet default icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: string })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -40,7 +40,6 @@ L.Icon.Default.mergeOptions({
 // ─── BROWSE SERVICES (MAIN CLIENT PAGE) ───────────────────────────────────────
 export function BrowseServices() {
   const { t } = useTranslation();
-  const {  } = useAuthStore();
   const { startCall } = useCallFlowStore();
   const { categories } = useServiceCatalog();
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -322,9 +321,15 @@ export function ClientWallet() {
   const { currentUser } = useAuthStore();
   const [topUpAmount, setTopUpAmount] = useState<number>(50);
   const [isTopping, setIsTopping] = useState(false);
+  type ClientProfileStore = {
+    userId: string;
+    walletBalance?: number;
+    loyaltyTier?: string;
+    totalBookings?: number;
+  };
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, [])
     .filter(tx => tx.userId === currentUser?.id);
-  const profiles = storage.get<any[]>(STORAGE_KEYS.clientProfiles, []);
+  const profiles = storage.get<ClientProfileStore[]>(STORAGE_KEYS.clientProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
   const balance = myProfile?.walletBalance ?? 120;
 
@@ -443,7 +448,13 @@ export function ClientWallet() {
 export function ClientLoyalty() {
   const { t } = useTranslation();
   const { currentUser } = useAuthStore();
-  const profiles = storage.get<any[]>(STORAGE_KEYS.clientProfiles, []);
+  type ClientProfileStore = {
+    userId: string;
+    walletBalance?: number;
+    loyaltyTier?: string;
+    totalBookings?: number;
+  };
+  const profiles = storage.get<ClientProfileStore[]>(STORAGE_KEYS.clientProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
   const tier = (myProfile?.loyaltyTier ?? 'bronze') as keyof typeof CLIENT_TIER_COLORS;
   const totalBookings = myProfile?.totalBookings ?? 3;

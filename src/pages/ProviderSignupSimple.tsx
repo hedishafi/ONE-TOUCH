@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -70,6 +70,7 @@ export default function ProviderSignupSimple() {
       notifications.show({ title: 'OTP sent', message: 'Verification code sent successfully.', color: 'green' });
     } catch (err: any) {
       const message =
+        err?.message ||
         err?.response?.data?.detail ||
         err?.response?.data?.errors?.phone_number?.[0] ||
         err?.response?.data?.phone_number?.[0] ||
@@ -98,6 +99,7 @@ export default function ProviderSignupSimple() {
       navigate('/provider/profile-setup');
     } catch (err: any) {
       const message =
+        err?.message ||
         err?.response?.data?.detail ||
         err?.response?.data?.errors?.otp_code?.[0] ||
         err?.response?.data?.otp_code?.[0] ||
@@ -119,7 +121,7 @@ export default function ProviderSignupSimple() {
       startTimer();
       notifications.show({ title: 'Code resent', message: 'A new OTP has been sent.', color: 'blue' });
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to resend OTP.');
+      setError(err?.message || err?.response?.data?.detail || 'Failed to resend OTP.');
     } finally {
       setLoading(false);
     }

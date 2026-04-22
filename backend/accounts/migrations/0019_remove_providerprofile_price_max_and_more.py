@@ -18,54 +18,5 @@ class Migration(migrations.Migration):
             model_name='providerprofile',
             name='price_min',
         ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_gender',
-            field=models.CharField(blank=True, help_text='Gender extracted by OCR (e.g., "Male", "Female").', max_length=20),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_home_address',
-            field=models.TextField(blank=True, help_text='Home address extracted from OCR.'),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_issue_date',
-            field=models.DateField(blank=True, help_text='Document issue date from OCR.', null=True),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_kebele',
-            field=models.CharField(blank=True, help_text='Sub-district (kebele) extracted from OCR.', max_length=100),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_phone',
-            field=models.CharField(blank=True, help_text='Phone number extracted from OCR.', max_length=30),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_region',
-            field=models.CharField(blank=True, help_text='Region or Sub-City extracted by OCR (e.g., "Addis Ababa").', max_length=100),
-        ),
-        migrations.AddField(
-            model_name='identitydocument',
-            name='extracted_wereda',
-            field=models.CharField(blank=True, help_text='District (wereda) extracted from OCR.', max_length=100),
-        ),
-        migrations.AlterField(
-            model_name='identitydocument',
-            name='extracted_name',
-            field=models.CharField(blank=True, help_text='Full name extracted by OCR.', max_length=255),
-        ),
-        migrations.AlterField(
-            model_name='provideronboardingsession',
-            name='back_image',
-            field=models.FileField(blank=True, null=True, upload_to='onboarding_temp/'),
-        ),
-        migrations.AlterField(
-            model_name='provideronboardingsession',
-            name='front_image',
-            field=models.FileField(blank=True, null=True, upload_to='onboarding_temp/'),
-        ),
     ]
+

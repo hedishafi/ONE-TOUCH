@@ -35,6 +35,37 @@ import * as authService from '../services/authService';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { useAuthStore } from '../store/authStore';
 
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null) {
+    const maybe = err as {
+      message?: string;
+      response?: {
+        data?: {
+          detail?: string;
+          errors?: { phone_number?: string[]; otp_code?: string[] };
+          phone_number?: string[];
+          phone?: string[];
+          non_field_errors?: string[];
+          otp_code?: string[];
+        };
+      };
+    };
+
+    return (
+      maybe.response?.data?.detail ||
+      maybe.response?.data?.errors?.phone_number?.[0] ||
+      maybe.response?.data?.errors?.otp_code?.[0] ||
+      maybe.response?.data?.phone_number?.[0] ||
+      maybe.response?.data?.phone?.[0] ||
+      maybe.response?.data?.non_field_errors?.[0] ||
+      maybe.response?.data?.otp_code?.[0] ||
+      maybe.message ||
+      fallback
+    );
+  }
+  return fallback;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Step 1: Enter Phone
 // ─────────────────────────────────────────────────────────────────────────────
@@ -200,13 +231,8 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       });
 
       onSuccess();
-    } catch (err: any) {
-      const message =
-        err.response?.data?.detail ||
-        err.response?.data?.errors?.otp_code?.[0] ||
-        err.response?.data?.non_field_errors?.[0] ||
-        err.response?.data?.otp_code?.[0] ||
-        'Invalid OTP. Please try again.';
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Invalid OTP. Please try again.');
 
       notifications.show({
         title: 'Verification Failed',
@@ -230,10 +256,10 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
         message: `New OTP sent to ${phone}`,
         color: 'blue',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       notifications.show({
         title: 'Resend Failed',
-        message: err.response?.data?.detail || 'Could not resend OTP',
+        message: getErrorMessage(err, 'Could not resend OTP'),
         color: 'red',
       });
     }
@@ -353,15 +379,8 @@ export const ClientSignupSimple: React.FC = () => {
         message: `Check the blue box below for the code`,
         color: 'blue',
       });
-    } catch (err: any) {
-      const message =
-        err.response?.data?.detail ||
-        err.response?.data?.errors?.phone_number?.[0] ||
-        err.response?.data?.phone_number?.[0] ||
-        err.response?.data?.phone?.[0] ||
-        err.response?.data?.non_field_errors?.[0] ||
-        err.message ||
-        'Failed to send OTP. Please try again.';
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Failed to send OTP. Please try again.');
       setError(message);
       notifications.show({
         title: 'Error',

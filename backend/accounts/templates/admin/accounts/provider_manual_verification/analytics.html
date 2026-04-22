@@ -1,0 +1,102 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'accounts/admin/manual_verification.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="mv-page">
+  <div class="mv-header-row">
+    <div>
+      <h1>{{ title }}</h1>
+      <p class="mv-subtitle">Lightweight verification insights for faster moderation decisions.</p>
+    </div>
+    <div class="mv-actions">
+      <a class="button" href="{{ queue_url }}">Open Queue</a>
+      <a class="button" href="{% url 'admin:accounts_providermanualverification_changelist' %}">Open Django List</a>
+    </div>
+  </div>
+
+  <div class="mv-kpis mv-kpis-3">
+    <div class="mv-kpi"><div class="mv-kpi-label">Total</div><div class="mv-kpi-value">{{ total_submissions }}</div></div>
+    <div class="mv-kpi mv-kpi-pending"><div class="mv-kpi-label">Pending</div><div class="mv-kpi-value">{{ pending_count }}</div></div>
+    <div class="mv-kpi mv-kpi-approved"><div class="mv-kpi-label">Approved</div><div class="mv-kpi-value">{{ approved_count }}</div></div>
+    <div class="mv-kpi mv-kpi-rejected"><div class="mv-kpi-label">Rejected</div><div class="mv-kpi-value">{{ rejected_count }}</div></div>
+  </div>
+
+  <div class="mv-chart-grid">
+    <div class="mv-chart-wrap">
+      <h2 class="mv-chart-title">Daily submissions</h2>
+      <canvas id="submissionChart" height="120"></canvas>
+    </div>
+    <div class="mv-chart-wrap">
+      <h2 class="mv-chart-title">Status split</h2>
+      <canvas id="statusChart" height="120"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  const labels = {{ chart_labels_json|safe }};
+  const data = {{ chart_data_json|safe }};
+  const pendingCount = {{ pending_count }};
+  const approvedCount = {{ approved_count }};
+  const rejectedCount = {{ rejected_count }};
+  const ctx = document.getElementById('submissionChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Daily submissions',
+          data,
+          fill: true,
+          tension: 0.3,
+          borderColor: '#2563EB',
+          backgroundColor: 'rgba(37, 99, 235, 0.14)',
+          pointBackgroundColor: '#2563EB',
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+      }
+    });
+  }
+
+  const statusCtx = document.getElementById('statusChart');
+  if (statusCtx) {
+    new Chart(statusCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pending', 'Approved', 'Rejected'],
+        datasets: [{
+          data: [pendingCount, approvedCount, rejectedCount],
+          backgroundColor: ['#F59E0B', '#16A34A', '#DC2626'],
+          borderColor: ['#FEF3C7', '#DCFCE7', '#FEE2E2'],
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endblock %}

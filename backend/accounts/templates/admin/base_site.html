@@ -1,0 +1,297 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a></h1>
+{% endblock %}
+
+{% block userlinks %}
+<div class="admin-userlinks-container">
+  <!-- Notification Bell -->
+  <div class="admin-notification-bell" id="notification-bell">
+    <a href="{% url 'admin:accounts_userregistrationnotification_changelist' %}?reviewed__exact=0" class="notification-bell-link">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+      </svg>
+      <span class="notification-count" id="notification-count" style="display: none;">0</span>
+    </a>
+    <div class="notification-dropdown" id="notification-dropdown" style="display: none;">
+      <div class="notification-header">
+        <h3>New Registrations</h3>
+        <a href="{% url 'admin:accounts_userregistrationnotification_changelist' %}?reviewed__exact=0" class="view-all-link">View All</a>
+      </div>
+      <div class="notification-list" id="notification-list">
+        <div class="notification-loading">Loading...</div>
+      </div>
+    </div>
+  </div>
+  
+  {{ block.super }}
+</div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .admin-userlinks-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .admin-notification-bell {
+    position: relative;
+  }
+  
+  .notification-bell-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #f8f9fa;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  
+  .notification-bell-link:hover {
+    background: #e9ecef;
+  }
+  
+  .notification-bell-link svg {
+    color: #495057;
+  }
+  
+  .notification-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #dc3545;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    text-align: center;
+  }
+  
+  .notification-dropdown {
+    position: absolute;
+    top: 45px;
+    right: 0;
+    width: 360px;
+    max-height: 480px;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    overflow: hidden;
+  }
+  
+  .notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #dee2e6;
+    background: #f8f9fa;
+  }
+  
+  .notification-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #212529;
+  }
+  
+  .view-all-link {
+    font-size: 12px;
+    color: #0d6efd;
+    text-decoration: none;
+  }
+  
+  .view-all-link:hover {
+    text-decoration: underline;
+  }
+  
+  .notification-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .notification-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f3f5;
+    transition: background 0.2s ease;
+    cursor: pointer;
+  }
+  
+  .notification-item:hover {
+    background: #f8f9fa;
+  }
+  
+  .notification-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 4px;
+  }
+  
+  .notification-item-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #212529;
+  }
+  
+  .notification-item-role {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .notification-item-role.client {
+    background: #d1ecf1;
+    color: #0c5460;
+  }
+  
+  .notification-item-role.provider {
+    background: #d4edda;
+    color: #155724;
+  }
+  
+  .notification-item-details {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 4px;
+  }
+  
+  .notification-item-time {
+    font-size: 11px;
+    color: #adb5bd;
+    margin-top: 4px;
+  }
+  
+  .notification-loading,
+  .notification-empty {
+    padding: 24px;
+    text-align: center;
+    color: #6c757d;
+    font-size: 13px;
+  }
+  
+  .notification-error {
+    padding: 16px;
+    text-align: center;
+    color: #dc3545;
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const bell = document.getElementById('notification-bell');
+  const dropdown = document.getElementById('notification-dropdown');
+  const countBadge = document.getElementById('notification-count');
+  const notificationList = document.getElementById('notification-list');
+  
+  let isOpen = false;
+  
+  // Toggle dropdown
+  bell.querySelector('.notification-bell-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    isOpen = !isOpen;
+    dropdown.style.display = isOpen ? 'block' : 'none';
+    
+    if (isOpen && notificationList.querySelector('.notification-loading')) {
+      loadNotifications();
+    }
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!bell.contains(e.target)) {
+      isOpen = false;
+      dropdown.style.display = 'none';
+    }
+  });
+  
+  // Load notifications
+  function loadNotifications() {
+    fetch('/admin/accounts/userregistrationnotification/api/unreviewed/')
+      .then(response => response.json())
+      .then(data => {
+        updateNotificationCount(data.count);
+        renderNotifications(data.notifications);
+      })
+      .catch(error => {
+        notificationList.innerHTML = '<div class="notification-error">Failed to load notifications</div>';
+      });
+  }
+  
+  function updateNotificationCount(count) {
+    if (count > 0) {
+      countBadge.textContent = count > 99 ? '99+' : count;
+      countBadge.style.display = 'block';
+    } else {
+      countBadge.style.display = 'none';
+    }
+  }
+  
+  function renderNotifications(notifications) {
+    if (notifications.length === 0) {
+      notificationList.innerHTML = '<div class="notification-empty">No new registrations</div>';
+      return;
+    }
+    
+    notificationList.innerHTML = notifications.map(notif => `
+      <div class="notification-item" onclick="window.location.href='/admin/accounts/userregistrationnotification/${notif.id}/change/'">
+        <div class="notification-item-header">
+          <span class="notification-item-name">${notif.user_name || notif.phone_number}</span>
+          <span class="notification-item-role ${notif.role}">${notif.role}</span>
+        </div>
+        <div class="notification-item-details">
+          ${notif.phone_number}
+          ${notif.provider_uid ? ` • UID: ${notif.provider_uid}` : ''}
+        </div>
+        <div class="notification-item-time">${notif.time_ago}</div>
+      </div>
+    `).join('');
+  }
+  
+  // Load count on page load
+  fetch('/admin/accounts/userregistrationnotification/api/unreviewed/')
+    .then(response => response.json())
+    .then(data => {
+      updateNotificationCount(data.count);
+    })
+    .catch(error => {
+      console.error('Failed to load notification count:', error);
+    });
+  
+  // Refresh count every 30 seconds
+  setInterval(function() {
+    fetch('/admin/accounts/userregistrationnotification/api/unreviewed/')
+      .then(response => response.json())
+      .then(data => {
+        updateNotificationCount(data.count);
+      })
+      .catch(error => {
+        console.error('Failed to refresh notification count:', error);
+      });
+  }, 30000);
+});
+</script>
+{% endblock %}

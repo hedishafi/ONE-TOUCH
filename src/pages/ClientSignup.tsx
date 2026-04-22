@@ -5,7 +5,7 @@
  *
  * No biometric face scan. No password entry. Frictionless and fast.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box, Center, Group, PinInput,
   Progress, Stack, Text, Alert, Anchor,
@@ -27,17 +27,28 @@ import {
 function useCountdown(start: number) {
   const [seconds, setSeconds] = useState(0);
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
-  const begin = () => {
+  const begin = useCallback(() => {
     setSeconds(start);
     if (ref.current) clearInterval(ref.current);
     ref.current = setInterval(() => setSeconds(s => {
       if (s <= 1) { clearInterval(ref.current!); return 0; }
       return s - 1;
     }), 1000);
-  };
+  }, [start]);
   useEffect(() => () => { if (ref.current) clearInterval(ref.current); }, []);
   return { seconds, begin };
 }
+
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null) {
+    const maybe = err as {
+      response?: { data?: { detail?: string } };
+      message?: string;
+    };
+    return maybe.response?.data?.detail || maybe.message || fallback;
+  }
+  return fallback;
+};
 
 // ─── Step 2 – Phone OTP Verification ──────────────────────────────────────────
 function StepPhoneOTP({
@@ -58,7 +69,7 @@ function StepPhoneOTP({
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;
 
-  useEffect(() => { begin(); }, []); // start countdown on mount
+  useEffect(() => { begin(); }, [begin]); // start countdown on mount
 
   const handleOtpChange = (val: string) => {
     setOtp(val);
@@ -93,9 +104,9 @@ function StepPhoneOTP({
         setVerifying(false);
         setError('Failed to create account. Please try again.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setVerifying(false);
-      const errorMessage = err?.response?.data?.detail || 'Failed to verify OTP. Please try again.';
+      const errorMessage = getErrorMessage(err, 'Failed to verify OTP. Please try again.');
       setError(errorMessage);
     }
   };

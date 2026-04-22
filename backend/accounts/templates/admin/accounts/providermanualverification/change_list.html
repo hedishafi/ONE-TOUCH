@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  <li>
+    <a href="{{ verification_queue_url }}" class="addlink">Verification Queue</a>
+  </li>
+  <li>
+    <a href="{{ verification_analytics_url }}" class="historylink">Analytics</a>
+  </li>
+  {{ block.super }}
+{% endblock %}

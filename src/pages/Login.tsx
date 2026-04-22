@@ -24,6 +24,33 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher';
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Screen = 'phone' | 'otp';
 
+const getErrorMessage = (err: unknown, fallback: string): string => {
+  if (typeof err === 'object' && err !== null) {
+    const maybe = err as {
+      response?: {
+        data?: {
+          detail?: string;
+          errors?: { phone_number?: string[] };
+          phone_number?: string[];
+          otp_code?: string[];
+        };
+      };
+      message?: string;
+    };
+
+    return (
+      maybe.response?.data?.detail ||
+      maybe.response?.data?.errors?.phone_number?.[0] ||
+      maybe.response?.data?.phone_number?.[0] ||
+      maybe.response?.data?.otp_code?.[0] ||
+      maybe.message ||
+      fallback
+    );
+  }
+
+  return fallback;
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function useCountdown(start: number) {
   const [seconds, setSeconds] = useState(0);
@@ -101,14 +128,9 @@ export default function Login() {
         color: 'teal',
         autoClose: 5000,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setPhoneLoading(false);
-      const message =
-        error?.response?.data?.detail ||
-        error?.response?.data?.errors?.phone_number?.[0] ||
-        error?.response?.data?.phone_number?.[0] ||
-        error?.message ||
-        'Failed to request OTP. Please try again.';
+      const message = getErrorMessage(error, 'Failed to request OTP. Please try again.');
       setPhoneError(message);
     }
   };
@@ -150,12 +172,9 @@ export default function Login() {
 
       setOtpVerifying(false);
       handleSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       setOtpVerifying(false);
-      const apiMessage =
-        error?.response?.data?.detail ||
-        error?.response?.data?.otp_code?.[0] ||
-        '';
+      const apiMessage = getErrorMessage(error, '');
 
       if (apiMessage) {
         setOtpError(apiMessage);
@@ -197,12 +216,8 @@ export default function Login() {
         color: 'teal',
         autoClose: 5000,
       });
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.detail ||
-        error?.response?.data?.errors?.phone_number?.[0] ||
-        error?.message ||
-        'Failed to resend code. Please try again.';
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Failed to resend code. Please try again.');
       setOtpError(message);
     }
   };
@@ -224,6 +239,14 @@ export default function Login() {
     if (currentUser?.role === 'provider') {
       try {
         const status = await authService.getProviderOnboardingStatus();
+        if (status.verification_status === 'rejected' && status.rejection_reason) {
+          notifications.show({
+            title: 'Verification Update',
+            message: `Admin feedback: ${status.rejection_reason}`,
+            color: 'orange',
+            autoClose: 8000,
+          });
+        }
         navigate(status.next_route, { replace: true });
       } catch {
         navigate(ROUTES.providerDashboard, { replace: true });

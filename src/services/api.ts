@@ -4,10 +4,19 @@ import { notifications } from '@mantine/notifications';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
+const getCookieValue = (name: string): string => {
+  if (typeof document === 'undefined') return '';
+  const cookie = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${name}=`));
+  return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+};
+
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,6 +29,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const method = (config.method || 'get').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      const csrfToken = getCookieValue('csrftoken');
+      if (csrfToken) {
+        config.headers['X-CSRFToken'] = csrfToken;
+      }
+    }
+
     return config;
   },
   (error) => {
@@ -40,18 +58,25 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
-        }
 
-        // Call refresh endpoint without JWT (it uses refresh token instead)
+        const refreshPayload = refreshToken ? { refresh: refreshToken } : {};
+
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/token/refresh/`,
-          { refresh: refreshToken }
+          refreshPayload,
+          {
+            withCredentials: true,
+            headers: {
+              'X-CSRFToken': getCookieValue('csrftoken'),
+            },
+          }
         );
 
         // Update stored access token
         localStorage.setItem('access_token', data.access);
+        if (data.refresh) {
+          localStorage.setItem('refresh_token', data.refresh);
+        }
         api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
 
         // Retry original request with new token

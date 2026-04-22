@@ -26,7 +26,7 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
 
   useEffect(() => {
     if (currentUser) fetchNotifications(currentUser.id);
-  }, [currentUser]);
+  }, [currentUser, fetchNotifications]);
 
   const displayName =
     clientProfile?.fullName ?? providerProfile?.fullName ?? currentUser?.email ?? 'User';

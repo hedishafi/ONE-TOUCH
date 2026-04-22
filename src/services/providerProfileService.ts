@@ -24,6 +24,27 @@ export interface ProviderProfileSetupResponse {
   message: string;
 }
 
+export interface ServiceCategoryItem {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface SubServiceItem {
+  id: number;
+  name: string;
+  slug: string;
+  category_id: number;
+}
+
+interface ServiceCategoryListResponse {
+  results: ServiceCategoryItem[];
+}
+
+interface SubServiceListResponse {
+  results: SubServiceItem[];
+}
+
 export const setupProviderProfile = async (
   payload: ProviderProfileSetupPayload
 ): Promise<ProviderProfileSetupResponse> => {
@@ -45,4 +66,14 @@ export const setupProviderProfile = async (
   });
 
   return data;
+};
+
+export const listServiceCategories = async (): Promise<ServiceCategoryItem[]> => {
+  const { data } = await api.get<ServiceCategoryListResponse>('/provider/service-categories/');
+  return data.results;
+};
+
+export const listSubServices = async (categoryId: number): Promise<SubServiceItem[]> => {
+  const { data } = await api.get<SubServiceListResponse>(`/provider/service-categories/${categoryId}/sub-services/`);
+  return data.results;
 };

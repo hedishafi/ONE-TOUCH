@@ -224,13 +224,21 @@ export function ClientHome() {
     setFoundProv(prov);
     const randomCategory = categories[Math.floor(Math.random() * categories.length)];
     const catId = randomCategory?.id ?? '1';
-    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
-      subcategoryId:'sub-001',description:desc,estimatedPrice:prov.priceMin,
-      status:'pending_agreement',commissionRate:10,
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:catId,
+      subcategoryId:'sub-001',
+      description:desc,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
-      createdAt:new Date().toISOString()} as any);
-    addNotification({id:`n-${Date.now()}`,userId:'provider-001',type:'new_job' as any,
-      title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()});
+      isRepeatBooking:false,
+    } as any);
+    const notificationPayload = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
+      title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
+    addNotification(notificationPayload as any);
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
@@ -239,7 +247,8 @@ export function ClientHome() {
     setDeclineStage('asking');
     setDeclineOpen(true);
   }
-  function pickReason(_reason:string){
+  function pickReason(reason?: string){
+    void reason;
     setDeclineStage('confirmed');
     declineTimer.current=setTimeout(()=>{
       setDeclineOpen(false);
@@ -272,11 +281,18 @@ export function ClientHome() {
     if(!currentUser)return;
     const prov=cSelectedProv??cProviders[0]??PROVIDER_POOL[0];
     const cat=categories.find(c=>c.name===cCat);
-    createJob({clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
-      subcategoryId:'sub-001',description:`${cCat} service request`,
-      estimatedPrice:prov.priceMin,status:'pending_agreement',commissionRate:10,
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:cat?.id??'cat-001',
+      subcategoryId:'sub-001',
+      description:`${cCat} service request`,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location'},
-      createdAt:new Date().toISOString()} as any);
+      isRepeatBooking:false,
+    } as any);
     closeCall();
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }

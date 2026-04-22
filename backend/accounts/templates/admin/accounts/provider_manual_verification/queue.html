@@ -1,0 +1,126 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'accounts/admin/manual_verification.css' %}">
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script defer src="{% static 'accounts/admin/ai_helper.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="mv-page" data-ai-helper-url="{{ ai_helper_url }}">
+  <div class="mv-header-row">
+    <div>
+      <h1>{{ title }}</h1>
+      <p class="mv-subtitle">Review provider submissions and take moderation actions with clear status and reason guidance.</p>
+    </div>
+    <div class="mv-actions">
+      <a class="button" href="{{ analytics_url }}">View Analytics</a>
+      <a class="button" href="{% url 'admin:accounts_providermanualverification_changelist' %}">Open Django List</a>
+    </div>
+  </div>
+
+  <div class="mv-kpis mv-kpis-3">
+    <div class="mv-kpi mv-kpi-pending">
+      <div class="mv-kpi-label">Pending submissions</div>
+      <div class="mv-kpi-value">{{ pending_count }}</div>
+    </div>
+    <div class="mv-kpi mv-kpi-approved">
+      <div class="mv-kpi-label">Approved</div>
+      <div class="mv-kpi-value">{{ approved_count }}</div>
+    </div>
+    <div class="mv-kpi mv-kpi-rejected">
+      <div class="mv-kpi-label">Rejected</div>
+      <div class="mv-kpi-value">{{ rejected_count }}</div>
+    </div>
+  </div>
+
+
+  <table class="mv-table">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>UID</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th>Documents</th>
+        <th>Review</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in page_obj.object_list %}
+      <tr>
+        <td>
+          <div class="mv-user-cell">
+            <div class="mv-user-name">{{ item.provider.get_full_name|default:"User" }}</div>
+            <div class="mv-user-meta">{{ item.provider.phone_number|default:"No phone" }}</div>
+            {% if item.provider.email %}
+              <div class="mv-user-meta">{{ item.provider.email }}</div>
+            {% endif %}
+          </div>
+        </td>
+        <td><span class="mv-uid">{{ item.provider.provider_uid|default:"—" }}</span></td>
+        <td><span class="mv-status mv-status-{{ item.status }}">{{ item.status|title }}</span></td>
+        <td>{{ item.submitted_at }}</td>
+        <td>
+          <div class="mv-preview-links">
+            {% if item.id_front_image %}<a target="_blank" href="{{ item.id_front_image.url }}">ID Front</a>{% endif %}
+            {% if item.id_back_image %}<a target="_blank" href="{{ item.id_back_image.url }}">ID Back</a>{% endif %}
+            {% if item.selfie_image %}<a target="_blank" href="{{ item.selfie_image.url }}">Selfie</a>{% endif %}
+          </div>
+        </td>
+        <td>
+          <form method="post" action="{% url 'admin:accounts_providermanualverification_review' item.id %}" class="mv-review-form" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" name="action" value="approve" class="button default mv-button-approve">Approve</button>
+
+            <label for="reject-reason-{{ item.id }}" class="mv-field-label">Rejection reason</label>
+            <textarea
+              id="reject-reason-{{ item.id }}"
+              name="rejection_reason"
+              class="mv-reason-input"
+              rows="3"
+              minlength="12"
+              placeholder="Enter a short reason (e.g., 'blurry image', 'ID expired'), then click 'Generate AI Reason' to expand it into professional variations..."></textarea>
+            <p class="mv-field-help">Tip: Enter a brief reason, then use AI to generate professional, detailed explanations.</p>
+            <p class="mv-field-error" aria-live="polite"></p>
+
+            <div class="mv-review-actions-row">
+              <button type="button" class="button mv-button-ai" data-generate-reason>Generate AI Reason</button>
+              <button type="submit" name="action" value="reject" class="button mv-button-reject">Reject</button>
+            </div>
+          </form>
+          {% if item.status == 'rejected' and item.rejection_reason %}
+          <div class="mv-last-reason">
+            <strong>Last rejection:</strong>
+            <p>{{ item.rejection_reason }}</p>
+          </div>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6">No verification submissions yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+  <div class="mv-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

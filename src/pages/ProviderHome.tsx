@@ -26,17 +26,21 @@ import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 // import { ChapaModal } from '../components/ChapaModal';
-import type { ProviderProfile } from '../types';
+import type { ProviderProfile, AppNotification, User } from '../types';
+
+type LeafletIconDefaultPrototype = {
+  _getIconUrl?: unknown;
+};
 
 // Fix Leaflet icons
 try {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  delete (L.Icon.Default.prototype as LeafletIconDefaultPrototype)._getIconUrl;
   L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
     iconUrl:        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
     shadowUrl:      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   });
-} catch (_) { /* already patched */ }
+} catch { /* already patched */ }
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -184,6 +188,7 @@ const NAV = [
 
 export function ProviderHome() {
   const nav = useNavigate();
+  const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
   const {unreadCount, fetchNotifications, addNotification} = useNotificationStore();
@@ -209,6 +214,8 @@ export function ProviderHome() {
   const [cancelTarget,  setCancelTarget]  = useState<Req|null>(null);
   const [cancelReason,  setCancelReason]  = useState('');
   const [cancelDone,    setCancelDone]    = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [showResubmittedNotice, setShowResubmittedNotice] = useState(false);
 
   const verificationStatus = currentUser?.verificationStatus ?? 'pending';
   const isVerified = verificationStatus === 'verified';
@@ -234,13 +241,23 @@ export function ProviderHome() {
   },[currentUser?.id]);
 
   useEffect(() => {
+    if (sessionStorage.getItem(RESUBMIT_SUCCESS_FLAG) === '1') {
+      setShowResubmittedNotice(true);
+      sessionStorage.removeItem(RESUBMIT_SUCCESS_FLAG);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!currentUser || currentUser.role !== 'provider') return;
 
     let isMounted = true;
 
     const refreshProviderStatus = async () => {
       try {
-        const latest = await authService.getProfile();
+        const [latest, onboardingStatus] = await Promise.all([
+          authService.getProfile(),
+          authService.getProviderOnboardingStatus(),
+        ]);
         if (!isMounted || latest.role !== 'provider') return;
 
         const latestStatus: 'pending' | 'verified' | 'rejected' | 're-verification-requested' =
@@ -261,6 +278,12 @@ export function ProviderHome() {
 
         storage.set(STORAGE_KEYS.currentUser, updatedUser);
         useAuthStore.setState({ currentUser: updatedUser });
+
+        if (latestStatus === 'rejected' && onboardingStatus.rejection_reason) {
+          setRejectionReason(onboardingStatus.rejection_reason);
+        } else {
+          setRejectionReason('');
+        }
       } catch {
         // Keep local status if refresh fails.
       }
@@ -271,7 +294,7 @@ export function ProviderHome() {
     return () => {
       isMounted = false;
     };
-  }, [currentUser?.id, currentUser?.role]);
+  }, [currentUser]);
 
   const visible   = DEMO.filter(r=>!dismissed.has(r.id)&&online);
   const myJobs    = jobs.filter(j=>j.providerId===currentUser?.id);
@@ -292,7 +315,6 @@ export function ProviderHome() {
     setOnline(v); updateProviderOnlineStatus(v);
     notifications.show({title:v?'You are Online':'You are Offline',
       message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[isRestricted, isUnderReview, updateProviderOnlineStatus]);
 
   const accept = useCallback((req:Req) => {
@@ -323,7 +345,7 @@ export function ProviderHome() {
 
   function finalize(req:Req) {
     setDismissed(s=>new Set([...s,req.id]));
-    const all = storage.get<any[]>(STORAGE_KEYS.users,[]);
+    const all = storage.get<User[]>(STORAGE_KEYS.users,[]);
     const cl  = all.find(u=>u.id===req.clientId)??all.find(u=>u.role==='client');
     const ph  = cl?.phone??'+251-912-345-678';
     setRevealed({req,phone:ph}); setRevOpen(true);
@@ -464,6 +486,32 @@ export function ProviderHome() {
           <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
             <Text fw={700} size="sm" c={N}>Your account is under review</Text>
             <Text size="xs" c="dimmed">You can access the dashboard, but going online and accepting jobs are disabled until approval.</Text>
+          </Paper>
+        )}
+
+        {showResubmittedNotice && (
+          <Paper mb={20} p="md" radius="xl" style={{background:'#ECFDF5', border:'1px solid #6EE7B7'}}>
+            <Group justify="space-between" align="flex-start" gap={12}>
+              <Box>
+                <Text fw={700} size="sm" c={N}>Verification re-submitted successfully</Text>
+                <Text size="xs" c="dimmed">Your updated identity package is pending admin review.</Text>
+              </Box>
+              <Button size="xs" variant="subtle" color="teal" onClick={() => setShowResubmittedNotice(false)}>
+                Dismiss
+              </Button>
+            </Group>
+          </Paper>
+        )}
+
+        {verificationStatus === 'rejected' && rejectionReason && (
+          <Paper mb={20} p="md" radius="xl" style={{background:'#FFF1F2', border:'1px solid #FCA5A5'}}>
+            <Group gap={8} align="flex-start">
+              <IconAlertCircle size={18} color={COLORS.error} />
+              <Box>
+                <Text fw={700} size="sm" c={N}>Your verification was rejected</Text>
+                <Text size="xs" c="dimmed">Admin feedback: {rejectionReason}</Text>
+              </Box>
+            </Group>
           </Paper>
         )}
 
@@ -624,7 +672,7 @@ export function ProviderHome() {
                               disabled={isRestricted}
                               onClick={() => {
                                 try { accept(req); }
-                                catch(e){ notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
+                                catch { notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
                               }}>
                               {isFree ? 'Accept (Free Trial)' : 'Accept & Pay'}
                             </Button>

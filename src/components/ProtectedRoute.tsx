@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { UserRole } from '../types';
 import { ROUTES } from '../utils/constants';
@@ -13,6 +13,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredRole, allowedRoles }: ProtectedRouteProps) {
   const { isAuthenticated, currentUser } = useAuthStore();
+  const location = useLocation();
 
   if (!isAuthenticated || !currentUser) {
     return <Navigate to={ROUTES.login} replace />;
@@ -28,6 +29,17 @@ export function ProtectedRoute({ children, requiredRole, allowedRoles }: Protect
         ? ROUTES.providerDashboard
         : ROUTES.adminDashboard;
     return <Navigate to={redirect} replace />;
+  }
+
+  const isProviderArea = location.pathname.startsWith('/provider/');
+  const isIdentityUploadPage = location.pathname === '/provider/onboarding/step1';
+  if (
+    currentUser.role === 'provider' &&
+    currentUser.verificationStatus === 'rejected' &&
+    isProviderArea &&
+    !isIdentityUploadPage
+  ) {
+    return <Navigate to="/provider/onboarding/step1" replace />;
   }
 
   // Outlet pattern (nested routes)
