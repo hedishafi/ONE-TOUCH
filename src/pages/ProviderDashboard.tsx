@@ -26,16 +26,6 @@ import { formatCurrency, formatTimeAgo, formatProviderTier } from '../utils/form
 import { COLORS, ROUTES, PROVIDER_TIER_COLORS } from '../utils/constants';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
 import type { WalletTransaction, ProviderProfile, PricingModel } from '../types';
-import type { NavItem } from '../types/nav';
-
-const PROVIDER_NAV: NavItem[] = [
-  { path: ROUTES.providerDashboard, label: 'Jobs',     icon: <IconBriefcase  size={20} /> },
-  { path: ROUTES.providerEarnings,  label: 'Earnings', icon: <IconTrendingUp size={20} /> },
-  { path: ROUTES.providerWallet,   label: 'Wallet',   icon: <IconWallet     size={20} /> },
-  { path: ROUTES.providerLoyalty,  label: 'Rewards',  icon: <IconStar       size={20} /> },
-  { path: ROUTES.providerProfile,  label: 'Profile',  icon: <IconUser       size={20} /> },
-];
-
 // ─── MOCK incoming job request (replace with real data source as needed) ─────
 const MOCK_JOB_REQUEST = {
   clientName:    'Selam A.',
@@ -161,7 +151,7 @@ export function ActiveJobs() {
   const T = COLORS.tealBlue;
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.my_jobs')}>
+    <DashboardLayout title={t('provider.my_jobs')}>
       <Stack gap="md">
 
         {/* ── NEW JOB REQUEST CARD ──────────────────────────────────────── */}
@@ -595,7 +585,7 @@ export function Earnings() {
   ];
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.earnings')}>
+    <DashboardLayout title={t('provider.earnings')}>
       <Stack gap="lg">
         {/* KPI Row */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
@@ -683,7 +673,7 @@ export function ProviderProfile() {
   };
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.profile')}>
+    <DashboardLayout title={t('provider.profile')}>
       <Stack gap="lg">
         {/* Avatar & verification */}
         <Card radius="lg" withBorder p="xl">
@@ -815,7 +805,7 @@ export function ProviderWallet() {
   };
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.wallet')}>
+    <DashboardLayout title={t('provider.wallet')}>
       <Stack gap="lg">
         <Box
           p="xl"
@@ -877,7 +867,7 @@ export function ProviderLoyalty() {
   const tc = PROVIDER_TIER_COLORS[tier as keyof typeof PROVIDER_TIER_COLORS] ?? COLORS.tealBlue;
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.loyalty')}>
+    <DashboardLayout title={t('provider.loyalty')}>
       <Stack gap="lg">
         {/* Tier Card */}
         <Box

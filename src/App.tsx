@@ -37,6 +37,8 @@ import {
   ClientWallet,
   ClientLoyalty,
 } from './pages/ClientDashboard';
+import { ClientMessages } from './pages/ClientMessages';
+import { ClientSettings } from './pages/ClientSettings';
 
 // Provider pages
 import { ProviderHome } from './pages/ProviderHome';
@@ -114,6 +116,8 @@ function App() {
           <Route path="saved" element={<SavedProviders />} />
           <Route path="wallet" element={<ClientWallet />} />
           <Route path="loyalty" element={<ClientLoyalty />} />
+          <Route path="messages" element={<ClientMessages />} />
+          <Route path="settings" element={<ClientSettings />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 

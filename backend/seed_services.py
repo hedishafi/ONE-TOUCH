@@ -6,7 +6,7 @@ import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 django.setup()
 
-from accounts.models import ServiceCategory, SubService
+from services.models import ServiceCategory, SubService
 
 # Create main service categories
 print("Creating service categories...")

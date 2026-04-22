@@ -4,7 +4,7 @@ from django.utils.html import format_html
 
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, User, FaceBiometricVerification,
-    ServiceCategory, SubService, ProviderService, ProviderOnboardingSession,
+    ProviderOnboardingSession,
     ProviderManualVerification, DeletedProviderRecord,
     ClientOnboardingSession
 )
@@ -145,37 +145,6 @@ class FaceBiometricVerificationAdmin(admin.ModelAdmin):
         queryset.update(status=FaceBiometricVerification.STATUS_REJECTED, reviewed_by=request.user, reviewed_at=timezone.now())
         self.message_user(request, f'{queryset.count()} face verification(s) rejected.')
     reject_verifications.short_description = 'Reject selected verifications'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SERVICE MANAGEMENT
-# ─────────────────────────────────────────────────────────────────────────────
-
-@admin.register(ServiceCategory)
-class ServiceCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active', 'created_at')
-    list_filter = ('is_active',)
-    search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
-
-
-@admin.register(SubService)
-class SubServiceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'slug', 'is_active', 'created_at')
-    list_filter = ('category', 'is_active')
-    search_fields = ('name', 'slug')
-    prepopulated_fields = {'slug': ('name',)}
-
-
-@admin.register(ProviderService)
-class ProviderServiceAdmin(admin.ModelAdmin):
-    list_display = ('provider', 'primary_service', 'subservice_count', 'created_at')
-    list_filter = ('primary_service',)
-    search_fields = ('provider__user__username', 'primary_service__name')
-
-    def subservice_count(self, obj):
-        return obj.subservices.count()
-    subservice_count.short_description = 'Subservices'
 
 
 @admin.register(ProviderOnboardingSession)

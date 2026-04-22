@@ -5,6 +5,7 @@ from .views import (
     ProviderCategoryPricingViewSet,
     ProviderSkillViewSet,
     ServiceCategoryViewSet,
+    ServiceSubServiceListView,
     ServiceViewSet,
     SkillViewSet,
 )
@@ -17,5 +18,6 @@ router.register(r'services/provider-pricing', ProviderCategoryPricingViewSet, ba
 router.register(r'services', ServiceViewSet, basename='service')
 
 urlpatterns = [
+    path('services/subservices/', ServiceSubServiceListView.as_view(), name='service-subservices'),
     path('', include(router.urls)),
 ]

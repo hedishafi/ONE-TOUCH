@@ -3,7 +3,6 @@ from decimal import Decimal
 from django.db import models
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
-from accounts.models import ProviderProfile
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -14,7 +13,7 @@ class ServiceCategory(models.Model):
     slug        = models.SlugField(max_length=120, unique=True, blank=True)
     icon        = models.CharField(max_length=100, blank=True, help_text='Icon name or URL')
     description = models.TextField(blank=True)
-    # is_active   = models.BooleanField(default=True)
+    is_active   = models.BooleanField(default=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -29,6 +28,43 @@ class ServiceCategory(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUB SERVICE  (sub-services under each category)
+# ─────────────────────────────────────────────────────────────────────────────
+class SubService(models.Model):
+    category    = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subservices')
+    name        = models.CharField(max_length=100)
+    slug        = models.SlugField()
+    description = models.TextField(blank=True)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('category', 'slug')
+        ordering = ['category', 'name']
+
+    def __str__(self):
+        return f'{self.category.name} - {self.name}'
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROVIDER SERVICE  (provider's chosen services)
+# ─────────────────────────────────────────────────────────────────────────────
+class ProviderService(models.Model):
+    provider        = models.OneToOneField('accounts.ProviderProfile', on_delete=models.CASCADE, related_name='service_offering')
+    primary_service = models.ForeignKey(ServiceCategory, on_delete=models.SET_NULL, null=True)
+    subservices     = models.ManyToManyField(SubService, help_text='Sub-services provider offers (can be multiple)')
+    created_at      = models.DateTimeField(auto_now_add=True)
+    updated_at      = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'Provider Services'
+
+    def __str__(self):
+        primary = self.primary_service.name if self.primary_service else 'Unassigned'
+        return f'{self.provider.user.username} — {primary}'
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +91,7 @@ class Skill(models.Model):
 # PROVIDER SKILL  (M2M junction — provider ↔ skill)
 # ─────────────────────────────────────────────────────────────────────────────
 class ProviderSkill(models.Model):
-    provider   = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='provider_skills')
+    provider   = models.ForeignKey('accounts.ProviderProfile', on_delete=models.CASCADE, related_name='provider_skills')
     skill      = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='provider_skills')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -71,7 +107,7 @@ class ProviderSkill(models.Model):
 # SERVICE  (a specific offering listed by a provider)
 # ─────────────────────────────────────────────────────────────────────────────
 class Service(models.Model):
-    providers   = models.ManyToManyField(ProviderProfile, related_name='services')
+    providers   = models.ManyToManyField('accounts.ProviderProfile', related_name='services')
     category    = models.ForeignKey(ServiceCategory, on_delete=models.PROTECT, related_name='services')
     title       = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -91,7 +127,7 @@ class Service(models.Model):
 # PROVIDER CATEGORY PRICING  (provider sets price range per category)
 # ─────────────────────────────────────────────────────────────────────────────
 class ProviderCategoryPricing(models.Model):
-    provider    = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='category_pricings')
+    provider    = models.ForeignKey('accounts.ProviderProfile', on_delete=models.CASCADE, related_name='category_pricings')
     category    = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='provider_pricings')
     min_price   = models.DecimalField(max_digits=10, decimal_places=2, help_text='Minimum price for services in this category')
     max_price   = models.DecimalField(max_digits=10, decimal_places=2, help_text='Maximum price for services in this category')
@@ -107,9 +143,9 @@ class ProviderCategoryPricing(models.Model):
     def clean(self):
         if self.min_price >= self.max_price:
             raise ValidationError('Minimum price must be less than maximum price.')
-        # Ensure reasonable gap for comparison (e.g., max price no more than 50% above min price)
-        if self.max_price > self.min_price * Decimal('1.5'):
-            raise ValidationError('Price range gap is too large for reasonable comparison. Maximum price cannot exceed 50% above minimum price.')
+        # Ensure reasonable gap for comparison (max price no more than 500% above min price)
+        if self.max_price > self.min_price * Decimal('6.0'):
+            raise ValidationError('Price range gap is too large for reasonable comparison. Maximum price cannot exceed 500% above minimum price.')
 
     def __str__(self):
         return f'{self.provider.user.username} — {self.category.name}: {self.min_price} - {self.max_price} ETB'

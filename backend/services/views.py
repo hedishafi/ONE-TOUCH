@@ -1,9 +1,11 @@
+from django.apps import apps
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from accounts.models import ProviderProfile
 from .filters import ProviderCategoryPricingFilter, ServiceFilter
-from .models import ProviderCategoryPricing, ProviderSkill, Service, ServiceCategory, Skill
+from .models import ProviderCategoryPricing, ProviderSkill, Service, ServiceCategory, Skill, SubService
 from .permissions import (
 	CanManageService,
 	IsAdminOrReadOnly,
@@ -16,6 +18,7 @@ from .serializers import (
 	ProviderSkillSerializer,
 	ServiceCategorySerializer,
 	ServiceSerializer,
+	SubServiceSerializer,
 	SkillSerializer,
 )
 
@@ -26,6 +29,12 @@ class ServiceCategoryViewSet(viewsets.ModelViewSet):
 	pagination_class = None
 	search_fields = ['name', 'description']
 	ordering_fields = ['name', 'created_at']
+
+	def get_queryset(self):
+		qs = super().get_queryset()
+		if self.action in ['list', 'retrieve']:
+			return qs.filter(is_active=True)
+		return qs
 
 	def get_permissions(self):
 		if self.action in ['list', 'retrieve']:
@@ -45,6 +54,18 @@ class SkillViewSet(viewsets.ModelViewSet):
 		return [IsAdminOrReadOnly()]
 
 
+class ServiceSubServiceListView(APIView):
+	permission_classes = [AllowAny]
+
+	def get(self, request):
+		category_id = request.query_params.get('category')
+		queryset = SubService.objects.filter(is_active=True)
+		if category_id:
+			queryset = queryset.filter(category_id=category_id)
+		serializer = SubServiceSerializer(queryset, many=True)
+		return Response(serializer.data)
+
+
 class ProviderSkillViewSet(viewsets.ModelViewSet):
 	queryset = ProviderSkill.objects.select_related('provider__user', 'skill').all()
 	serializer_class = ProviderSkillSerializer
@@ -57,7 +78,8 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
 		user = self.request.user
 		if user.is_staff or user.role == user.ROLE_ADMIN:
 			return qs
-		provider = ProviderProfile.objects.filter(user=user).first()
+		provider_model = apps.get_model('accounts', 'ProviderProfile')
+		provider = provider_model.objects.filter(user=user).first()
 		if not provider:
 			return qs.none()
 		return qs.filter(provider=provider)
@@ -67,7 +89,8 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
 		if user.is_staff or user.role == user.ROLE_ADMIN:
 			serializer.save()
 			return
-		provider = ProviderProfile.objects.filter(user=user).first()
+		provider_model = apps.get_model('accounts', 'ProviderProfile')
+		provider = provider_model.objects.filter(user=user).first()
 		serializer.save(provider=provider)
 
 
@@ -83,7 +106,8 @@ class ProviderCategoryPricingViewSet(viewsets.ModelViewSet):
 		user = self.request.user
 		if user.is_staff or user.role == user.ROLE_ADMIN:
 			return qs
-		provider = ProviderProfile.objects.filter(user=user).first()
+		provider_model = apps.get_model('accounts', 'ProviderProfile')
+		provider = provider_model.objects.filter(user=user).first()
 		if not provider:
 			return qs.none()
 		return qs.filter(provider=provider)
@@ -93,7 +117,8 @@ class ProviderCategoryPricingViewSet(viewsets.ModelViewSet):
 		if user.is_staff or user.role == user.ROLE_ADMIN:
 			serializer.save()
 			return
-		provider = ProviderProfile.objects.filter(user=user).first()
+		provider_model = apps.get_model('accounts', 'ProviderProfile')
+		provider = provider_model.objects.filter(user=user).first()
 		serializer.save(provider=provider)
 
 

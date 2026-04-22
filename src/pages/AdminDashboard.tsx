@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Text, Group, Stack, SimpleGrid, Card, Badge, Button,
   Table, ScrollArea, Select, TextInput, NumberInput,
@@ -18,7 +18,7 @@ import { DashboardLayout } from '../components/DashboardLayout';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo } from '../utils/formatting';
 import { COLORS, ROUTES } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import type {
   User, Job, WalletTransaction,
   FraudFlag, Dispute, CommissionConfig,
@@ -235,9 +235,16 @@ export function CommissionSettings() {
 
 // ─── CATEGORY MANAGER ─────────────────────────────────────────────────────────
 export function CategoryManager() {
-  const [cats, setCats] = useState(MOCK_CATEGORIES);
+  const { categories } = useServiceCatalog();
+  const [cats, setCats] = useState(categories);
   const [addModal, setAddModal] = useState(false);
   const [newName, setNewName] = useState('');
+
+  useEffect(() => {
+    if (cats.length === 0 && categories.length > 0) {
+      setCats(categories);
+    }
+  }, [categories, cats.length]);
 
   const deletecat = (id: string) => {
     setCats(prev => prev.filter(c => c.id !== id));
@@ -246,7 +253,7 @@ export function CategoryManager() {
 
   const addCat = () => {
     if (!newName) return;
-    setCats(prev => [...prev, { id: Date.now().toString(), name: newName, icon: '🔧', color: '#777', subcategories: [] }]);
+    setCats(prev => [...prev, { id: Date.now().toString(), name: newName, icon: 'bolt', color: '#777', subcategories: [] }]);
     setNewName('');
     setAddModal(false);
     notifications.show({ title: 'Category Added ✅', message: newName, color: 'teal' });

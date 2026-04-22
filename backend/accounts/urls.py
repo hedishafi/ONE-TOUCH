@@ -24,7 +24,6 @@ from .views import (
     ProviderProfileSetupView,
     SignupRequestOTPView,
     SignupVerifyView,
-    SubServiceListView,
     TokenRefreshView,
     UserProfileView,
 )
@@ -65,9 +64,6 @@ urlpatterns = [
     path('client/onboarding/step3/otp-request/', ClientOnboardingStep3OTPRequestView.as_view(), name='client-onboarding-step3-otp-request'),
     path('client/onboarding/step3/otp-verify/', ClientOnboardingStep3OTPVerifyView.as_view(), name='client-onboarding-step3-otp-verify'),
     path('client/onboarding/step4/', ClientOnboardingStep4ProfileView.as_view(), name='client-onboarding-step4'),
-
-    # Services (avoid route overlap with services app category list)
-    path('services/categories/<int:category_id>/subservices/', SubServiceListView.as_view(), name='category-subservices'),
 
     # Testing/development
     path('test/ocr-extract/', OCRTestView.as_view(), name='ocr-test'),

@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import (
     IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-    ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+    ProviderOnboardingSession, ClientOnboardingSession,
     ProviderManualVerification, DeletedProviderRecord,
 )
 
@@ -564,23 +564,6 @@ class ProviderManualVerificationStatusSerializer(serializers.ModelSerializer):
 # ─────────────────────────────────────────────────────────────────────────────
 # PROVIDER ONBOARDING FLOW  (5-step signup)
 # ─────────────────────────────────────────────────────────────────────────────
-
-class ServiceCategorySerializer(serializers.ModelSerializer):
-    """List available service categories for provider to choose from."""
-    class Meta:
-        model = ServiceCategory
-        fields = ['id', 'name', 'slug', 'description', 'icon_url']
-        read_only_fields = ['id']
-
-
-class SubServiceSerializer(serializers.ModelSerializer):
-    """Get sub-services under a category."""
-    class Meta:
-        model = SubService
-        fields = ['id', 'name', 'slug', 'description']
-        read_only_fields = ['id']
-
-
 class OnboardingStep1Serializer(serializers.Serializer):
     """Step 1: Upload front/back document images and OCR extract."""
     document_type = serializers.ChoiceField(
@@ -615,6 +598,28 @@ class OnboardingStep1Serializer(serializers.Serializer):
             raise serializers.ValidationError('Back image type not supported. Use JPEG, PNG, or WEBP.')
         if value.size > MAX_SIZE_MB * 1024 * 1024:
             raise serializers.ValidationError(f'Back image exceeds {MAX_SIZE_MB}MB limit.')
+        return value
+
+
+class ClientOnboardingStep1Serializer(serializers.Serializer):
+    """Client onboarding Step 1: Upload a single document image or PDF for OCR."""
+    document_type = serializers.ChoiceField(
+        choices=['national_id', 'drivers_license', 'kebele_id']
+    )
+    document_file = serializers.FileField(
+        max_length=10485760,
+        required=True,
+        use_url=False,
+    )
+
+    def validate_document_file(self, value):
+        ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'application/pdf'}
+        MAX_SIZE_MB = 10
+
+        if value.content_type not in ALLOWED_TYPES:
+            raise serializers.ValidationError('Document type not supported. Use JPEG, PNG, WEBP, or PDF.')
+        if value.size > MAX_SIZE_MB * 1024 * 1024:
+            raise serializers.ValidationError(f'Document exceeds {MAX_SIZE_MB}MB limit.')
         return value
 
 
@@ -662,7 +667,15 @@ class OnboardingStep3OTPRequestSerializer(serializers.Serializer):
 class OnboardingStep3OTPVerifySerializer(serializers.Serializer):
     """Step 3b: Verify OTP code."""
     session_id = serializers.CharField(max_length=64)
-    otp = serializers.CharField(max_length=6, min_length=6)
+    otp_code = serializers.CharField(max_length=6, min_length=6, required=False)
+    otp = serializers.CharField(max_length=6, min_length=6, required=False, write_only=True)
+
+    def validate(self, attrs):
+        otp_code = attrs.get('otp_code') or attrs.get('otp')
+        if not otp_code:
+            raise serializers.ValidationError({'otp_code': 'This field is required.'})
+        attrs['otp_code'] = otp_code
+        return attrs
 
 
 class OnboardingStep4Serializer(serializers.Serializer):

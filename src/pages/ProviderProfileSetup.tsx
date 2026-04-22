@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ActionIcon,
   Alert,
   Avatar,
   Box,
@@ -7,47 +8,58 @@ import {
   Container,
   FileButton,
   Group,
+  MultiSelect,
   NumberInput,
   Paper,
+  Select,
   Stack,
   Text,
   TextInput,
   Textarea,
   Title,
+  Tooltip,
 } from '@mantine/core';
-import { IconAlertCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
+import { IconAlertCircle, IconInfoCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { setupProviderProfile } from '../services/providerProfileService';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 export default function ProviderProfileSetup() {
+  const MIN_PRICE_RATIO = 0.5;
+
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
-  const [serviceCategory, setServiceCategory] = useState('');
-  const [subServicesText, setSubServicesText] = useState('');
-  const [priceMin, setPriceMin] = useState<number | ''>('');
+  const [serviceCategoryId, setServiceCategoryId] = useState('');
+  const [subServiceIds, setSubServiceIds] = useState<string[]>([]);
   const [priceMax, setPriceMax] = useState<number | ''>('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const { categories, loading: catalogLoading, error: catalogError } = useServiceCatalog();
 
   const previewUrl = useMemo(() => (profilePicture ? URL.createObjectURL(profilePicture) : null), [profilePicture]);
+  const calculatedPriceMin = useMemo(
+    () => (priceMax === '' ? '' : Math.round(Number(priceMax) * MIN_PRICE_RATIO)),
+    [priceMax],
+  );
 
-  const parseSubServices = (input: string) => {
-    return input
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-  };
+  const selectedCategory = categories.find((category) => category.id === serviceCategoryId);
+  const subServiceOptions = selectedCategory?.subcategories?.map((sub) => ({
+    value: sub.id,
+    label: sub.name,
+  })) ?? [];
 
   const validateForm = () => {
     if (!fullName.trim()) return 'Full name is required.';
-    if (!serviceCategory.trim()) return 'Service category is required.';
-    const parsed = parseSubServices(subServicesText);
-    if (!parsed.length) return 'At least one sub service is required (comma separated).';
-    if (priceMin === '' || priceMax === '') return 'Price range is required.';
-    if (Number(priceMin) > Number(priceMax)) return 'price_max must be greater than or equal to price_min.';
+    if (!serviceCategoryId) return 'Service category is required.';
+    if (!subServiceIds.length) return 'Please select at least one sub service.';
+    if (priceMax === '') return 'Maximum price is required.';
+    if (Number(priceMax) <= 0) return 'Maximum price must be greater than 0.';
+    const min = Number(calculatedPriceMin);
+    const max = Number(priceMax);
+    if (min > max) return 'Calculated minimum price must be less than or equal to maximum price.';
     return null;
   };
 
@@ -62,11 +74,16 @@ export default function ProviderProfileSetup() {
       setLoading(true);
       setError(null);
 
+      const categoryName = selectedCategory?.name ?? '';
+      const subServiceNames = (selectedCategory?.subcategories ?? [])
+        .filter((sub) => subServiceIds.includes(sub.id))
+        .map((sub) => sub.name);
+
       await setupProviderProfile({
         full_name: fullName.trim(),
-        service_category: serviceCategory.trim(),
-        sub_services: parseSubServices(subServicesText),
-        price_min: Number(priceMin),
+        service_category: categoryName,
+        sub_services: subServiceNames,
+        price_min: Number(calculatedPriceMin),
         price_max: Number(priceMax),
         bio: bio.trim(),
         profile_picture: profilePicture,
@@ -126,6 +143,12 @@ export default function ProviderProfileSetup() {
             </Alert>
           )}
 
+          {catalogError && (
+            <Alert icon={<IconAlertCircle size={16} />} color="yellow">
+              {catalogError}
+            </Alert>
+          )}
+
           <Group align="flex-start" gap="md">
             <Avatar src={previewUrl} size={72} radius="xl">
               {fullName ? fullName[0] : 'P'}
@@ -149,31 +172,53 @@ export default function ProviderProfileSetup() {
             required
           />
 
-          <TextInput
+          <Select
             label="Service Category"
-            placeholder="e.g. Plumbing"
-            value={serviceCategory}
-            onChange={(event) => setServiceCategory(event.currentTarget.value)}
+            placeholder={catalogLoading ? 'Loading categories...' : 'Select a category'}
+            data={categories.map((category) => ({ value: category.id, label: category.name }))}
+            value={serviceCategoryId}
+            onChange={(value) => {
+              setServiceCategoryId(value ?? '');
+              setSubServiceIds([]);
+            }}
+            searchable
             required
           />
 
-          <TextInput
+          <MultiSelect
             label="Sub Services"
-            placeholder="e.g. Pipe Repair, Leak Fix"
-            value={subServicesText}
-            onChange={(event) => setSubServicesText(event.currentTarget.value)}
-            description="Enter multiple values separated by commas"
+            placeholder={serviceCategoryId ? 'Select sub services' : 'Select a category first'}
+            data={subServiceOptions}
+            value={subServiceIds}
+            onChange={setSubServiceIds}
+            searchable
             required
+            disabled={!serviceCategoryId}
           />
 
           <Group grow>
-            <NumberInput
-              label="Minimum Price (ETB)"
-              value={priceMin}
-              onChange={(value) => setPriceMin(value === '' ? '' : Number(value))}
-              min={0}
-              required
-            />
+            <Box>
+              <Group gap={6} mb={4}>
+                <Text size="sm" fw={500}>Minimum Price (ETB)</Text>
+                <Tooltip
+                  multiline
+                  w={280}
+                  withArrow
+                  label="Minimum price is automatically set to 50% of your maximum price to support a fair and consistent marketplace policy."
+                >
+                  <ActionIcon variant="subtle" size="sm" aria-label="Minimum price rule information">
+                    <IconInfoCircle size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              <NumberInput
+                value={calculatedPriceMin}
+                min={0}
+                readOnly
+                disabled
+                required
+              />
+            </Box>
             <NumberInput
               label="Maximum Price (ETB)"
               value={priceMax}

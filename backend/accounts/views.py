@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiParameter, OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -20,9 +20,10 @@ from rest_framework_simplejwt.views import TokenRefreshView as BaseTokenRefreshV
 
 from .models import (
 	IdentityDocument, PhoneOTP, ProviderProfile, ClientProfile, FaceBiometricVerification,
-	ProviderOnboardingSession, ServiceCategory, SubService, ProviderService, ClientOnboardingSession,
+	ProviderOnboardingSession, ClientOnboardingSession,
 	ProviderManualVerification, DeletedProviderRecord,
 )
+from services.models import ProviderService, ServiceCategory, SubService
 from .ocr_engine import get_ocr_engine
 from .permissions import IsProvider, IsClient
 from .serializers import (
@@ -40,14 +41,13 @@ from .serializers import (
 	SignupOTPRequestSerializer,
 	SignupVerifySerializer,
 	UserProfileSerializer,
-	ServiceCategorySerializer,
-	SubServiceSerializer,
 	OnboardingStep1Serializer,
 	OnboardingStep2Serializer,
 	OnboardingStep3OTPRequestSerializer,
 	OnboardingStep3OTPVerifySerializer,
 	OnboardingStep4Serializer,
 	OnboardingStep5Serializer,
+	ClientOnboardingStep1Serializer,
 	ClientOnboardingProfileUpdateSerializer,
 	ProviderManualVerificationUploadSerializer,
 	ProviderManualVerificationStatusSerializer,
@@ -885,13 +885,13 @@ class FaceVerificationView(APIView):
 			'the document is auto-approved; otherwise it is flagged for admin review.'
 		),
 		parameters=[
-			{
-				'name': 'id',
-				'in': 'path',
-				'required': True,
-				'schema': {'type': 'integer'},
-				'description': 'Identity document ID',
-			}
+			OpenApiParameter(
+				name='id',
+				type=OpenApiTypes.INT,
+				location=OpenApiParameter.PATH,
+				required=True,
+				description='Identity document ID',
+			),
 		],
 	)
 	def post(self, request, id):
@@ -1547,31 +1547,6 @@ class ProviderOnboardingStep5View(APIView):
 		}, status=status.HTTP_201_CREATED)
 
 
-class ServiceCategoryListView(APIView):
-	"""List all available service categories."""
-	permission_classes = [permissions.AllowAny]
-	
-	def get(self, request):
-		"""Get all service categories."""
-		categories = ServiceCategory.objects.filter(is_active=True)
-		serializer = ServiceCategorySerializer(categories, many=True)
-		return Response(serializer.data)
-
-
-class SubServiceListView(APIView):
-	"""List sub-services for a category."""
-	permission_classes = [permissions.AllowAny]
-	
-	def get(self, request, category_id):
-		"""Get sub-services for a category."""
-		subservices = SubService.objects.filter(
-			category_id=category_id,
-			is_active=True
-		)
-		serializer = SubServiceSerializer(subservices, many=True)
-		return Response(serializer.data)
-
-
 class ProviderProfileSetupView(APIView):
 	"""Create/update authenticated provider profile and offered services."""
 	permission_classes = [permissions.IsAuthenticated, IsProvider]
@@ -1708,7 +1683,7 @@ class ClientOnboardingStep1View(APIView):
 	parser_classes = [MultiPartParser, FormParser]
 	
 	@extend_schema(
-		request=OnboardingStep1Serializer,  # Reuse provider serializer
+		request=ClientOnboardingStep1Serializer,
 		responses={201: inline_serializer(
 			name='ClientStep1Response',
 			fields={
@@ -1726,7 +1701,7 @@ class ClientOnboardingStep1View(APIView):
 		from .ocr_engine import get_ocr_engine
 		import uuid
 		
-		serializer = OnboardingStep1Serializer(data=request.data)
+		serializer = ClientOnboardingStep1Serializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
 		
 		document_type = serializer.validated_data['document_type']

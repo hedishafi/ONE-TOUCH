@@ -117,6 +117,18 @@ SPECTACULAR_SETTINGS = {
     'VERSION': 'v1',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
+    'ENUM_NAME_OVERRIDES': {
+        'UserRoleEnum': 'accounts.User.role',
+        'PhoneOTPRoleEnum': 'accounts.PhoneOTP.role',
+        'UserVerificationStatusEnum': 'accounts.User.verification_status',
+        'IdentityDocumentStatusEnum': 'accounts.IdentityDocument.status',
+        'FaceBiometricVerificationStatusEnum': 'accounts.FaceBiometricVerification.status',
+        'ProviderManualVerificationStatusEnum': 'accounts.ProviderManualVerification.status',
+        'ProviderOnboardingSessionStatusEnum': 'accounts.ProviderOnboardingSession.status',
+        'ClientOnboardingSessionStatusEnum': 'accounts.ClientOnboardingSession.status',
+        'OrderStatusEnum': 'orders.Order.status',
+        'CommissionPaymentStatusEnum': 'payments.CommissionPayment.status',
+    },
 }
 
 # ─── CORS ────────────────────────────────────────────────────────────────────

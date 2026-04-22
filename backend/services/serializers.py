@@ -1,10 +1,12 @@
 from decimal import Decimal
 
+from django.apps import apps
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from accounts.models import ProviderProfile
-from .models import ProviderCategoryPricing, ProviderSkill, Service, ServiceCategory, Skill
+from .models import ProviderCategoryPricing, ProviderSkill, Service, ServiceCategory, Skill, SubService
+
+ProviderProfile = apps.get_model('accounts', 'ProviderProfile')
 
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
@@ -19,6 +21,13 @@ class SkillSerializer(serializers.ModelSerializer):
 		model = Skill
 		fields = ['id', 'name', 'slug', 'created_at']
 		read_only_fields = ['id', 'slug', 'created_at']
+
+
+class SubServiceSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SubService
+		fields = ['id', 'name', 'slug', 'description', 'category_id', 'is_active', 'created_at']
+		read_only_fields = ['id', 'created_at']
 
 
 class ProviderBriefSerializer(serializers.ModelSerializer):
@@ -77,9 +86,9 @@ class ProviderCategoryPricingSerializer(serializers.ModelSerializer):
 		if min_price is not None and max_price is not None:
 			if min_price >= max_price:
 				raise serializers.ValidationError('Minimum price must be less than maximum price.')
-			# Ensure reasonable gap for comparison (e.g., max price no more than 50% above min price)
-			if max_price > min_price * Decimal('1.5'):
-				raise serializers.ValidationError('Price range gap is too large for reasonable comparison. Maximum price cannot exceed 50% above minimum price.')
+			# Ensure reasonable gap for comparison (max price no more than 500% above min price)
+			if max_price > min_price * Decimal('6.0'):
+				raise serializers.ValidationError('Price range gap is too large for reasonable comparison. Maximum price cannot exceed 500% above minimum price.')
 
 		# Only validate uniqueness if provider and category are available
 		if provider and category:

@@ -85,6 +85,7 @@ export const ROUTES = {
   clientSaved: '/client/saved',
   clientWallet: '/client/wallet',
   clientLoyalty: '/client/loyalty',
+  clientMessages: '/client/messages',
   clientSettings: '/client/settings',
   providerDashboard: '/provider/dashboard',
   providerJobs: '/provider/jobs',
