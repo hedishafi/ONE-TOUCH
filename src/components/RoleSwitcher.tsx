@@ -13,16 +13,14 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Button, Text, Stack, Group, Badge, Box } from '@mantine/core';
+import { Button, Text, Badge, Box } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useNavigate } from 'react-router-dom';
 import { IconSwitchHorizontal, IconUser, IconBriefcase } from '@tabler/icons-react';
 import { useAuthStore } from '../store/authStore';
 import * as authService from '../services/authService';
 
 export const RoleSwitcher: React.FC = () => {
   const { currentUser } = useAuthStore();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [autoRefreshed, setAutoRefreshed] = useState(false);
 
