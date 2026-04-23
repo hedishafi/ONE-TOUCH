@@ -6,8 +6,6 @@ from .models import (
     DeletedProviderRecord,
     ProviderManualVerification,
     ProviderProfile,
-    ServiceCategory,
-    SubService,
 )
 
 
@@ -230,6 +228,7 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
             raise serializers.ValidationError({'price_max': 'price_max must be greater than or equal to price_min.'})
 
         category_name = attrs['service_category']
+        from services.models import ServiceCategory, SubService
         category = ServiceCategory.objects.filter(name__iexact=category_name, is_active=True).first()
         if not category:
             raise serializers.ValidationError({'service_category': 'Invalid service category. Please choose from available categories.'})

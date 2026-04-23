@@ -4,8 +4,6 @@ from .views import (
     LoginRequestOTPView,
     LoginVerifyView,
     LogoutView,
-    ServiceCategoryListView,
-    SubServiceListView,
     UserProfileView,
     RoleSwitchView,
     SignupRequestOTPView,
@@ -38,6 +36,4 @@ urlpatterns = [
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
     path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
-    path('provider/service-categories/', ServiceCategoryListView.as_view(), name='provider-service-categories'),
-    path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='provider-sub-services'),
 ]

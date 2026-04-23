@@ -10,7 +10,7 @@ import {
   IconClock, IconEngine, IconTool, IconWand, IconWifi,
   IconBrush, IconMusic, IconMath, IconLanguage,
 } from '@tabler/icons-react';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LandingNavbar } from '../components/LandingNavbar';
 
@@ -155,8 +155,17 @@ const TRUST_BADGES = [
 export function ServiceSubcategory() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
+  const { categories, loading } = useServiceCatalog();
 
-  const category = MOCK_CATEGORIES.find(c => c.id === categoryId);
+  const category = categories.find(c => c.id === categoryId);
+
+  if (loading && categories.length === 0) {
+    return (
+      <Box style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Text fw={700} size="lg" c={COLORS.navyBlue}>Loading services…</Text>
+      </Box>
+    );
+  }
 
   /* ── 404 fallback ── */
   if (!category) {

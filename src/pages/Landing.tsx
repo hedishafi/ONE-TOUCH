@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { AIHelpCenter } from '../components/AIHelpCenter';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const ANIMATIONS = `
 @keyframes fadeUp {
@@ -179,6 +179,7 @@ const STEPS = [
 
 export function Landing() {
   const navigate = useNavigate();
+  const { categories } = useServiceCatalog();
 
   function CountUp({ end, duration = 1500, decimals = 0, suffix = '' }: { end: number; duration?: number; decimals?: number; suffix?: string }) {
     const [value, setValue] = useState(0);
@@ -430,7 +431,7 @@ export function Landing() {
           </Stack>
 
           <SimpleGrid cols={{ base:2,xs:4 }} spacing="lg">
-            {MOCK_CATEGORIES.map((cat,i) => (
+            {categories.map((cat,i) => (
               <Box key={cat.id} className="cat-card" p="xl" ta="center"
                 style={{ background:'white',border:'1.5px solid #E9ECEF',borderRadius:20,boxShadow:'0 2px 12px rgba(0,0,137,0.05)',animation:`fadeUp 0.6s ${0.06*i}s ease both` }}
                 onClick={() => navigate(`/services/${cat.id}`)}>

@@ -16,10 +16,11 @@ import { AIHelpCenter } from './AIHelpCenter';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
 import type { NavItem } from '../types/nav';
+import { getRoleNavItems } from './roleNav';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  navItems: NavItem[];
+  navItems?: NavItem[];
   title?: string;
 }
 
@@ -101,6 +102,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
     .slice(0, 2)
     .toUpperCase();
   const role = currentUser?.role ?? 'client';
+  const resolvedNavItems = navItems ?? getRoleNavItems(role);
 
   function go(path: string) {
     navigate(path);
@@ -171,7 +173,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
         {/* Nav links — scrollable */}
         <AppShell.Section grow component={ScrollArea} p={8}>
           <Stack gap={2}>
-            {navItems.map((item) => {
+            {resolvedNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <NavLink
@@ -279,7 +281,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {navItems.slice(0, 5).map((item) => (
+        {resolvedNavItems.slice(0, 5).map((item) => (
           <BottomNavBtn
             key={item.path + '_btm'}
             item={item}

@@ -22,9 +22,7 @@ from .models import (
     PhoneOTP,
     ProviderProfile,
     ClientProfile,
-    ServiceCategory,
-    SubService,
-    ProviderService,
+
     ProviderManualVerification,
     DeletedProviderRecord,
 )
@@ -843,6 +841,7 @@ class ProviderProfileSetupView(APIView):
         provider_profile.profile_completed = True
         provider_profile.save()
 
+        from services.models import ProviderService
         provider_service, _ = ProviderService.objects.get_or_create(provider=provider_profile)
         provider_service.primary_service = service_category
         provider_service.save()
@@ -898,6 +897,7 @@ class ServiceCategoryListView(APIView):
         summary='List service categories for profile setup',
     )
     def get(self, request):
+        from services.models import ServiceCategory
         categories = ServiceCategory.objects.filter(is_active=True).order_by('name')
         return Response(
             {
@@ -939,7 +939,8 @@ class SubServiceListView(APIView):
         },
         summary='List sub-services by service category',
     )
-    def get(self, request, category_id: int):
+    def get(self, request, category_id):
+        from services.models import SubService
         sub_services = SubService.objects.filter(category_id=category_id, is_active=True).order_by('name')
         return Response(
             {

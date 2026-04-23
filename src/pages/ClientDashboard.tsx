@@ -7,8 +7,7 @@ import {
 } from '@mantine/core';
 import {
   IconSearch, IconMapPin, IconFilter, IconList, IconMap,
-  IconHeart, IconHistory, IconWallet, IconStar,
-  IconBuildingStore, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
+  IconHeart, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
   IconCreditCard, IconCircleFilled,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
@@ -26,10 +25,9 @@ import { useJobStore, useCallFlowStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo, calcDistance } from '../utils/formatting';
 import { COLORS, ROUTES, CLIENT_TIER_COLORS } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
 import type { ProviderProfile, WalletTransaction } from '../types';
-import type { NavItem } from '../types/nav';
 
 // Fix Leaflet default icons
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: string })._getIconUrl;
@@ -39,17 +37,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-const CLIENT_NAV: NavItem[] = [
-  { path: ROUTES.clientDashboard, label: 'Browse',   icon: <IconBuildingStore size={20} /> },
-  { path: ROUTES.clientHistory,   label: 'Bookings', icon: <IconHistory       size={20} /> },
-  { path: ROUTES.clientWallet,    label: 'Wallet',   icon: <IconWallet        size={20} /> },
-  { path: ROUTES.clientLoyalty,   label: 'Rewards',  icon: <IconStar          size={20} /> },
-];
-
 // ─── BROWSE SERVICES (MAIN CLIENT PAGE) ───────────────────────────────────────
 export function BrowseServices() {
   const { t } = useTranslation();
   const { startCall } = useCallFlowStore();
+  const { categories } = useServiceCatalog();
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,11 +87,11 @@ export function BrowseServices() {
 
   const catOptions = [
     { value: '', label: 'All Categories' },
-    ...MOCK_CATEGORIES.map(c => ({ value: c.id, label: c.name })),
+    ...categories.map(c => ({ value: c.id, label: c.name })),
   ];
 
   return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.browse_services')}>
+    <DashboardLayout title={t('client.browse_services')}>
       <Stack gap="md">
         {/* Controls */}
         <Group gap="sm" wrap="nowrap">
@@ -188,6 +180,7 @@ export function BrowseServices() {
                     </Stack>
                   </Popup>
                 </Marker>
+                
               ))}
             </MapContainer>
           </Box>
@@ -230,7 +223,7 @@ export function BookingHistory() {
   ];
 
   return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.my_bookings')}>
+    <DashboardLayout title={t('client.my_bookings')}>
       <Stack gap="md">
         <Group justify="space-between">
           <Text size="sm" c="dimmed">{displayed.length} {filterStatus ? 'matching' : 'total'} bookings</Text>
@@ -288,7 +281,7 @@ export function SavedProviders() {
   const handleBook = (p: ProviderProfile) => { setBookProviderId(p.userId); };
 
   return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.saved_providers')}>
+    <DashboardLayout title={t('client.saved_providers')}>
       <Stack gap="md">
         {providers.length === 0 ? (
           <Center py={60}>
@@ -349,7 +342,7 @@ export function ClientWallet() {
   };
 
   return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.wallet')}>
+    <DashboardLayout title={t('client.wallet')}>
       <Stack gap="lg">
         {/* Balance Card */}
         <Box
@@ -476,7 +469,7 @@ export function ClientLoyalty() {
   const tierLabel = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' }[tier] ?? tier;
 
   return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.loyalty')}>
+    <DashboardLayout title={t('client.loyalty')}>
       <Stack gap="lg">
         {/* Tier Card */}
         <Box
