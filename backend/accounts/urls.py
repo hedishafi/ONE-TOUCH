@@ -12,6 +12,8 @@ from .views import (
     ProviderProfileSetupView,
     ProviderManualVerificationUploadView,
     ProviderOnboardingStatusView,
+    ServiceCategoryListView,
+    SubServiceListView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -36,4 +38,8 @@ urlpatterns = [
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
     path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
+    
+    # ── Provider Service Catalog ───────────────────────────────────────────────
+    path('provider/service-categories/', ServiceCategoryListView.as_view(), name='service-category-list'),
+    path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='sub-service-list'),
 ]
