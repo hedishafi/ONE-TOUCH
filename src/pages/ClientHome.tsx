@@ -5,11 +5,11 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
-  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone,
+  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone, IconSettings,
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
@@ -23,9 +23,8 @@ import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { RoleSwitcher } from '../components/RoleSwitcher';
-import type { AppNotification, Job } from '../types';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -133,11 +132,12 @@ const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
 const NAV=[
-  {label:'Home',    icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
-  {label:'History', icon:<IconHistory      size={16}/>,r:ROUTES.clientHistory},
-  {label:'Saved',   icon:<IconHeart        size={16}/>,r:ROUTES.clientSaved},
-  {label:'Wallet',  icon:<IconWallet       size={16}/>,r:ROUTES.clientWallet},
-  {label:'Loyalty', icon:<IconStar         size={16}/>,r:ROUTES.clientLoyalty},
+  {label:'Explore Services', icon:<IconSearch  size={16}/>,r:ROUTES.clientBrowse},
+  {label:'My Requests',      icon:<IconHistory size={16}/>,r:ROUTES.clientHistory},
+  {label:'Messages',         icon:<IconMessage size={16}/>,r:ROUTES.clientMessages},
+  {label:'Payments',         icon:<IconWallet  size={16}/>,r:ROUTES.clientWallet},
+  {label:'Favorites',        icon:<IconHeart   size={16}/>,r:ROUTES.clientSaved},
+  {label:'Settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
 ];
 
 export function ClientHome() {
@@ -145,8 +145,10 @@ export function ClientHome() {
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
+  const { categories } = useServiceCatalog();
 
   const [sidebar,setSidebar]=useState(false);
+  const [searchQuery,setSearchQuery]=useState('');
   const [aOpen,setAOpen]=useState(false);
   const [aStage,setAStage]=useState<AStage>('idle');
   const [desc,setDesc]=useState('');
@@ -176,6 +178,7 @@ export function ClientHome() {
   const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const mapTile='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const quickActions = categories.slice(0, 4);
 
   useEffect(()=>{
     if(!currentUser){nav(ROUTES.login);return;}
@@ -187,6 +190,12 @@ export function ClientHome() {
   const myJobs   =jobs.filter(j=>j.clientId===currentUser?.id);
   const activeJob=myJobs.find(j=>j.status==='pending_agreement'||j.status==='in_progress');
   const recent   =[...myJobs].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()).slice(0,5);
+
+  function submitSearch(){
+    const q = searchQuery.trim();
+    if (!q) return;
+    nav(`${ROUTES.services}?q=${encodeURIComponent(q)}`);
+  }
 
   /* ── Voice assistant ─────────────────────────────────────────────────────── */
   function startAssist(){
@@ -214,16 +223,23 @@ export function ClientHome() {
     if(!currentUser)return;
     const prov=selectedProv??foundProviders[0]??foundProv;
     setFoundProv(prov);
-    const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
-    const jobPayload = {clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
-      subcategoryId:'sub-001',description:desc,estimatedPrice:prov.priceMin,
-      status:'pending_agreement',commissionRate:10,
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const catId = randomCategory?.id ?? '1';
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:catId,
+      subcategoryId:'sub-001',
+      description:desc,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
-      isRepeatBooking:false};
-    createJob(jobPayload as unknown as Omit<Job, 'id' | 'createdAt'>);
-    const notificationPayload: AppNotification = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
+      isRepeatBooking:false,
+    } as any);
+    const notificationPayload = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
       title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
-    addNotification(notificationPayload);
+    addNotification(notificationPayload as any);
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
@@ -265,13 +281,19 @@ export function ClientHome() {
   function confirmCall(){
     if(!currentUser)return;
     const prov=cSelectedProv??cProviders[0]??PROVIDER_POOL[0];
-    const cat=MOCK_CATEGORIES.find(c=>c.name===cCat);
-    const jobPayload = {clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
-      subcategoryId:'sub-001',description:`${cCat} service request`,
-      estimatedPrice:prov.priceMin,status:'pending_agreement',commissionRate:10,
+    const cat=categories.find(c=>c.name===cCat);
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:cat?.id??'cat-001',
+      subcategoryId:'sub-001',
+      description:`${cCat} service request`,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location'},
-      isRepeatBooking:false};
-    createJob(jobPayload as unknown as Omit<Job, 'id' | 'createdAt'>);
+      isRepeatBooking:false,
+    } as any);
     closeCall();
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
@@ -347,7 +369,7 @@ export function ClientHome() {
       <Box style={{position:'sticky',top:0,zIndex:200,background:'var(--ot-bg-card)',
         borderBottom:'1px solid var(--ot-border)'}}>
         <Box px={20} py={12} style={{maxWidth:960,margin:'0 auto'}}>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="nowrap">
             <Group gap={12}>
               <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(true)}><IconMenu2 size={22}/></ActionIcon>
               <Group gap={8}>
@@ -357,20 +379,18 @@ export function ClientHome() {
                 <Text fw={800} size="sm" c={N} visibleFrom="sm">OneTouch</Text>
               </Group>
             </Group>
+            <Box style={{flex:1, maxWidth:360, margin:'0 10px'}} visibleFrom="sm">
+              <TextInput
+                placeholder="Search services"
+                value={searchQuery}
+                onChange={e=>setSearchQuery(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&submitSearch()}
+                leftSection={<IconSearch size={16}/>}
+                radius="xl"
+                size="sm"
+              />
+            </Box>
             <Group gap={10}>
-              {/* AI Call button */}
-              <Box
-                role="button" aria-label="Call In-App AI" tabIndex={0}
-                onClick={()=>startCall('AI Assistant')}
-                onKeyDown={e=>e.key==='Enter'&&startCall('AI Assistant')}
-                style={{display:'flex',alignItems:'center',gap:6,
-                  padding:'7px 13px',borderRadius:20,flexShrink:0,cursor:'pointer',
-                  background:`linear-gradient(135deg,${T},${N})`,
-                  color:'white',fontWeight:700,fontSize:13,
-                  boxShadow:`0 2px 10px ${T}55`,minHeight:44}}>
-                <IconMicrophone size={15} color="white"/>
-                <Text size="xs" fw={800} c="white" visibleFrom="xs">AI Call</Text>
-              </Box>
               {/* Call Center button */}
               <Box
                 component="a" href="tel:8182" aria-label="Call center 8182"
@@ -400,6 +420,33 @@ export function ClientHome() {
       {/* Body */}
       <Box style={{maxWidth:960,margin:'0 auto',padding:'24px 16px 64px'}}>
 
+        {/* Welcome + quick actions */}
+        <Paper mb={20} p="md" radius="xl"
+          style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
+          <Group justify="space-between" align="center" wrap="nowrap" mb={10}>
+            <Box>
+              <Text size="xs" c="var(--ot-text-muted)">Welcome</Text>
+              <Text fw={800} size="lg" c={N}>
+                {clientProfile?.fullName || currentUser?.email || 'Client'}
+              </Text>
+            </Box>
+            <Badge size="sm" color="teal" variant="light">Client</Badge>
+          </Group>
+          <Text size="sm" fw={700} c={N} mb={8}>What do you need today?</Text>
+          <Group gap={8} wrap="wrap">
+            {quickActions.map(cat=> (
+              <Button key={cat.id} size="xs" radius="xl" variant="light"
+                onClick={()=>nav(`/services/${cat.id}`)}>
+                {cat.name}
+              </Button>
+            ))}
+            <Button size="xs" radius="xl" onClick={()=>nav(ROUTES.services)}
+              style={{background:`linear-gradient(135deg,${T},${N})`,border:'none'}}>
+              View all services
+            </Button>
+          </Group>
+        </Paper>
+
         {/* Active job banner */}
         {activeJob&&(
           <Paper mb={20} p="md" radius="xl"
@@ -411,7 +458,7 @@ export function ClientHome() {
                 </ThemeIcon>
                 <Box>
                   <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">Active Request</Text><Badge size="xs" color="yellow">Live</Badge></Group>
-                  <Text fw={700} size="sm" c="white" lineClamp={1}>{MOCK_CATEGORIES.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
+                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
                   <Text size="xs" c="rgba(255,255,255,.7)">{statusLabel(activeJob.status)} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
                 </Box>
               </Group>
@@ -469,17 +516,17 @@ export function ClientHome() {
                 <Box w={44} h={44} style={{borderRadius:14,flexShrink:0,
                   background:`linear-gradient(135deg,${N},${T})`,
                   display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <IconMessage size={22} color="white"/>
+                  <IconBriefcase size={22} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>Chat in App</Text>
-                  <Text size="xs" c="dimmed">AI finds &amp; connects you to the right pro</Text>
+                  <Text fw={800} size="sm" c={N}>Request Services</Text>
+                  <Text size="xs" c="dimmed">Browse services and request a provider</Text>
                 </Box>
               </Group>
-              <Button size="sm" radius="xl" onClick={startAssist}
+              <Button size="sm" radius="xl" onClick={()=>nav(ROUTES.services)}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
-                leftSection={<IconMessage size={14}/>}>
-                Chat Now
+                leftSection={<IconBriefcase size={14}/>}> 
+                Request Service
               </Button>
             </Group>
           </Paper>
@@ -488,7 +535,7 @@ export function ClientHome() {
         {/* Category grid */}
         <Text fw={800} size="sm" c={N} mb={14}>All Services</Text>
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
-          {MOCK_CATEGORIES.map(cat=>(
+          {categories.map(cat=>(
             <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
               role="button" aria-label={`Book ${cat.name}`} tabIndex={0}
               onKeyDown={e=>e.key==='Enter'&&openPick(cat.name)}
@@ -517,7 +564,7 @@ export function ClientHome() {
             </Group>
             <Stack gap={10}>
               {recent.map(job=>{
-                const cat=MOCK_CATEGORIES.find(c=>c.id===job.categoryId);
+                const cat=categories.find(c=>c.id===job.categoryId);
                 return(
                   <Paper key={job.id} p="md" radius="xl"
                     style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
@@ -529,7 +576,7 @@ export function ClientHome() {
                           {catEmoji(cat?.icon??'tool')}
                         </Box>
                         <Box>
-                          <Text size="sm" fw={700} lineClamp={1}>{MOCK_CATEGORIES.find(c=>c.id===job.categoryId)?.name??'Service Request'}</Text>
+                          <Text size="sm" fw={700} lineClamp={1}>{categories.find(c=>c.id===job.categoryId)?.name??'Service Request'}</Text>
                           <Group gap={10}>
                             <Text size="xs" c="var(--ot-text-muted)">{CURRENCY_SYMBOL} {job.estimatedPrice}</Text>
                             <Text size="xs" c="var(--ot-text-muted)">·</Text>

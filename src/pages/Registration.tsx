@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { COLORS, MOCK_OTP, ROUTES } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { AIHelpCenter } from '../components/AIHelpCenter';
 import { storage, STORAGE_KEYS } from '../utils/storage';
@@ -407,6 +407,7 @@ export function BusinessClientRegister() {
 // ─── PROVIDER REGISTRATION ─────────────────────────────────────────────────────
 export function ProviderRegister() {
   const navigate = useNavigate();
+  const { categories } = useServiceCatalog();
   const [active, setActive] = useState(0);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [ocrDone, setOcrDone] = useState(false);
@@ -419,8 +420,8 @@ export function ProviderRegister() {
   const [bio, setBio] = useState('');
   const [isOnline, setIsOnline] = useState(true);
 
-  const catOptions = MOCK_CATEGORIES.map(c => ({ value: c.id, label: c.name }));
-  const selectedCat = MOCK_CATEGORIES.find(c => c.id === selectedCategory);
+  const catOptions = categories.map(c => ({ value: c.id, label: c.name }));
+  const selectedCat = categories.find(c => c.id === selectedCategory);
   const subcatOptions = selectedCat?.subcategories.map(s => ({ value: s.id, label: s.name })) ?? [];
 
   const simOcr = (file: File | null) => {

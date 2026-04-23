@@ -24,8 +24,8 @@ import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { RoleSwitcher } from '../components/RoleSwitcher';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile, AppNotification, User } from '../types';
 
@@ -101,7 +101,6 @@ const ago = (iso: string) => {
   const m = Math.floor((Date.now()-new Date(iso).getTime())/60000);
   return m<1?'Just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`;
 };
-const catName  = (id: string) => MOCK_CATEGORIES.find(c=>c.id===id)?.name ?? 'Service';
 
 function dot(color: string) {
   return L.divIcon({
@@ -121,8 +120,9 @@ interface ProviderMapProps {
   visible: Req[];
   onAccept: (r: Req) => void;
   onGoOnline: () => void;
+  getCategoryName: (id: string) => string;
 }
-const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, restricted, profileName, visible, onAccept, onGoOnline }: ProviderMapProps) {
+const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, restricted, profileName, visible, onAccept, onGoOnline, getCategoryName }: ProviderMapProps) {
   return (
     <Paper radius="xl" style={{overflow:'hidden',border:'1px solid var(--ot-border)',position:'relative'}}>
       <MapContainer center={mapCtr} zoom={14} style={{width:'100%',height:420}}>
@@ -135,7 +135,7 @@ const ProviderMap = memo(function ProviderMap({ mapCtr, mapTile, online, restric
           <Marker key={r.id} position={r.coords} icon={dot(COLORS.warning)}>
             <Popup>
               <Stack gap={6}>
-                <Text size="sm" fw={700}>{catName(r.catId)}</Text>
+                <Text size="sm" fw={700}>{getCategoryName(r.catId)}</Text>
                 <Text size="xs">{r.desc}</Text>
                 <Text size="xs" c="dimmed">{r.addr}</Text>
                 <Button mt={4} size="xs" color="teal" onClick={()=>onAccept(r)} disabled={restricted}>Accept</Button>
@@ -193,6 +193,7 @@ export function ProviderHome() {
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
   const {unreadCount, fetchNotifications, addNotification} = useNotificationStore();
+  const { categories } = useServiceCatalog();
 
   const [profile,   setProfile]   = useState<ProviderProfile|null>(authProf);
   const [online,    setOnline]    = useState(authProf?.isOnline ?? false);
@@ -225,6 +226,10 @@ export function ProviderHome() {
   // Platform commission percentage (fixed)
   const commPct  = 2;
   const mapCtr: [number,number] = (profile?.lat&&profile?.lng) ? [profile.lat,profile.lng] : MAP_CTR;
+  const getCategoryName = useCallback(
+    (id: string) => categories.find(c => c.id === id)?.name ?? 'Service',
+    [categories]
+  );
 
   useEffect(()=>{
     if (!currentUser) { nav(ROUTES.login); return; }
@@ -345,10 +350,9 @@ export function ProviderHome() {
     const cl  = all.find(u=>u.id===req.clientId)??all.find(u=>u.role==='client');
     const ph  = cl?.phone??'+251-912-345-678';
     setRevealed({req,phone:ph}); setRevOpen(true);
-    const notificationPayload: AppNotification = {id:`n-${Date.now()}`,userId:req.clientId,type:'job_update',
-      title:'Provider Confirmed!',message:`Provider accepted your ${catName(req.catId)} request.`,
-      isRead:false,createdAt:new Date().toISOString()};
-    addNotification(notificationPayload);
+    addNotification({id:`n-${Date.now()}`,userId:req.clientId,type:'job_update' as any,
+      title:'Provider Confirmed!',message:`Provider accepted your ${getCategoryName(req.catId)} request.`,
+      isRead:false,createdAt:new Date().toISOString()});
   }
 
   function decline(id:string) {
@@ -595,6 +599,7 @@ export function ProviderHome() {
             visible={visible}
             onAccept={accept}
             onGoOnline={() => toggle(true)}
+            getCategoryName={getCategoryName}
           />
 
           {/* Request list */}

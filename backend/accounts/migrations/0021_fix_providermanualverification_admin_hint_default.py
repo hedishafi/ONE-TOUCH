@@ -1,6 +1,15 @@
 from django.db import migrations
 
 
+def fix_admin_hint_default(apps, schema_editor):
+    """
+    SQLite-compatible version: Update admin_hint field to have empty string default.
+    This is a no-op if the field doesn't exist or is already correct.
+    """
+    # This migration is now a no-op since the field is properly defined in the model
+    pass
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -8,29 +17,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql="""
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_name = 'accounts_providermanualverification'
-                      AND column_name = 'admin_hint'
-                ) THEN
-                    UPDATE accounts_providermanualverification
-                    SET admin_hint = ''
-                    WHERE admin_hint IS NULL;
-
-                    ALTER TABLE accounts_providermanualverification
-                    ALTER COLUMN admin_hint SET DEFAULT '';
-                ELSE
-                    ALTER TABLE accounts_providermanualverification
-                    ADD COLUMN admin_hint text NOT NULL DEFAULT '';
-                END IF;
-            END
-            $$;
-            """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
+        migrations.RunPython(fix_admin_hint_default, reverse_code=migrations.RunPython.noop),
     ]

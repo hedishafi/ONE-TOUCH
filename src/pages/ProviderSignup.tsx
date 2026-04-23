@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { COLORS, ROUTES } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import {
   Shell, Card, CardHeader,
   StepIdentity, StepVerify,
@@ -61,6 +61,7 @@ function StepProfileProvider({
   const [yearsOfExperience, setYearsOfExperience] = useState<number | null>(null);
   const [whatMakesYouSpecial, setWhatMakesYouSpecial] = useState('');
   const [errors, setErrors]                   = useState<Record<string, string>>({});
+  const { categories } = useServiceCatalog();
 
   const handlePhoto = (file: File | null) => {
     if (!file) return;
@@ -70,7 +71,7 @@ function StepProfileProvider({
   };
 
   // Category → sub-service options
-  const selectedCategory = MOCK_CATEGORIES.find(c => c.id === categoryId);
+  const selectedCategory = categories.find(c => c.id === categoryId);
   const subOptions = selectedCategory?.subcategories?.map(s => ({ value: s.id, label: s.name })) ?? [];
 
   const validate = () => {
@@ -81,6 +82,8 @@ function StepProfileProvider({
     if (subcategoryIds.length === 0)      e.subcategory = 'Please select at least one sub-service';
     if (priceMin !== null && priceMax !== null && priceMin >= priceMax)
       e.priceRange = 'Min price must be less than max price';
+    if (priceMin !== null && priceMax !== null && priceMin > 0 && priceMax > priceMin * 6)
+      e.priceRange = 'Price range is too wide. Max price cannot exceed 500% above minimum.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -199,7 +202,7 @@ function StepProfileProvider({
           <Select
             label="Service Category"
             placeholder="Select your main service area"
-            data={MOCK_CATEGORIES.map(c => ({ value: c.id, label: c.name }))}
+            data={categories.map(c => ({ value: c.id, label: c.name }))}
             value={categoryId}
             onChange={v => { setCategoryId(v ?? ''); setSubcategoryIds([]); }}
             error={errors.category}

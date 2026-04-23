@@ -22,9 +22,7 @@ from .models import (
     PhoneOTP,
     ProviderProfile,
     ClientProfile,
-    ServiceCategory,
-    SubService,
-    ProviderService,
+
     ProviderManualVerification,
     DeletedProviderRecord,
 )
@@ -805,8 +803,6 @@ class ProviderProfileSetupView(APIView):
                     'full_name': rest_framework_serializers.CharField(),
                     'service_category': rest_framework_serializers.CharField(),
                     'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
-                    'price_min': rest_framework_serializers.IntegerField(),
-                    'price_max': rest_framework_serializers.IntegerField(),
                     'bio': rest_framework_serializers.CharField(allow_blank=True),
                     'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
                     'profile_completed': rest_framework_serializers.BooleanField(),
@@ -836,13 +832,12 @@ class ProviderProfileSetupView(APIView):
 
         provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
         provider_profile.bio = vd.get('bio', '')
-        provider_profile.price_min = vd['price_min']
-        provider_profile.price_max = vd['price_max']
         if vd.get('profile_picture') is not None:
             provider_profile.profile_picture = vd['profile_picture']
         provider_profile.profile_completed = True
         provider_profile.save()
 
+        from services.models import ProviderService
         provider_service, _ = ProviderService.objects.get_or_create(provider=provider_profile)
         provider_service.primary_service = service_category
         provider_service.save()
@@ -862,8 +857,6 @@ class ProviderProfileSetupView(APIView):
                 'full_name': full_name,
                 'service_category': service_category.name,
                 'sub_services': [item.name for item in sub_service_objects],
-                'price_min': vd['price_min'],
-                'price_max': vd['price_max'],
                 'bio': provider_profile.bio,
                 'profile_picture': profile_picture_url,
                 'profile_completed': provider_profile.profile_completed,
@@ -898,6 +891,7 @@ class ServiceCategoryListView(APIView):
         summary='List service categories for profile setup',
     )
     def get(self, request):
+        from services.models import ServiceCategory
         categories = ServiceCategory.objects.filter(is_active=True).order_by('name')
         return Response(
             {
@@ -939,7 +933,8 @@ class SubServiceListView(APIView):
         },
         summary='List sub-services by service category',
     )
-    def get(self, request, category_id: int):
+    def get(self, request, category_id):
+        from services.models import SubService
         sub_services = SubService.objects.filter(category_id=category_id, is_active=True).order_by('name')
         return Response(
             {

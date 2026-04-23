@@ -165,31 +165,12 @@ class ProviderProfile(models.Model):
     is_available       = models.BooleanField(default=True)
     years_of_experience = models.PositiveSmallIntegerField(default=0)
 
-    # Price range set by the provider — used to calculate commission.
-    # Commission = (price_min + price_max) / 2  ×  2%
-    price_min = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Minimum service price in ETB.'
-    )
-    price_max = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Maximum service price in ETB.'
-    )
-
     # Denormalized cache — updated by signals after each Review
     avg_rating         = models.FloatField(default=0.0)
     total_reviews      = models.PositiveIntegerField(default=0)
     total_jobs         = models.PositiveIntegerField(default=0)
     created_at         = models.DateTimeField(auto_now_add=True)
     updated_at         = models.DateTimeField(auto_now=True)
-
-    @property
-    def commission_amount(self):
-        """Calculate the 2% commission based on the average of the price range."""
-        if self.price_min is not None and self.price_max is not None:
-            average = (self.price_min + self.price_max) / 2
-            return round(average * 2 / 100, 2)
-        return None
 
     class Meta:
         verbose_name = 'Provider Profile'
@@ -352,66 +333,5 @@ class ProviderManualVerification(models.Model):
         return f'{self.provider.username} — Manual verification ({self.status})'
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SERVICE CATEGORIES & SUB-SERVICES
-# ─────────────────────────────────────────────────────────────────────────────
-class ServiceCategory(models.Model):
-    """Main service categories (e.g., Plumbing, Electrical, Cleaning)"""
-    name          = models.CharField(max_length=100, unique=True)
-    slug          = models.SlugField(unique=True)
-    description   = models.TextField(blank=True)
-    icon_url      = models.URLField(blank=True, help_text='URL to category icon')
-    is_active     = models.BooleanField(default=True)
-    created_at    = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        verbose_name_plural = 'Service Categories'
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-
-class SubService(models.Model):
-    """Sub-services under each category (e.g., Fix Faucet, Unclog Pipe)"""
-    category      = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subservices')
-    name          = models.CharField(max_length=100)
-    slug          = models.SlugField()
-    description   = models.TextField(blank=True)
-    is_active     = models.BooleanField(default=True)
-    created_at    = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('category', 'slug')
-        ordering = ['category', 'name']
-
-    def __str__(self):
-        return f'{self.category.name} - {self.name}'
-
-
-class ProviderService(models.Model):
-    """Provider's chosen services (many-to-many with sub-services)"""
-    provider      = models.OneToOneField(
-        ProviderProfile, 
-        on_delete=models.CASCADE, 
-        related_name='service_offering'
-    )
-    primary_service = models.ForeignKey(
-        ServiceCategory,
-        on_delete=models.SET_NULL,
-        null=True,
-        help_text='Primary service category (the one they specialize in)'
-    )
-    subservices   = models.ManyToManyField(
-        SubService,
-        help_text='Sub-services provider offers (can be multiple)'
-    )
-    created_at    = models.DateTimeField(auto_now_add=True)
-    updated_at    = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name_plural = 'Provider Services'
-
-    def __str__(self):
-        return f'{self.provider.user.username} — {self.primary_service.name}'
 
