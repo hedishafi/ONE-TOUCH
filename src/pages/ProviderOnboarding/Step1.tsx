@@ -651,7 +651,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
           </Group>
 
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => navigate('/provider/profile-setup')} disabled={loading}>
+            <Button variant="default" onClick={() => navigate(-1)} disabled={loading}>
               Back
             </Button>
             <Button onClick={handleSubmit} loading={loading} disabled={!frontImage || !backImage || !selfieImage || cameraLoading}>

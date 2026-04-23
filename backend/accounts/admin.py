@@ -87,9 +87,13 @@ class ProviderProfileAdmin(admin.ModelAdmin):
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Ensure only providers appear in the user dropdown"""
+        """
+        Show all users with provider capability in dropdown,
+        regardless of their current active role.
+        """
         if db_field.name == 'user':
-            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+            # Use has_provider_role to show all users with provider capability
+            kwargs['queryset'] = User.objects.filter(has_provider_role=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def provider_name_display(self, obj):
@@ -149,10 +153,13 @@ class ProviderServiceAdmin(admin.ModelAdmin):
     search_fields = ('provider__user__username', 'provider__user__phone_number', 'provider__user__first_name', 'provider__user__last_name', 'provider__user__provider_uid', 'primary_service__name')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Ensure only providers appear in dropdowns"""
+        """
+        Show all provider profiles regardless of user's current active role.
+        This ensures admin can manage provider services even when user switches roles.
+        """
         if db_field.name == 'provider':
-            # Filter to show only ProviderProfile instances (which are already provider-only)
-            kwargs['queryset'] = ProviderProfile.objects.select_related('user').filter(user__role=User.ROLE_PROVIDER)
+            # Use has_provider_role to show all provider profiles
+            kwargs['queryset'] = ProviderProfile.objects.select_related('user').filter(user__has_provider_role=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def provider_name_display(self, obj):
@@ -176,7 +183,7 @@ class ProviderServiceAdmin(admin.ModelAdmin):
 @admin.register(ProviderManualVerification)
 class ProviderManualVerificationAdmin(admin.ModelAdmin):
     change_list_template = 'admin/accounts/providermanualverification/change_list.html'
-    list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_at')
+    list_display = ('provider_identity', 'provider_uid_display', 'current_role_display', 'status', 'submitted_at', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
     search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
     readonly_fields = ('reviewed_at', 'submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
@@ -197,20 +204,49 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
     actions = ['approve_selected', 'reject_selected']
 
     def get_queryset(self, request):
-        """Only show verifications for providers, not clients"""
+        """
+        Show verifications for all users who have provider role capability,
+        regardless of their current active role (client or provider).
+        This ensures admin can always access provider records even when user switches roles.
+        """
         qs = super().get_queryset(request)
-        return qs.filter(provider__role=User.ROLE_PROVIDER)
+        # Use has_provider_role instead of role to maintain visibility during role switching
+        return qs.filter(provider__has_provider_role=True)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Only show providers in the dropdown"""
+        """
+        Show all users with provider capability in dropdown,
+        regardless of their current active role.
+        """
         if db_field.name == 'provider':
-            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+            # Use has_provider_role to show all users with provider capability
+            kwargs['queryset'] = User.objects.filter(has_provider_role=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         if obj.status in {ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED}:
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
+            
+            # If approving, check if onboarding should be marked complete
+            if obj.status == ProviderManualVerification.STATUS_APPROVED:
+                provider = obj.provider
+                provider.verification_status = User.STATUS_VERIFIED
+                
+                # Check if profile is also completed to mark onboarding as complete
+                try:
+                    provider_profile = ProviderProfile.objects.get(user=provider)
+                    if provider_profile.profile_completed:
+                        provider.provider_onboarding_completed = True
+                except ProviderProfile.DoesNotExist:
+                    pass
+                
+                provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
+            elif obj.status == ProviderManualVerification.STATUS_REJECTED:
+                provider = obj.provider
+                provider.verification_status = User.STATUS_REJECTED
+                provider.save(update_fields=['verification_status'])
+        
         super().save_model(request, obj, form, change)
 
     def get_urls(self):
@@ -325,6 +361,15 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             verification.status = ProviderManualVerification.STATUS_APPROVED
             verification.rejection_reason = ''
             provider.verification_status = User.STATUS_VERIFIED
+            
+            # Check if profile is also completed to mark onboarding as complete
+            try:
+                provider_profile = ProviderProfile.objects.get(user=provider)
+                if provider_profile.profile_completed:
+                    provider.provider_onboarding_completed = True
+            except ProviderProfile.DoesNotExist:
+                pass
+            
             message = f'Approved verification for {provider.phone_number}.'
         else:
             if not rejection_reason:
@@ -336,7 +381,7 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             message = f'Rejected verification for {provider.phone_number}.'
 
         verification.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
-        provider.save(update_fields=['verification_status'])
+        provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
         self._notify_provider(verification, approved=(action == 'approve'))
         messages.success(request, message)
         return redirect(next_url)
@@ -464,6 +509,20 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
         return obj.provider.provider_uid or '—'
     provider_uid_display.short_description = 'UID'
 
+    def current_role_display(self, obj):
+        """
+        Display the user's current active role.
+        Shows a badge to indicate if provider has switched to client role.
+        """
+        role = obj.provider.role
+        if role == User.ROLE_PROVIDER:
+            return format_html('<span style="color: #0066cc; font-weight: 600;">Provider</span>')
+        elif role == User.ROLE_CLIENT:
+            return format_html('<span style="color: #ff9800; font-weight: 600;">Client</span> <span style="color: #999; font-size: 11px;">(switched)</span>')
+        else:
+            return role.title()
+    current_role_display.short_description = 'Active Role'
+
     def id_front_preview(self, obj):
         if obj.id_front_image:
             return format_html('<img src="{}" style="max-height:160px;" />', obj.id_front_image.url)
@@ -516,7 +575,16 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
 
             provider = verification.provider
             provider.verification_status = User.STATUS_VERIFIED
-            provider.save(update_fields=['verification_status'])
+            
+            # Check if profile is also completed to mark onboarding as complete
+            try:
+                provider_profile = ProviderProfile.objects.get(user=provider)
+                if provider_profile.profile_completed:
+                    provider.provider_onboarding_completed = True
+            except ProviderProfile.DoesNotExist:
+                pass
+            
+            provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
 
             self._notify_provider(verification, approved=True)
 

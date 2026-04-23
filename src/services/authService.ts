@@ -167,6 +167,10 @@ export const signupVerify = async (payload: {
     }
     localStorage.setItem('user', JSON.stringify(data.user));
     localStorage.setItem('user_id', String(data.user.id));
+    
+    // Immediately sync to authStore
+    const { syncUserDataToAuthStore } = await import('../utils/syncUserData');
+    syncUserDataToAuthStore();
 
     return data;
   } catch (error) {
@@ -207,6 +211,10 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
     }
     localStorage.setItem('user', JSON.stringify(data.user));
     localStorage.setItem('user_id', String(data.user.id));
+    
+    // Immediately sync to authStore
+    const { syncUserDataToAuthStore } = await import('../utils/syncUserData');
+    syncUserDataToAuthStore();
 
     return data;
   } catch (error) {
@@ -233,15 +241,37 @@ export const signupResendOTP = async (payload: { phone: string; role?: 'client' 
 // ─── Profile ─────────────────────────────────────────────────────────────
 
 /**
- * Get current user profile
+ * Get current user profile and sync to authStore
  */
 export const getProfile = async (): Promise<UserProfile> => {
   const { data } = await api.get<UserProfile>('/auth/profile/');
+  
+  // Update localStorage with latest user data
+  localStorage.setItem('user', JSON.stringify(data));
+  
+  // Force sync to authStore
+  const { syncUserDataToAuthStore } = await import('../utils/syncUserData');
+  syncUserDataToAuthStore();
+  
+  console.log('🔄 Profile refreshed and synced:', data);
+  
   return data;
 };
 
 export const getProviderOnboardingStatus = async (): Promise<ProviderOnboardingStatus> => {
   const { data } = await api.get<ProviderOnboardingStatus>('/provider/onboarding/status/');
+  return data;
+};
+
+/**
+ * Switch user role between client and provider
+ */
+export const switchRole = async (role: 'client' | 'provider'): Promise<{
+  message: string;
+  role: string;
+  redirect: string;
+}> => {
+  const { data } = await api.post('/auth/role/switch/', { role });
   return data;
 };
 
@@ -252,6 +282,7 @@ export const logout = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('ot_current_user');
 };
 
 /**

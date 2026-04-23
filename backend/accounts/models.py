@@ -32,7 +32,8 @@ class User(AbstractUser):
     provider_uid        = models.CharField(max_length=6, unique=True, null=True, blank=True, db_index=True)
 
     # Multi-role system fields
-    has_provider_role = models.BooleanField(default=False, help_text='True if user has provider role')
+    has_provider_role = models.BooleanField(default=False, help_text='True if user has provider role (approved or in progress)')
+    has_client_role = models.BooleanField(default=True, help_text='True if user has client role (default for all users)')
     provider_onboarding_completed = models.BooleanField(default=False, help_text='True if provider onboarding is complete')
 
     # Free-trial support: providers get trial_ends_at set on signup
@@ -54,6 +55,21 @@ class User(AbstractUser):
     @property
     def is_client(self):
         return self.role == self.ROLE_CLIENT
+    
+    @property
+    def available_roles(self):
+        """Return list of roles this user can switch to"""
+        roles = []
+        if self.has_client_role:
+            roles.append(self.ROLE_CLIENT)
+        if self.has_provider_role:
+            roles.append(self.ROLE_PROVIDER)
+        return roles
+    
+    @property
+    def can_switch_roles(self):
+        """True if user has multiple roles available"""
+        return len(self.available_roles) > 1
 
     @property
     def trial_is_active(self):
@@ -70,8 +86,10 @@ class User(AbstractUser):
                 return candidate
 
     def save(self, *args, **kwargs):
-        # Set has_provider_role based on role
-        self.has_provider_role = (self.role == self.ROLE_PROVIDER)
+        # Only set has_provider_role to True when becoming a provider for the first time
+        # Don't set it to False when switching away from provider role
+        if self.role == self.ROLE_PROVIDER and not self.has_provider_role:
+            self.has_provider_role = True
         
         if self.role == self.ROLE_PROVIDER and not self.provider_uid:
             self.provider_uid = self.generate_provider_uid()

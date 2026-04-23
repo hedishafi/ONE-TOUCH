@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { ROUTES } from './utils/constants';
 import { ScrollToTop } from './components/ScrollToTop';
+import { initUserDataSync } from './utils/syncUserData';
 
 // Public pages
 import { Landing } from './pages/Landing';
@@ -69,6 +71,11 @@ import {
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
+  // Initialize user data sync on app load
+  useEffect(() => {
+    initUserDataSync();
+  }, []);
+
   return (
     <BrowserRouter>
       <ScrollToTop />
