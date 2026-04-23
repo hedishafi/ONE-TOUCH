@@ -7,6 +7,7 @@ from .views import (
     ServiceCategoryListView,
     SubServiceListView,
     UserProfileView,
+    RoleSwitchView,
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/logout/',        LogoutView.as_view(),        name='logout'),
     path('auth/profile/',       UserProfileView.as_view(),   name='auth-profile'),
+    path('auth/role/switch/',   RoleSwitchView.as_view(),    name='role-switch'),
 
     # ── Provider Identity Verification (manual admin review) ──────────────────
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),

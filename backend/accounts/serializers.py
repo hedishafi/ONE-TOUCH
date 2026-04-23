@@ -50,6 +50,9 @@ class ClientAuthProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'has_provider_role',
+            'has_client_role',
+            'provider_onboarding_completed',
             'date_joined',
         ]
         read_only_fields = fields
@@ -68,6 +71,9 @@ class ProviderAuthProfileSerializer(serializers.ModelSerializer):
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
+            'has_provider_role',
+            'has_client_role',
+            'provider_onboarding_completed',
             'date_joined',
         ]
         read_only_fields = fields
