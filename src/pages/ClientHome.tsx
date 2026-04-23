@@ -23,6 +23,7 @@ import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
+import { RoleSwitcher } from '../components/RoleSwitcher';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const N = COLORS.navyBlue;
@@ -354,10 +355,11 @@ export function ClientHome() {
           ))}
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+          <RoleSwitcher />
           <Box p={10}
             onClick={()=>{logout();nav(ROUTES.landing);}}
             style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer'}}>
+              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
             <IconLogout size={18}/> Sign out
           </Box>
         </Box>

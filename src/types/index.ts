@@ -12,6 +12,10 @@ export interface User {
   verificationStatus: VerificationStatus;
   providerUid?: string;
   isOnline?: boolean;
+  // Multi-role system fields
+  has_provider_role?: boolean;
+  has_client_role?: boolean;
+  provider_onboarding_completed?: boolean;
 }
 
 export interface ClientProfile {

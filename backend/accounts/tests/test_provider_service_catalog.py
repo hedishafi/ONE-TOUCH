@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import ServiceCategory, SubService
+from services.models import ServiceCategory, SubService
 from accounts.tests.base import AuthScenarioBase
 
 

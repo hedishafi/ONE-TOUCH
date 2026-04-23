@@ -592,6 +592,160 @@ class UserProfileView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class RoleSwitchView(APIView):
+    """
+    API endpoint for switching between client and provider roles.
+    
+    Validates:
+    - User has access to target role
+    - Provider onboarding is complete (for provider switch)
+    
+    Returns appropriate redirect URLs and error messages.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['Auth'],
+        request=inline_serializer(
+            'RoleSwitchRequest',
+            {
+                'role': rest_framework_serializers.ChoiceField(choices=['client', 'provider']),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                'RoleSwitchSuccess',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'role': rest_framework_serializers.CharField(),
+                    'redirect': rest_framework_serializers.CharField(),
+                },
+            ),
+            400: inline_serializer(
+                'RoleSwitchOnboardingRequired',
+                {
+                    'error': rest_framework_serializers.CharField(),
+                    'onboarding_required': rest_framework_serializers.BooleanField(),
+                    'onboarding_status': rest_framework_serializers.DictField(),
+                    'redirect': rest_framework_serializers.CharField(),
+                },
+            ),
+            403: OpenApiResponse(description='User does not have access to target role.'),
+        },
+        summary='Switch between client and provider roles',
+        description='Allows users with multiple roles to switch between client and provider modes. '
+                    'Validates onboarding completion for provider access.',
+    )
+    def post(self, request):
+        target_role = request.data.get('role')
+        
+        # Validate role
+        if target_role not in [User.ROLE_CLIENT, User.ROLE_PROVIDER]:
+            return Response(
+                {'error': 'Invalid role. Must be "client" or "provider".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if already in target role
+        if request.user.role == target_role:
+            return Response(
+                {
+                    'message': f'Already in {target_role} role.',
+                    'role': target_role,
+                    'redirect': f'/{target_role}/dashboard'
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        # ===== SWITCH TO CLIENT =====
+        if target_role == User.ROLE_CLIENT:
+            if not request.user.has_client_role:
+                return Response(
+                    {'error': 'You do not have access to client role.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Allow immediate switch to client (no onboarding checks)
+            request.user.role = User.ROLE_CLIENT
+            request.user.save(update_fields=['role'])
+            
+            return Response({
+                'message': 'Switched to client role successfully.',
+                'role': User.ROLE_CLIENT,
+                'redirect': '/client/dashboard'
+            }, status=status.HTTP_200_OK)
+        
+        # ===== SWITCH TO PROVIDER =====
+        elif target_role == User.ROLE_PROVIDER:
+            if not request.user.has_provider_role:
+                return Response(
+                    {'error': 'You do not have access to provider role.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get provider profile and verification status
+            try:
+                provider_profile = ProviderProfile.objects.get(user=request.user)
+                profile_completed = provider_profile.profile_completed
+            except ProviderProfile.DoesNotExist:
+                profile_completed = False
+            
+            verification_status = request.user.verification_status
+            
+            # Check if verification was submitted (pending or approved)
+            has_submitted_verification = ProviderManualVerification.objects.filter(
+                provider=request.user
+            ).exists()
+            
+            # Allow switch if:
+            # 1. Onboarding is fully completed (approved), OR
+            # 2. Profile is complete AND verification is pending/under review, OR
+            # 3. Profile is complete AND verification was submitted (any status except rejected)
+            can_switch = (
+                request.user.provider_onboarding_completed or
+                (profile_completed and verification_status == User.STATUS_PENDING) or
+                (profile_completed and has_submitted_verification and verification_status != User.STATUS_REJECTED)
+            )
+            
+            if not can_switch:
+                # Only redirect to onboarding if:
+                # 1. Profile not completed, OR
+                # 2. Verification was rejected
+                
+                if not profile_completed:
+                    next_step = 'profile-setup'
+                    redirect_url = '/provider/profile-setup'
+                elif verification_status == User.STATUS_REJECTED:
+                    # Rejected - need to re-submit verification
+                    next_step = 'identity-verification'
+                    redirect_url = '/provider/onboarding/step1'
+                else:
+                    # No verification submitted yet
+                    next_step = 'identity-verification'
+                    redirect_url = '/provider/onboarding/step1'
+                
+                return Response({
+                    'error': 'Provider onboarding not completed.',
+                    'onboarding_required': True,
+                    'onboarding_status': {
+                        'profile_completed': profile_completed,
+                        'verification_status': verification_status,
+                        'next_step': next_step
+                    },
+                    'redirect': redirect_url
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Switch to provider role
+            request.user.role = User.ROLE_PROVIDER
+            request.user.save(update_fields=['role'])
+            
+            return Response({
+                'message': 'Switched to provider role successfully.',
+                'role': User.ROLE_PROVIDER,
+                'redirect': '/provider/dashboard'
+            }, status=status.HTTP_200_OK)
+
+
 class ProviderManualVerificationUploadView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsProvider]
     parser_classes = [MultiPartParser, FormParser]
@@ -649,8 +803,6 @@ class ProviderProfileSetupView(APIView):
                     'full_name': rest_framework_serializers.CharField(),
                     'service_category': rest_framework_serializers.CharField(),
                     'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
-                    'price_min': rest_framework_serializers.IntegerField(),
-                    'price_max': rest_framework_serializers.IntegerField(),
                     'bio': rest_framework_serializers.CharField(allow_blank=True),
                     'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
                     'profile_completed': rest_framework_serializers.BooleanField(),
@@ -680,8 +832,6 @@ class ProviderProfileSetupView(APIView):
 
         provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
         provider_profile.bio = vd.get('bio', '')
-        provider_profile.price_min = vd['price_min']
-        provider_profile.price_max = vd['price_max']
         if vd.get('profile_picture') is not None:
             provider_profile.profile_picture = vd['profile_picture']
         provider_profile.profile_completed = True
@@ -707,8 +857,6 @@ class ProviderProfileSetupView(APIView):
                 'full_name': full_name,
                 'service_category': service_category.name,
                 'sub_services': [item.name for item in sub_service_objects],
-                'price_min': vd['price_min'],
-                'price_max': vd['price_max'],
                 'bio': provider_profile.bio,
                 'profile_picture': profile_picture_url,
                 'profile_completed': provider_profile.profile_completed,

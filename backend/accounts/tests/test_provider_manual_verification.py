@@ -135,3 +135,63 @@ class ProviderManualVerificationUploadTests(AuthScenarioBase):
         self.assertEqual(verification.provider.id, self.provider_user.id)
         self.assertIsNone(verification.reviewed_by)
         self.assertIsNone(verification.reviewed_at)
+
+    def test_rejected_provider_can_resubmit_while_in_client_role(self):
+        """
+        Test that a rejected provider who switches to client role can still
+        access the verification upload endpoint using has_provider_role check.
+        """
+        # Setup: Provider submits verification
+        self._auth_as(self.provider_user)
+        first_response = self.client.post(
+            '/api/v1/provider/manual-verification/upload/',
+            {
+                'id_front_image': self._image_file('front1.png'),
+                'id_back_image': self._image_file('back1.png'),
+                'selfie_image': self._image_file('selfie1.png'),
+            },
+            format='multipart',
+        )
+        self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+
+        # Admin rejects the verification
+        verification = ProviderManualVerification.objects.get(id=first_response.data['id'])
+        verification.status = ProviderManualVerification.STATUS_REJECTED
+        verification.rejection_reason = 'Document not clear'
+        verification.save()
+        
+        self.provider_user.verification_status = User.STATUS_REJECTED
+        self.provider_user.save()
+
+        # User switches to client role (simulating role switch)
+        self.provider_user.role = User.ROLE_CLIENT
+        self.provider_user.save()
+        self.provider_user.refresh_from_db()
+        
+        # Verify user is in client role but still has provider capability
+        self.assertEqual(self.provider_user.role, User.ROLE_CLIENT)
+        self.assertTrue(self.provider_user.has_provider_role)
+
+        # Re-authenticate with updated user state
+        self._auth_as(self.provider_user)
+
+        # User should still be able to resubmit verification
+        # because IsProvider now checks has_provider_role instead of role
+        resubmit_response = self.client.post(
+            '/api/v1/provider/manual-verification/upload/',
+            {
+                'id_front_image': self._image_file('front2.png'),
+                'id_back_image': self._image_file('back2.png'),
+                'selfie_image': self._image_file('selfie2.png'),
+            },
+            format='multipart',
+        )
+
+        # Should succeed because has_provider_role=True
+        self.assertEqual(resubmit_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(ProviderManualVerification.objects.filter(provider=self.provider_user).count(), 2)
+        
+        # Verify the new verification was created
+        new_verification = ProviderManualVerification.objects.get(id=resubmit_response.data['id'])
+        self.assertEqual(new_verification.status, ProviderManualVerification.STATUS_PENDING)
+        self.assertEqual(new_verification.provider, self.provider_user)

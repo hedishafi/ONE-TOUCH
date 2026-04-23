@@ -48,6 +48,9 @@ class ClientAuthProfileSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'role',
+            'has_provider_role',
+            'has_client_role',
+            'provider_onboarding_completed',
             'date_joined',
         ]
         read_only_fields = fields
@@ -66,6 +69,9 @@ class ProviderAuthProfileSerializer(serializers.ModelSerializer):
             'verification_status',
             'is_on_trial',
             'trial_ends_at',
+            'has_provider_role',
+            'has_client_role',
+            'provider_onboarding_completed',
             'date_joined',
         ]
         read_only_fields = fields
@@ -194,8 +200,6 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     service_category = serializers.CharField(max_length=100)
     sub_services = serializers.ListField(child=serializers.CharField(max_length=100), allow_empty=False)
-    price_min = serializers.IntegerField(min_value=0)
-    price_max = serializers.IntegerField(min_value=0)
     bio = serializers.CharField(required=False, allow_blank=True)
     profile_picture = serializers.ImageField(required=False, allow_null=True)
 
@@ -218,9 +222,6 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, attrs):
-        if attrs['price_min'] > attrs['price_max']:
-            raise serializers.ValidationError({'price_max': 'price_max must be greater than or equal to price_min.'})
-
         category_name = attrs['service_category']
         from services.models import ServiceCategory, SubService
         category = ServiceCategory.objects.filter(name__iexact=category_name, is_active=True).first()
