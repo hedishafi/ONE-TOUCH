@@ -803,8 +803,6 @@ class ProviderProfileSetupView(APIView):
                     'full_name': rest_framework_serializers.CharField(),
                     'service_category': rest_framework_serializers.CharField(),
                     'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
-                    'price_min': rest_framework_serializers.IntegerField(),
-                    'price_max': rest_framework_serializers.IntegerField(),
                     'bio': rest_framework_serializers.CharField(allow_blank=True),
                     'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
                     'profile_completed': rest_framework_serializers.BooleanField(),
@@ -834,8 +832,6 @@ class ProviderProfileSetupView(APIView):
 
         provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
         provider_profile.bio = vd.get('bio', '')
-        provider_profile.price_min = vd['price_min']
-        provider_profile.price_max = vd['price_max']
         if vd.get('profile_picture') is not None:
             provider_profile.profile_picture = vd['profile_picture']
         provider_profile.profile_completed = True
@@ -861,8 +857,6 @@ class ProviderProfileSetupView(APIView):
                 'full_name': full_name,
                 'service_category': service_category.name,
                 'sub_services': [item.name for item in sub_service_objects],
-                'price_min': vd['price_min'],
-                'price_max': vd['price_max'],
                 'bio': provider_profile.bio,
                 'profile_picture': profile_picture_url,
                 'profile_completed': provider_profile.profile_completed,

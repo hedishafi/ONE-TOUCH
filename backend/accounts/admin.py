@@ -78,7 +78,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
+    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'created_at')
     list_filter = ('is_available',)
     search_fields = ('user__username', 'user__phone_number', 'user__first_name', 'user__last_name', 'user__provider_uid', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
@@ -105,11 +105,6 @@ class ProviderProfileAdmin(admin.ModelAdmin):
         """Display clean 6-digit UID"""
         return obj.user.provider_uid or '—'
     provider_uid_display.short_description = 'Provider UID'
-
-    def commission_amount_display(self, obj):
-        val = obj.commission_amount
-        return f'{val} ETB' if val is not None else '—'
-    commission_amount_display.short_description = '2% Commission'
 
 
 @admin.register(PhoneOTP)

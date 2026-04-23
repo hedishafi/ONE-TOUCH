@@ -165,31 +165,12 @@ class ProviderProfile(models.Model):
     is_available       = models.BooleanField(default=True)
     years_of_experience = models.PositiveSmallIntegerField(default=0)
 
-    # Price range set by the provider — used to calculate commission.
-    # Commission = (price_min + price_max) / 2  ×  2%
-    price_min = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Minimum service price in ETB.'
-    )
-    price_max = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text='Maximum service price in ETB.'
-    )
-
     # Denormalized cache — updated by signals after each Review
     avg_rating         = models.FloatField(default=0.0)
     total_reviews      = models.PositiveIntegerField(default=0)
     total_jobs         = models.PositiveIntegerField(default=0)
     created_at         = models.DateTimeField(auto_now_add=True)
     updated_at         = models.DateTimeField(auto_now=True)
-
-    @property
-    def commission_amount(self):
-        """Calculate the 2% commission based on the average of the price range."""
-        if self.price_min is not None and self.price_max is not None:
-            average = (self.price_min + self.price_max) / 2
-            return round(average * 2 / 100, 2)
-        return None
 
     class Meta:
         verbose_name = 'Provider Profile'
