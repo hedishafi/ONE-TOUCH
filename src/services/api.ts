@@ -22,12 +22,33 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor: Add JWT token to every request
+const PUBLIC_AUTH_PATHS = new Set([
+  '/auth/signup/otp/',
+  '/auth/signup/resend-otp/',
+  '/auth/signup/verify/',
+  '/auth/login/otp/',
+  '/auth/login/verify/',
+  '/auth/token/refresh/',
+]);
+
+const isPublicAuthRequest = (url?: string): boolean => {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, API_BASE_URL);
+    return PUBLIC_AUTH_PATHS.has(parsed.pathname.replace('/api/v1', ''));
+  } catch {
+    return PUBLIC_AUTH_PATHS.has(url);
+  }
+};
+
+// Request interceptor: Add JWT token to protected requests
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!isPublicAuthRequest(config.url)) {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
 
     const method = (config.method || 'get').toLowerCase();
@@ -53,13 +74,17 @@ api.interceptors.response.use(
     const originalRequest = error.config as any;
 
     // Skip retry for public endpoints
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isPublicAuthRequest(originalRequest?.url)) {
       originalRequest._retry = true;
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
 
-        const refreshPayload = refreshToken ? { refresh: refreshToken } : {};
+        if (!refreshToken) {
+          return Promise.reject(error);
+        }
+
+        const refreshPayload = { refresh: refreshToken };
 
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/token/refresh/`,

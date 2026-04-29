@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 from datetime import timedelta
 
 from django.conf import settings
@@ -177,7 +178,13 @@ def _otp_response(code: str) -> dict:
     return payload
 
 
-def _error_response(detail: str, *, http_status: int = status.HTTP_400_BAD_REQUEST, errors=None, extra: dict | None = None) -> Response:
+def _error_response(
+    detail: str,
+    *,
+    http_status: int = status.HTTP_400_BAD_REQUEST,
+    errors=None,
+    extra: Optional[dict] = None,
+) -> Response:
     payload = {
         'error': detail,
         'detail': detail,
