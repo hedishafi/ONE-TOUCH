@@ -41,6 +41,7 @@ import {
 } from './pages/ClientDashboard';
 import { ClientMessages } from './pages/ClientMessages';
 import { ClientSettings } from './pages/ClientSettings';
+import { SearchProviders } from './pages/SearchProviders';
 
 // Provider pages
 import { ProviderHome } from './pages/ProviderHome';
@@ -119,6 +120,7 @@ function App() {
         >
           <Route path="dashboard" element={<ClientHome />} />
           <Route path="browse" element={<BrowseServices />} />
+          <Route path="search-providers" element={<SearchProviders />} />
           <Route path="history" element={<BookingHistory />} />
           <Route path="saved" element={<SavedProviders />} />
           <Route path="wallet" element={<ClientWallet />} />

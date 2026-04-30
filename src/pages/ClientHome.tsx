@@ -8,47 +8,25 @@ import {
   Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput,
 } from '@mantine/core';
 import {
-  IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
+  IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet,
   IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone, IconSettings,
   IconPhoneOff, IconSearch, IconChevronRight,
-  IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
+  IconBell, IconBellFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
   IconMessage,
 } from '@tabler/icons-react';
-import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { RoleSwitcher } from '../components/RoleSwitcher';
+import { OSMClientMap } from '../components/OSMClientMap';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
 const MAP_CTR: [number, number] = [9.032, 38.747];
-
-// Fixed nearby provider dots for the live map preview
-const PROV_DOTS: {pos:[number,number]; color:string; name:string; rating:number}[] = [
-  {pos:[9.036,38.751],color:T,              name:'Abebe T.',rating:4.9},
-  {pos:[9.029,38.743],color:COLORS.success, name:'Sara M.',  rating:4.8},
-  {pos:[9.034,38.755],color:N,              name:'Dawit K.', rating:4.7},
-  {pos:[9.027,38.748],color:T,              name:'Tigist A.',rating:4.9},
-  {pos:[9.039,38.744],color:COLORS.success, name:'Yared T.', rating:4.6},
-  {pos:[9.031,38.757],color:COLORS.warning, name:'Hana B.',  rating:4.8},
-];
-const provDot=(color:string)=>L.divIcon({
-  className:'',
-  html:`<div class="ot-prov-dot" style="--dc:${color}"></div>`,
-  iconAnchor:[9,9],iconSize:[18,18],
-});
-const userDot=L.divIcon({
-  className:'',
-  html:`<div class="ot-user-dot"></div>`,
-  iconAnchor:[12,12],iconSize:[24,24],
-});
 
 // Map icon string names to emojis for display
 const CAT_ICONS: Record<string, string> = {
@@ -117,17 +95,6 @@ const DECLINE_REASONS = [
   'Other',
 ];
 
-function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
-  const [r,setR]=useState(300);
-  useEffect(()=>{const id=setInterval(()=>setR(p=>(p>=2500?300:p+60)),90);return()=>clearInterval(id);},[]);
-  return(
-    <>
-      <Circle center={ctr} radius={r}    pathOptions={{color,fillOpacity:0.04,weight:1.5,opacity:0.6}}/>
-      <Circle center={ctr} radius={r*.5} pathOptions={{color:N,fillOpacity:0.02,weight:1,opacity:0.35}}/>
-    </>
-  );
-}
-
 const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='in_progress'?'blue':'orange';
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
@@ -146,6 +113,8 @@ export function ClientHome() {
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
   const { categories } = useServiceCatalog();
+
+  console.log('🏠 ClientHome rendered, currentUser:', currentUser);
 
   const [sidebar,setSidebar]=useState(false);
   const [searchQuery,setSearchQuery]=useState('');
@@ -177,11 +146,15 @@ export function ClientHome() {
   const [declineStage,setDeclineStage]=useState<'asking'|'confirmed'>('asking');
   const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  const mapTile='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const quickActions = categories.slice(0, 4);
 
   useEffect(()=>{
-    if(!currentUser){nav(ROUTES.login);return;}
+    if(!currentUser){
+      console.log('❌ No currentUser, redirecting to login');
+      nav(ROUTES.login);
+      return;
+    }
+    console.log('✅ CurrentUser found, fetching notifications');
     fetchNotifications(currentUser.id);
     return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(declineTimer.current)clearTimeout(declineTimer.current);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -440,6 +413,10 @@ export function ClientHome() {
                 {cat.name}
               </Button>
             ))}
+            <Button size="xs" radius="xl" onClick={()=>nav('/client/search-providers')}
+              style={{background:`linear-gradient(135deg,${COLORS.success},${T})`,border:'none',color:'white'}}>
+              Find Nearby Providers
+            </Button>
             <Button size="xs" radius="xl" onClick={()=>nav(ROUTES.services)}
               style={{background:`linear-gradient(135deg,${T},${N})`,border:'none'}}>
               View all services
@@ -469,44 +446,20 @@ export function ClientHome() {
           </Paper>
         )}
 
-        {/* Hero — Live Provider Map */}
+        {/* Hero — Live Provider Map with OpenStreetMap */}
         <Box mb={28}>
-          <Paper radius="xl"
-            style={{overflow:'hidden',border:'1px solid var(--ot-border)',
-              boxShadow:'0 4px 24px rgba(0,0,0,.07)',position:'relative'}}>
-
-            <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:300}}
-              zoomControl={false} dragging={false} scrollWheelZoom={false}
-              doubleClickZoom={false} keyboard={false} attributionControl={false}>
-              <TileLayer url={mapTile}/>
-              <AnimRing ctr={MAP_CTR} color={T}/>
-              {PROV_DOTS.map((p,i)=>(
-                <Marker key={i} position={p.pos} icon={provDot(p.color)}/>
-              ))}
-              <Marker position={MAP_CTR} icon={userDot}/>
-            </MapContainer>
-
-            {/* Top pill — providers online */}
-            <Box style={{position:'absolute',top:12,left:12,zIndex:500}}>
-              <Group gap={6} px={10} py={6}
-                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
-                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
-                <Box w={7} h={7} style={{borderRadius:'50%',background:COLORS.success,
-                  boxShadow:`0 0 0 3px ${COLORS.success}44`,flexShrink:0}}/>
-                <Text size="xs" fw={700} c={N}>{PROV_DOTS.length} providers online</Text>
-              </Group>
-            </Box>
-
-            {/* Top-right pill — location */}
-            <Box style={{position:'absolute',top:12,right:12,zIndex:500}}>
-              <Group gap={5} px={9} py={6}
-                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
-                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
-                <IconMapPin size={12} color={T}/>
-                <Text size="xs" fw={600} c={N}>Near you</Text>
-              </Group>
-            </Box>
-          </Paper>
+          <OSMClientMap
+            onProviderSelect={(provider) => {
+              notifications.show({
+                title: 'Provider Selected',
+                message: `You selected ${provider.full_name}. Call them to book a service.`,
+                color: 'teal',
+              });
+            }}
+            height="400px"
+            searchRadius={10}
+            allowPinDrop={true}
+          />
 
           {/* CTA bar below the map — no overlay, clean card */}
           <Paper mt={10} p="md" radius="xl"
@@ -719,13 +672,6 @@ export function ClientHome() {
                 <Text size="xs" c={T}>Live map search active</Text>
               </Box>
             </Group>
-            <Box style={{height:220,borderRadius:16,overflow:'hidden',border:'1px solid var(--ot-border)'}}>
-              <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:'100%'}}
-                zoomControl={false} dragging={false} scrollWheelZoom={false}>
-                <TileLayer url={mapTile}/>
-                <AnimRing ctr={MAP_CTR} color={T}/>
-              </MapContainer>
-            </Box>
             <Progress value={70} color="teal" size="sm" radius="xl" animated/>
           </Stack>
         )}

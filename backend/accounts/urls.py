@@ -14,6 +14,11 @@ from .views import (
     ProviderOnboardingStatusView,
     ServiceCategoryListView,
     SubServiceListView,
+    ProviderGoOnlineView,
+    ProviderGoOfflineView,
+    ProviderUpdateLocationView,
+    ProviderStatusView,
+    SearchNearbyProvidersView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -42,4 +47,13 @@ urlpatterns = [
     # ── Provider Service Catalog ───────────────────────────────────────────────
     path('provider/service-categories/', ServiceCategoryListView.as_view(), name='service-category-list'),
     path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='sub-service-list'),
+    
+    # ── Provider Online/Offline Status & Location ──────────────────────────────
+    path('provider/go-online/', ProviderGoOnlineView.as_view(), name='provider-go-online'),
+    path('provider/go-offline/', ProviderGoOfflineView.as_view(), name='provider-go-offline'),
+    path('provider/update-location/', ProviderUpdateLocationView.as_view(), name='provider-update-location'),
+    path('provider/status/', ProviderStatusView.as_view(), name='provider-status'),
+    
+    # ── Client Search Providers ────────────────────────────────────────────────
+    path('client/search-providers/', SearchNearbyProvidersView.as_view(), name='search-nearby-providers'),
 ]

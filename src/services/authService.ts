@@ -215,6 +215,9 @@ export const loginVerify = async (payload: LoginVerifyRequest): Promise<AuthToke
     // Immediately sync to authStore
     const { syncUserDataToAuthStore } = await import('../utils/syncUserData');
     syncUserDataToAuthStore();
+    
+    // Wait a tick to ensure authStore is updated
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     return data;
   } catch (error) {
@@ -298,4 +301,95 @@ export const getStoredUser = (): UserProfile | null => {
  */
 export const hasValidTokens = (): boolean => {
   return !!localStorage.getItem('access_token');
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROVIDER ONLINE/OFFLINE STATUS & LOCATION TRACKING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Provider goes online with initial location
+ */
+export const goOnline = async (latitude: number, longitude: number): Promise<{
+  message: string;
+  is_online: boolean;
+  latitude: number;
+  longitude: number;
+  last_location_update: string;
+}> => {
+  const { data } = await api.post('/provider/go-online/', { latitude, longitude });
+  return data;
+};
+
+/**
+ * Provider goes offline
+ */
+export const goOffline = async (): Promise<{
+  message: string;
+  is_online: boolean;
+}> => {
+  const { data } = await api.post('/provider/go-offline/');
+  return data;
+};
+
+/**
+ * Update provider location while online
+ */
+export const updateProviderLocation = async (latitude: number, longitude: number): Promise<{
+  message: string;
+  latitude: number;
+  longitude: number;
+  last_location_update: string;
+}> => {
+  const { data } = await api.post('/provider/update-location/', { latitude, longitude });
+  return data;
+};
+
+/**
+ * Get provider current status and location
+ */
+export const getProviderStatus = async (): Promise<{
+  is_online: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  last_location_update: string | null;
+}> => {
+  const { data } = await api.get('/provider/status/');
+  return data;
+};
+
+/**
+ * Search for nearby online providers (client-side)
+ */
+export const searchNearbyProviders = async (
+  latitude: number,
+  longitude: number,
+  serviceCategoryId?: number,
+  radiusKm: number = 10
+): Promise<{
+  results: Array<{
+    provider_id: number;
+    provider_uid: string;
+    full_name: string;
+    phone_number: string;
+    latitude: number;
+    longitude: number;
+    distance_km: number;
+    avg_rating: number;
+    total_jobs: number;
+    profile_picture: string | null;
+    primary_service: string | null;
+  }>;
+  count: number;
+}> => {
+  const params: any = {
+    latitude,
+    longitude,
+    radius_km: radiusKm,
+  };
+  if (serviceCategoryId) {
+    params.service_category_id = serviceCategoryId;
+  }
+  const { data } = await api.get('/client/search-providers/', { params });
+  return data;
 };
