@@ -1,16 +1,16 @@
 /**
  * OSMClientMap.tsx
- * Client map showing nearby providers and their locations
- * Allows address geocoding and provider selection
+ * Client map with AUTOMATIC location detection
+ * Shows nearby providers without manual address entry
  */
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Circle, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Box, Loader, Text, Group, Badge, Button, Stack, TextInput, Paper } from '@mantine/core';
-import { IconAlertCircle, IconSearch, IconCurrentLocation } from '@tabler/icons-react';
+import { Box, Loader, Text, Group, Badge, Button, Stack, Paper } from '@mantine/core';
+import { IconAlertCircle, IconCurrentLocation } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { geocodeAddress, reverseGeocode, formatAddress } from '../services/geocoding.service';
+import { reverseGeocode, formatAddress } from '../services/geocoding.service';
 import * as authService from '../services/authService';
 import { COLORS } from '../utils/constants';
 
@@ -30,8 +30,8 @@ const clientIcon = L.divIcon({
   className: 'client-marker',
   html: `
     <div style="
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       background: ${N};
       border: 3px solid white;
       border-radius: 50%;
@@ -39,36 +39,54 @@ const clientIcon = L.divIcon({
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 20px;
     ">
-      📍
+      👤
     </div>
   `,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
 });
 
-const providerIcon = L.divIcon({
-  className: 'provider-marker',
-  html: `
-    <div style="
-      width: 32px;
-      height: 32px;
-      background: ${T};
-      border: 3px solid white;
-      border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-    ">
-      🚗
-    </div>
-  `,
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-});
+// Provider icon with service category
+const createProviderIcon = (serviceCategory?: string) => {
+  const categoryEmojis: Record<string, string> = {
+    'Plumbing': '🔧',
+    'Electrical': '⚡',
+    'Cleaning': '🧹',
+    'Painting': '🎨',
+    'Carpentry': '🪚',
+    'Moving': '📦',
+    'Beauty': '💅',
+    'Tutoring': '📚',
+    'Car Repair': '🚗',
+    'Laundry': '👕',
+  };
+  
+  const emoji = serviceCategory ? (categoryEmojis[serviceCategory] || '🔧') : '🔧';
+  
+  return L.divIcon({
+    className: 'provider-marker',
+    html: `
+      <div style="
+        width: 36px;
+        height: 36px;
+        background: ${T};
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      ">
+        ${emoji}
+      </div>
+    `,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+};
 
 interface Provider {
   provider_id: number;
@@ -84,55 +102,75 @@ interface Provider {
   primary_service: string | null;
 }
 
-// Component to handle map clicks for pin dropping
-function MapClickHandler({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
 interface OSMClientMapProps {
   height?: string;
   searchRadius?: number;
   onProviderSelect?: (provider: Provider) => void;
-  onAddressConfirm?: (address: string, lat: number, lng: number) => void;
-  allowPinDrop?: boolean;
+  onLocationDetected?: (address: string, lat: number, lng: number) => void;
 }
 
 export function OSMClientMap({
   height = '500px',
   searchRadius = 10,
   onProviderSelect,
-  onAddressConfirm,
-  allowPinDrop = true,
+  onLocationDetected,
 }: OSMClientMapProps) {
   const [clientLocation, setClientLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchAddress, setSearchAddress] = useState('');
-  const [geocoding, setGeocoding] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
-  const [currentAddress, setCurrentAddress] = useState<string>('');
+  const [currentAddress, setCurrentAddress] = useState<string>('Detecting your location...');
 
   const defaultCenter: [number, number] = [9.032, 38.747];
   const mapCenter: [number, number] = clientLocation
     ? [clientLocation.lat, clientLocation.lng]
     : defaultCenter;
 
-  // Get current location
-  const getCurrentLocation = async () => {
+  // Search for nearby providers
+  const searchNearbyProviders = async (lat: number, lng: number) => {
+    try {
+      console.log('🔍 Searching for providers near:', lat, lng);
+      const result = await authService.searchNearbyProviders(lat, lng, undefined, searchRadius);
+      setProviders(result.results);
+      console.log(`✅ Found ${result.results.length} providers`);
+    } catch (error) {
+      console.error('❌ Failed to search providers:', error);
+    }
+  };
+
+  // Auto-detect client location on mount
+  const detectClientLocation = async () => {
     setLoading(true);
     setError(null);
+    setCurrentAddress('Detecting your location...');
+
+    console.log('🔍 Auto-detecting client location...');
+
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      const msg = 'Geolocation is not supported by your browser';
+      console.error('❌', msg);
+      setError(msg);
+      setCurrentAddress('Location not available');
+      setLoading(false);
+      return;
+    }
 
     try {
+      // Check permission first
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('📋 Location permission:', permission.state);
+        
+        if (permission.state === 'denied') {
+          throw new Error('Location permission denied. Please enable it in browser settings.');
+        }
+      }
+
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 30000, // Increased to 30 seconds
           maximumAge: 0,
         });
       });
@@ -142,197 +180,97 @@ export function OSMClientMap({
         lng: position.coords.longitude,
       };
 
+      console.log('✅ Client location detected:', location);
       setClientLocation(location);
       
       // Reverse geocode to get address
-      const result = await reverseGeocode(location.lat, location.lng);
-      if (result) {
-        setCurrentAddress(formatAddress(result));
+      try {
+        const result = await reverseGeocode(location.lat, location.lng);
+        if (result) {
+          const address = formatAddress(result);
+          setCurrentAddress(address);
+          console.log('📍 Address:', address);
+          onLocationDetected?.(address, location.lat, location.lng);
+        } else {
+          setCurrentAddress(`${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`);
+        }
+      } catch (geoErr) {
+        console.warn('⚠️ Reverse geocoding failed, using coordinates');
+        setCurrentAddress(`${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`);
       }
 
-      // Search for nearby providers
+      // Auto-search for nearby providers
       await searchNearbyProviders(location.lat, location.lng);
+      
+      notifications.show({
+        title: 'Location Detected',
+        message: `Found ${providers.length} providers nearby`,
+        color: 'teal',
+      });
     } catch (err: any) {
+      console.error('❌ Location detection failed:', err);
       const message = err.code === 1
-        ? 'Location permission denied'
-        : 'Failed to get location';
+        ? 'Location permission denied. Please enable location access in browser settings.'
+        : err.message || 'Failed to detect location. Please enable location services.';
       setError(message);
+      setCurrentAddress('Location not available');
       notifications.show({
         title: 'Location Error',
         message,
         color: 'red',
+        autoClose: false,
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // Search for nearby providers
-  const searchNearbyProviders = async (lat: number, lng: number) => {
-    try {
-      const result = await authService.searchNearbyProviders(lat, lng, undefined, searchRadius);
-      setProviders(result.results);
-    } catch (error) {
-      console.error('Failed to search providers:', error);
-    }
-  };
-
-  // Geocode address
-  const handleAddressSearch = async () => {
-    if (!searchAddress.trim()) return;
-
-    setGeocoding(true);
-    setError(null);
-
-    try {
-      const result = await geocodeAddress(searchAddress);
-      
-      if (result) {
-        const location = { lat: result.lat, lng: result.lon };
-        setClientLocation(location);
-        setCurrentAddress(formatAddress(result));
-        
-        // Search for nearby providers
-        await searchNearbyProviders(result.lat, result.lon);
-        
-        notifications.show({
-          title: 'Address Found',
-          message: formatAddress(result),
-          color: 'teal',
-        });
-      } else {
-        setError('Address not found. Try dropping a pin on the map.');
-        notifications.show({
-          title: 'Address Not Found',
-          message: 'Please try a different address or drop a pin on the map',
-          color: 'orange',
-        });
-      }
-    } catch (err) {
-      setError('Failed to geocode address');
-      notifications.show({
-        title: 'Geocoding Error',
-        message: 'Failed to find address. Try dropping a pin on the map.',
-        color: 'red',
-      });
-    } finally {
-      setGeocoding(false);
-    }
-  };
-
-  // Handle manual pin drop
-  const handleLocationSelect = async (lat: number, lng: number) => {
-    if (!allowPinDrop) return;
-
-    setClientLocation({ lat, lng });
-    
-    // Reverse geocode to get address
-    const result = await reverseGeocode(lat, lng);
-    if (result) {
-      setCurrentAddress(formatAddress(result));
-    }
-    
-    // Search for nearby providers
-    await searchNearbyProviders(lat, lng);
-    
+  // Handle provider selection
+  const handleProviderClick = (provider: Provider) => {
+    onProviderSelect?.(provider);
     notifications.show({
-      title: 'Location Selected',
-      message: 'Pin dropped on map',
+      title: 'Provider Selected',
+      message: `${provider.full_name} - ${provider.distance_km.toFixed(1)}km away`,
       color: 'teal',
     });
   };
 
-  // Confirm address
-  const handleConfirmAddress = () => {
-    if (clientLocation && currentAddress) {
-      onAddressConfirm?.(currentAddress, clientLocation.lat, clientLocation.lng);
-      notifications.show({
-        title: 'Address Confirmed',
-        message: currentAddress,
-        color: 'teal',
-      });
-    }
-  };
-
-  // Handle provider selection
-  const handleProviderClick = (provider: Provider) => {
-    setSelectedProvider(provider);
-    onProviderSelect?.(provider);
-  };
-
-  // Initialize
+  // Auto-detect location on mount
   useEffect(() => {
-    getCurrentLocation();
+    detectClientLocation();
   }, []);
 
   return (
     <Box>
-      {/* Search Controls */}
+      {/* Location Status Bar */}
       <Paper mb={16} p="md" radius="xl" style={{ background: 'var(--ot-bg-card)', border: '1px solid var(--ot-border)' }}>
-        <Stack gap={12}>
-          <Group gap={8}>
-            <TextInput
-              placeholder="Enter your address..."
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
-              leftSection={<IconSearch size={16} />}
-              style={{ flex: 1 }}
-              size="sm"
-            />
-            <Button
-              size="sm"
-              onClick={handleAddressSearch}
-              loading={geocoding}
-              color="teal"
-            >
-              Search
-            </Button>
-            <Button
-              size="sm"
-              variant="light"
-              onClick={getCurrentLocation}
-              loading={loading}
-              leftSection={<IconCurrentLocation size={16} />}
-            >
-              My Location
-            </Button>
+        <Group justify="space-between" align="center">
+          <Box style={{ flex: 1 }}>
+            <Text size="xs" c="dimmed" mb={4}>Your Location</Text>
+            <Text size="sm" fw={600} c={N}>{currentAddress}</Text>
+            {providers.length > 0 && (
+              <Badge size="sm" color="teal" variant="light" mt={6}>
+                {providers.length} provider{providers.length !== 1 ? 's' : ''} nearby
+              </Badge>
+            )}
+          </Box>
+          <Button
+            size="sm"
+            variant="light"
+            onClick={detectClientLocation}
+            loading={loading}
+            leftSection={<IconCurrentLocation size={16} />}
+          >
+            Refresh
+          </Button>
+        </Group>
+
+        {error && (
+          <Group gap={8} mt={12}>
+            <IconAlertCircle size={14} color={COLORS.error} />
+            <Text size="xs" c="red">{error}</Text>
           </Group>
-
-          {currentAddress && (
-            <Group justify="space-between">
-              <Text size="xs" c="dimmed">
-                📍 {currentAddress}
-              </Text>
-              {onAddressConfirm && (
-                <Button size="xs" variant="light" onClick={handleConfirmAddress}>
-                  Confirm Address
-                </Button>
-              )}
-            </Group>
-          )}
-
-          {error && (
-            <Group gap={8}>
-              <IconAlertCircle size={14} color={COLORS.error} />
-              <Text size="xs" c="red">
-                {error}
-              </Text>
-            </Group>
-          )}
-
-          {providers.length > 0 && (
-            <Badge size="sm" color="teal" variant="light">
-              {providers.length} provider{providers.length !== 1 ? 's' : ''} nearby
-            </Badge>
-          )}
-
-          {allowPinDrop && (
-            <Text size="xs" c="dimmed" ta="center">
-              💡 Tip: Click on the map to drop a pin at your exact location
-            </Text>
-          )}
-        </Stack>
+        )}
       </Paper>
 
       {/* Map */}
@@ -346,13 +284,16 @@ export function OSMClientMap({
               right: 0,
               bottom: 0,
               zIndex: 1000,
-              background: 'rgba(255,255,255,0.8)',
+              background: 'rgba(255,255,255,0.9)',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: 16,
             }}
           >
-            <Loader color="teal" />
+            <Loader color="teal" size="lg" />
+            <Text size="sm" c="dimmed">Detecting your location...</Text>
           </Box>
         )}
 
@@ -368,21 +309,15 @@ export function OSMClientMap({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {allowPinDrop && <MapClickHandler onLocationSelect={handleLocationSelect} />}
-
           {/* Client location */}
           {clientLocation && (
             <>
               <Marker position={[clientLocation.lat, clientLocation.lng]} icon={clientIcon}>
                 <Popup>
                   <Stack gap={4}>
-                    <Text size="sm" fw={700}>
-                      Your Location
-                    </Text>
+                    <Text size="sm" fw={700}>You</Text>
                     {currentAddress && (
-                      <Text size="xs" c="dimmed">
-                        {currentAddress}
-                      </Text>
+                      <Text size="xs" c="dimmed">{currentAddress}</Text>
                     )}
                   </Stack>
                 </Popup>
@@ -408,27 +343,23 @@ export function OSMClientMap({
             <Marker
               key={provider.provider_id}
               position={[provider.latitude, provider.longitude]}
-              icon={providerIcon}
+              icon={createProviderIcon(provider.primary_service || undefined)}
               eventHandlers={{
                 click: () => handleProviderClick(provider),
               }}
             >
               <Popup>
                 <Stack gap={4}>
-                  <Text size="sm" fw={700}>
-                    {provider.full_name}
-                  </Text>
+                  <Text size="sm" fw={700}>{provider.full_name}</Text>
+                  {provider.primary_service && (
+                    <Badge size="xs" color="teal">{provider.primary_service}</Badge>
+                  )}
                   <Text size="xs" c="dimmed">
                     ⭐ {provider.avg_rating.toFixed(1)} • {provider.total_jobs} jobs
                   </Text>
                   <Text size="xs" c="dimmed">
                     📍 {provider.distance_km.toFixed(1)} km away
                   </Text>
-                  {provider.primary_service && (
-                    <Badge size="xs" color="teal">
-                      {provider.primary_service}
-                    </Badge>
-                  )}
                   <Button
                     size="xs"
                     fullWidth

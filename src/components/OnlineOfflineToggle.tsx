@@ -25,8 +25,13 @@ export function OnlineOfflineToggle({
 }: OnlineOfflineToggleProps) {
   const [online, setOnline] = useState(initialOnline);
   const [loading, setLoading] = useState(false);
-  const locationIntervalRef = useRef<number | null>(null);
+  const locationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchIdRef = useRef<number | null>(null);
+
+  // Sync with parent state
+  useEffect(() => {
+    setOnline(initialOnline);
+  }, [initialOnline]);
 
   // Cleanup on unmount
   useEffect(() => {

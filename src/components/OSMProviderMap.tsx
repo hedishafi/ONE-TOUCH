@@ -24,41 +24,61 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom provider icon
-const providerIcon = L.divIcon({
-  className: 'provider-marker',
-  html: `
-    <div style="
-      width: 40px;
-      height: 40px;
-      background: ${T};
-      border: 4px solid white;
-      border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-    ">
-      🚗
-    </div>
-  `,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
-});
+// Custom provider icon - shows service category
+const createProviderIcon = (serviceCategory?: string) => {
+  // Map service categories to emojis
+  const categoryEmojis: Record<string, string> = {
+    'Plumbing': '🔧',
+    'Electrical': '⚡',
+    'Cleaning': '🧹',
+    'Painting': '🎨',
+    'Carpentry': '🪚',
+    'Moving': '📦',
+    'Beauty': '💅',
+    'Tutoring': '📚',
+    'Car Repair': '🚗',
+    'Laundry': '👕',
+  };
+  
+  const emoji = serviceCategory ? (categoryEmojis[serviceCategory] || '🔧') : '🔧';
+  
+  return L.divIcon({
+    className: 'provider-marker',
+    html: `
+      <div style="
+        width: 40px;
+        height: 40px;
+        background: ${T};
+        border: 4px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+      ">
+        ${emoji}
+      </div>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+  });
+};
 
 interface MapUpdaterProps {
   center: [number, number];
   zoom: number;
 }
 
-// Component to update map view
+// Component to update map view when location changes
 function MapUpdater({ center, zoom }: MapUpdaterProps) {
   const map = useMap();
   
   useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
+    if (center) {
+      map.setView(center, zoom, { animate: true });
+    }
+  }, [center[0], center[1], zoom, map]);
   
   return null;
 }
@@ -128,7 +148,11 @@ export function OSMProviderMap({
     }
     
     try {
-      const location = await locationService.getCurrentLocation();
+      const location = await locationService.getCurrentLocation({
+        enableHighAccuracy: true,
+        timeout: 30000, // Increased to 30 seconds
+        maximumAge: 0,
+      });
       console.log('✅ Location received:', location);
       setCurrentLocation(location);
       onLocationUpdate?.(location.latitude, location.longitude);
@@ -167,7 +191,7 @@ export function OSMProviderMap({
     // Start continuous tracking
     locationService.startTracking({
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 30000, // Increased to 30 seconds
       maximumAge: 0,
     });
     
@@ -208,7 +232,8 @@ export function OSMProviderMap({
       unsubscribeErrors();
       locationService.stopTracking();
     };
-  }, [isOnline, onLocationUpdate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline]);
 
   // Refresh location manually
   const refreshLocation = () => {
@@ -216,7 +241,7 @@ export function OSMProviderMap({
   };
 
   return (
-    <Box style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden' }}>
+    <Box style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', zIndex: 1 }}>
       {/* Loading overlay */}
       {loading && (
         <Box
@@ -246,6 +271,7 @@ export function OSMProviderMap({
             left: 16,
             right: 16,
             zIndex: 1000,
+            pointerEvents: 'none',
           }}
         >
           <Group
@@ -255,6 +281,7 @@ export function OSMProviderMap({
               background: 'white',
               borderRadius: '8px',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              pointerEvents: 'auto',
             }}
           >
             <IconAlertCircle size={18} color={COLORS.error} />
@@ -275,9 +302,10 @@ export function OSMProviderMap({
           top: 16,
           right: 16,
           zIndex: 1000,
+          pointerEvents: 'none',
         }}
       >
-        <Stack gap={8}>
+        <Stack gap={8} style={{ pointerEvents: 'auto' }}>
           <Badge
             size="lg"
             color={isOnline ? 'teal' : 'gray'}
@@ -323,9 +351,15 @@ export function OSMProviderMap({
       <MapContainer
         center={mapCenter}
         zoom={14}
-        style={{ width: '100%', height }}
+        style={{ width: '100%', height, cursor: 'grab' }}
         zoomControl={true}
         scrollWheelZoom={true}
+        dragging={true}
+        touchZoom={true}
+        doubleClickZoom={true}
+        boxZoom={true}
+        keyboard={true}
+        attributionControl={true}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -339,7 +373,7 @@ export function OSMProviderMap({
           <>
             <Marker
               position={[currentLocation.latitude, currentLocation.longitude]}
-              icon={providerIcon}
+              icon={createProviderIcon()}
             >
               <Popup>
                 <Stack gap={4}>

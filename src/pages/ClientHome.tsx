@@ -446,19 +446,21 @@ export function ClientHome() {
           </Paper>
         )}
 
-        {/* Hero — Live Provider Map with OpenStreetMap */}
+        {/* Hero — Live Provider Map with Auto Location Detection */}
         <Box mb={28}>
           <OSMClientMap
             onProviderSelect={(provider) => {
               notifications.show({
                 title: 'Provider Selected',
-                message: `You selected ${provider.full_name}. Call them to book a service.`,
+                message: `${provider.full_name} - ${provider.distance_km.toFixed(1)}km away`,
                 color: 'teal',
               });
             }}
+            onLocationDetected={(address, lat, lng) => {
+              console.log('📍 Client location detected:', address, lat, lng);
+            }}
             height="400px"
             searchRadius={10}
-            allowPinDrop={true}
           />
 
           {/* CTA bar below the map — no overlay, clean card */}
