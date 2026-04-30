@@ -12,6 +12,13 @@ from .test_admin_provider_profile import ProviderProfileAdminTests
 # )
 from .test_admin_otp import PhoneOTPAdminTests
 from .test_admin_deleted_provider import DeletedProviderRecordAdminTests
+from .test_provider_location import (
+    ProviderGoOnlineTests,
+    ProviderGoOfflineTests,
+    ProviderUpdateLocationTests,
+    ProviderStatusTests,
+    SearchNearbyProvidersTests,
+)
 
 __all__ = [
     'SignupFlowTests',
@@ -26,4 +33,9 @@ __all__ = [
     # 'ProviderServiceAdminTests',
     'PhoneOTPAdminTests',
     'DeletedProviderRecordAdminTests',
+    'ProviderGoOnlineTests',
+    'ProviderGoOfflineTests',
+    'ProviderUpdateLocationTests',
+    'ProviderStatusTests',
+    'SearchNearbyProvidersTests',
 ]
