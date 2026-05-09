@@ -3,21 +3,23 @@
  * Live map · Online/Offline toggle · Incoming requests · Accept → Chapa → Reveal phone
  */
 import { useState, useEffect, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, Switch,
   ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, PasswordInput,
 } from '@mantine/core';
 import {
-  IconBriefcase, IconTrendingUp, IconUser, IconWallet,
+  IconTrendingUp, IconUser, IconSettings, IconLayoutDashboard,
+  IconStar, IconLifebuoy,
   IconBell, IconBellFilled, IconMenu2, IconX, IconLogout,
-  IconCheck, IconClock, IconMapPin, IconCircleFilled, IconGift,
-  IconShieldCheck, IconCurrencyDollar, IconPhoneCall, IconRadar, IconStar,
+  IconCheck, IconClock, IconMapPin, IconGift,
+  IconShieldCheck, IconCurrencyDollar, IconPhoneCall, IconRadar,
   IconStarFilled, IconAlertCircle, IconWifiOff,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
@@ -25,6 +27,7 @@ import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
 import { RoleSwitcher } from '../components/RoleSwitcher';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile, AppNotification, User } from '../types';
@@ -180,15 +183,17 @@ function PulseRings({ctr, on}: {ctr:[number,number]; on:boolean}) {
 }
 
 const NAV = [
-  {label:'Dashboard',                    icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
-  {label:'Profile Setup',                icon:<IconUser         size={16}/>, r:'/provider/profile-setup'},
-  {label:'Services & Subservices',       icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
-  {label:'Wallet / Commission Overview', icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
-  {label:'Earnings',                     icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
+  { label: 'Dashboard',    icon: <IconLayoutDashboard size={16}/>, r: ROUTES.providerDashboard },
+  { label: 'Profile',      icon: <IconUser            size={16}/>, r: ROUTES.providerProfile },
+  { label: 'Earnings',     icon: <IconTrendingUp      size={16}/>, r: ROUTES.providerEarnings },
+  { label: 'Reviews',      icon: <IconStar            size={16}/>, r: ROUTES.providerReviews },
+  { label: 'Settings',     icon: <IconSettings        size={16}/>, r: ROUTES.providerSettings },
+  { label: 'Help & Support', icon: <IconLifebuoy      size={16}/>, r: ROUTES.providerHelp },
 ];
 
 export function ProviderHome() {
   const nav = useNavigate();
+  const location = useLocation();
   const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
@@ -377,85 +382,130 @@ export function ProviderHome() {
   return (
     <Box style={{minHeight:'100vh',background:'var(--ot-bg-page)'}}>
 
-      {/* Sidebar backdrop */}
-      {sidebar&&<Box onClick={()=>setSidebar(false)}
-        style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:399}}/>}
+      {/* ── Backdrop + Sidebar rendered into document.body via portal ──
+          Escapes ALL stacking contexts — z-index is always absolute.  */}
+      {createPortal(
+        <>
+          {/* Backdrop — zIndex 1000 */}
+          {sidebar && (
+            <div
+              onClick={()=>setSidebar(false)}
+              style={{
+                position:'fixed', inset:0,
+                background:'rgba(0,0,0,0.45)',
+                zIndex:1000,
+                cursor:'pointer',
+              }}
+            />
+          )}
 
-      {/* Sidebar */}
-      <Box style={{position:'fixed',top:0,left:0,bottom:0,width:260,zIndex:400,
-        background:'var(--ot-bg-card)',borderRight:'1px solid var(--ot-border)',
-        transform:sidebar?'translateX(0)':'translateX(-260px)',
-        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
-        display:'flex',flexDirection:'column'}}>
-        <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
-          <Group justify="space-between">
-            <Group gap={8}>
-              <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
-              </Box>
-              <Text fw={800} size="sm" c={N}>OneTouch</Text>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-        </Box>
-        <Box p="md">
-          <Group gap={10}>
-            <Avatar radius="xl" size="md" color="blue">{profile?.fullName?.charAt(0)?.charAt(0) ?? 'P'}</Avatar>
-            <Box>
-              <Text size="sm" fw={700} lineClamp={1}>{profile?.fullName??currentUser?.email??'Provider'}</Text>
-              <Group gap={6}>
-                <Badge size="xs" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
+          {/* Sidebar — zIndex 1100, always above backdrop */}
+          <div style={{
+            position:'fixed', top:0, left:0, bottom:0, width:260,
+            zIndex:1100,
+            background:'var(--ot-bg-card)',
+            borderRight:'1px solid var(--ot-border)',
+            display:'flex', flexDirection:'column',
+            transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+            transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+            boxShadow: sidebar ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
+            overflowY:'auto',
+          }}>
+            <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
+              <Group justify="space-between">
+                <Group gap={8}>
+                  <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Text fw={900} size="11px" c="white">OT</Text>
+                  </Box>
+                  <Text fw={800} size="sm" c={N}>OneTouch</Text>
+                </Group>
+                <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
+              </Group>
+            </Box>
+            <Box p="md">
+              <Group gap={10}>
+                <Avatar radius="xl" size="md" color="blue">{profile?.fullName?.charAt(0)?.charAt(0) ?? 'P'}</Avatar>
+                <Box>
+                  <Text size="sm" fw={700} lineClamp={1}>{profile?.fullName??currentUser?.email??'Provider'}</Text>
+                  <Group gap={6}>
+                    <Badge size="xs" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
+                      {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
+                    </Badge>
+                    <Box w={7} h={7} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa'}}/>
+                    <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online?'Online':'Offline'}</Text>
+                  </Group>
+                  <Text size="10px" c="dimmed">UID: {currentUser?.providerUid ?? '—'}</Text>
+                  <Text size="10px" c="dimmed">{localizedDate}</Text>
+                </Box>
+              </Group>
+            </Box>
+            <Divider/>
+            <Stack gap={2} p="sm" style={{flex:1}}>
+              {currentUser?.role === 'provider' && NAV.map(n => {
+                const isActive = location.pathname === n.r || location.pathname.startsWith(n.r + '/');
+                return (
+                  <Box key={n.label} p={10}
+                    onClick={() => { setSidebar(false); nav(n.r); }}
+                    style={{
+                      borderRadius: 10,
+                      borderLeft: `3px solid ${isActive ? T : 'transparent'}`,
+                      paddingLeft: 13,
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      fontWeight: isActive ? 700 : 600,
+                      fontSize: 14,
+                      color: isActive ? N : 'var(--ot-text-muted)',
+                      backgroundColor: isActive ? `${T}13` : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}>
+                    <Box style={{ color: isActive ? T : '#ADB5BD', display: 'flex' }}>{n.icon}</Box>
+                    {n.label}
+                  </Box>
+                );
+              })}
+              <Paper p="xs" radius="md" mt="xs" style={{border:'1px solid var(--ot-border)'}}>
+                <Text size="xs" fw={700} c={N}>Identity Verification Status</Text>
+                <Badge mt={6} size="sm" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
                   {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
                 </Badge>
-                <Box w={7} h={7} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa'}}/>
-                <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online?'Online':'Offline'}</Text>
-              </Group>
-              <Text size="10px" c="dimmed">UID: {currentUser?.providerUid ?? '—'}</Text>
-              <Text size="10px" c="dimmed">{localizedDate}</Text>
+              </Paper>
+            </Stack>
+            <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+              <RoleSwitcher />
+              <Box p={10}
+                onClick={()=>{logout();nav(ROUTES.landing);}}
+                style={{borderRadius:10,display:'flex',alignItems:'center',
+                  gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
+                <IconLogout size={18}/> Sign out
+              </Box>
             </Box>
-          </Group>
-        </Box>
-        <Divider/>
-        <Stack gap={2} p="sm" style={{flex:1}}>
-          {currentUser?.role === 'provider' && NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
-          <Paper p="xs" radius="md" mt="xs" style={{border:'1px solid var(--ot-border)'}}>
-            <Text size="xs" fw={700} c={N}>Identity Verification Status</Text>
-            <Badge mt={6} size="sm" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
-              {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
-            </Badge>
-          </Paper>
-        </Stack>
-        <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <RoleSwitcher />
-          <Box p={10}
-            onClick={()=>{logout();nav(ROUTES.landing);}}
-            style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
-          </Box>
-        </Box>
-      </Box>
+          </div>
+        </>,
+        document.body
+      )}
 
-      {/* Header */}
-      <Box style={{position:'sticky',top:0,zIndex:200,background:'var(--ot-bg-card)',
-        borderBottom:'1px solid var(--ot-border)'}}>
-        <Box px={20} py={12} style={{maxWidth:1100,margin:'0 auto'}}>
+      {/* ── Main column: header + body ── */}
+      <Box style={{minHeight:'100vh', display:'flex', flexDirection:'column'}}>
+
+      {/* ── Header ── */}
+      <Box style={{
+        position:'sticky', top:0,
+        zIndex:400,  /* same level as sidebar so header stays above backdrop */
+        background:'var(--ot-bg-card)',
+        borderBottom:'1px solid var(--ot-border)',
+        flexShrink:0,
+      }}>
+        <Box px={20} py={12}>
           <Group justify="space-between">
             <Group gap={12}>
-              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(true)}><IconMenu2 size={22}/></ActionIcon>
+              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(v=>!v)}>
+                <IconMenu2 size={22}/>
+              </ActionIcon>
               <Group gap={8}>
                 <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
+                  <Text fw={900} size="11px" c="white">OT</Text>
                 </Box>
-                <Text fw={800} size="sm" c={N} visibleFrom="sm">Provider Dashboard</Text>
+                <Text fw={800} size="sm" c={N}>Provider Dashboard</Text>
               </Group>
             </Group>
             <Group gap={12}>
@@ -473,7 +523,8 @@ export function ProviderHome() {
                   borderRadius:'50%',background:COLORS.error,display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <Text size="8px" c="white" fw={700}>{unreadCount}</Text></Box>}
               </ActionIcon>
-              <Avatar radius="xl" size="sm" color="blue" style={{cursor:'pointer'}} onClick={()=>setSidebar(true)}>
+              <DarkModeToggle size="sm" />
+              <Avatar radius="xl" size="sm" color="blue" style={{cursor:'pointer'}} onClick={()=>setSidebar(v=>!v)}>
                 {profile?.fullName?.charAt(0)?.charAt(0) ?? 'P'}
               </Avatar>
             </Group>
@@ -482,7 +533,7 @@ export function ProviderHome() {
       </Box>
 
       {/* Body */}
-      <Box style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 64px'}}>
+      <Box style={{flex:1, padding:'24px 24px 64px', overflowX:'hidden'}}>
 
         {isUnderReview && (
           <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
@@ -709,7 +760,7 @@ export function ProviderHome() {
                   <Avatar size={32} radius="xl" color="teal">{cancelTarget.clientName.charAt(0)}</Avatar>
                   <Box>
                     <Text size="xs" fw={700} c={N}>{cancelTarget.clientName}</Text>
-                    <Text size="xs" c="dimmed">{catName(cancelTarget.catId)} · {cancelTarget.dist} km</Text>
+                    <Text size="xs" c="dimmed">{getCategoryName(cancelTarget.catId)} · {cancelTarget.dist} km</Text>
                   </Box>
                 </Group>
               )}
@@ -816,7 +867,7 @@ export function ProviderHome() {
               <Text size="xs" c="dimmed" fw={600} tt="uppercase">Client Phone</Text>
               <Text fw={900} size="xl" c={N} style={{letterSpacing:2}}>{revealed?.phone}</Text>
               <Text size="xs" c={COLORS.success}>
-                {revealed?.req.clientName} · {revealed?catName(revealed.req.catId):''}
+                {revealed?.req.clientName} · {revealed ? getCategoryName(revealed.req.catId) : ''}
               </Text>
             </Stack>
           </Paper>
@@ -838,6 +889,7 @@ export function ProviderHome() {
           </Group>
         </Stack>
       </Modal>
+    </Box>
     </Box>
   );
 }

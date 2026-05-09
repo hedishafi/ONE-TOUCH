@@ -17,6 +17,7 @@ import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
 import type { NavItem } from '../types/nav';
 import { getRoleNavItems } from './roleNav';
+import { RoleSwitcher } from './RoleSwitcher';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -212,6 +213,10 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
         <AppShell.Section
           style={{ borderTop: '1px solid var(--ot-border)', padding: 10 }}
         >
+          {/* Role switcher — only shown when user has multiple roles */}
+          <Box mb={8}>
+            <RoleSwitcher />
+          </Box>
           <Group gap={10} wrap="nowrap">
             <Avatar size={34} radius="xl" color="teal" style={{ flexShrink: 0 }}>
               {initials}

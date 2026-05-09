@@ -22,7 +22,7 @@ export const oneTouchTheme = createTheme({
     teal: tealBlue,
   },
   primaryColor: 'teal',
-  primaryShade: { light: 5, dark: 7 },
+  primaryShade: { light: 5, dark: 4 },
 
   fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
   fontFamilyMonospace: "'Fira Code', monospace",
@@ -44,42 +44,38 @@ export const oneTouchTheme = createTheme({
 
   components: {
     Button: {
-      defaultProps: {
-        radius: 'md',
-      },
+      defaultProps: { radius: 'md' },
       styles: {
-        root: {
-          fontWeight: 600,
-          transition: 'all 0.2s ease',
-        },
+        root: { fontWeight: 600, transition: 'all 0.2s ease' },
       },
     },
     Card: {
-      defaultProps: {
-        radius: 'lg',
-        shadow: 'sm',
-      },
+      defaultProps: { radius: 'lg', shadow: 'sm' },
       styles: {
         root: {
-          border: '1px solid rgba(0, 0, 0, 0.05)',
+          border: '1px solid var(--ot-border)',
+          background: 'var(--ot-bg-card)',
           transition: 'all 0.2s ease',
         },
       },
     },
-    TextInput: {
-      defaultProps: {
-        radius: 'md',
-      },
-    },
-    Badge: {
-      defaultProps: {
-        radius: 'sm',
-      },
-    },
     Paper: {
-      defaultProps: {
-        radius: 'lg',
-        shadow: 'xs',
+      defaultProps: { radius: 'lg', shadow: 'xs' },
+      styles: {
+        root: {
+          background: 'var(--ot-bg-card)',
+        },
+      },
+    },
+    Modal: {
+      styles: {
+        content: { background: 'var(--ot-bg-card)' },
+        header: { background: 'var(--ot-bg-card)' },
+      },
+    },
+    NavLink: {
+      styles: {
+        root: { color: 'var(--ot-text-body)' },
       },
     },
   },

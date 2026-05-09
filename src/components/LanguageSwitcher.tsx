@@ -3,7 +3,11 @@ import { IconCheck } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { storage, STORAGE_KEYS } from '../utils/storage';
-import { SUPPORTED_LANGUAGES } from '../utils/constants';
+
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'am', label: 'Amharic' },
+];
 
 export function LanguageSwitcher() {
   const { i18n } = useTranslation();
@@ -12,18 +16,10 @@ export function LanguageSwitcher() {
   const handleChange = (code: string) => {
     i18n.changeLanguage(code);
     storage.set(STORAGE_KEYS.language, code);
-    document.documentElement.dir = code === 'ar' ? 'rtl' : 'ltr';
     setOpened(false);
   };
 
-  const current = SUPPORTED_LANGUAGES.find(l => l.code === i18n.language) ?? SUPPORTED_LANGUAGES[0];
-  
-  // Map codes to short forms and flags
-  const shortCodeMap: Record<string, string> = {
-    'en': 'EN',
-    'am': 'AM',
-    'om': 'OR',
-  };
+  const current = LANGUAGES.find(l => l.code === i18n.language) ?? LANGUAGES[0];
 
   return (
     <Popover position="bottom-end" withArrow shadow="md" radius="12" opened={opened} onChange={setOpened}>
@@ -33,62 +29,54 @@ export function LanguageSwitcher() {
           size="sm"
           onClick={() => setOpened(!opened)}
           style={{
-            color: '#000080',
+            color: 'var(--ot-text-navy)',
             fontWeight: 700,
             fontSize: 13,
             padding: '6px 12px',
             height: 'auto',
-            letterSpacing: '0.5px',
+            letterSpacing: '0.3px',
             transition: 'all 0.2s ease',
-            backgroundColor: opened ? 'rgba(0, 128, 128, 0.1)' : 'transparent',
-            border: `1px solid ${opened ? 'rgba(0, 128, 128, 0.3)' : 'transparent'}`,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
+            backgroundColor: opened ? 'rgba(0,128,128,0.1)' : 'transparent',
+            border: `1px solid ${opened ? 'rgba(0,128,128,0.3)' : 'transparent'}`,
+            borderRadius: 8,
           }}
         >
-          <Text size="sm">{current.flag}</Text>
-          <Text size="xs" fw={700} style={{ letterSpacing: '0.3px' }}>
-            {shortCodeMap[current.code] || current.code.toUpperCase()}
-          </Text>
-          <Text size="10px" style={{ opacity: 0.6, marginLeft: '2px' }}>▼</Text>
+          {current.label}
         </Button>
       </Popover.Target>
-      <Popover.Dropdown p="md" style={{ minWidth: '140px' }}>
-        <Stack gap="6px">
-          {SUPPORTED_LANGUAGES.map(lang => (
+
+      <Popover.Dropdown p="xs" style={{ minWidth: 130 }}>
+        <Stack gap={4}>
+          {LANGUAGES.map(lang => (
             <Box
               key={lang.code}
-              p="8px 12px"
+              px={12} py={8}
               style={{
-                borderRadius: '8px',
+                borderRadius: 8,
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                backgroundColor: i18n.language === lang.code ? 'rgba(0, 128, 128, 0.15)' : 'transparent',
-                border: i18n.language === lang.code ? '1px solid #008080' : '1px solid rgba(0,0,137,0.1)',
+                transition: 'background 0.15s ease',
+                background: i18n.language === lang.code
+                  ? 'rgba(0,128,128,0.12)'
+                  : 'transparent',
+                border: `1px solid ${i18n.language === lang.code ? '#008080' : 'transparent'}`,
               }}
               onClick={() => handleChange(lang.code)}
-              onMouseEnter={(e) => {
-                if (i18n.language !== lang.code) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(0, 128, 128, 0.08)';
-                }
+              onMouseEnter={e => {
+                if (i18n.language !== lang.code)
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(0,128,128,0.07)';
               }}
-              onMouseLeave={(e) => {
-                if (i18n.language !== lang.code) {
-                  (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                }
+              onMouseLeave={e => {
+                if (i18n.language !== lang.code)
+                  (e.currentTarget as HTMLElement).style.background = 'transparent';
               }}
             >
               <Group justify="space-between" gap="sm">
-                <Group gap="8px">
-                  <Text size="md">{lang.flag}</Text>
-                  <Text size="sm" fw={600} c={i18n.language === lang.code ? '#008080' : '#000080'}>
-                    {shortCodeMap[lang.code] || lang.code.toUpperCase()}
-                  </Text>
-                </Group>
+                <Text size="sm" fw={600}
+                  c={i18n.language === lang.code ? '#008080' : 'var(--ot-text-navy)'}>
+                  {lang.label}
+                </Text>
                 {i18n.language === lang.code && (
-                  <IconCheck size={16} color="#008080" style={{ minWidth: '16px' }} />
+                  <IconCheck size={14} color="#008080" />
                 )}
               </Group>
             </Box>

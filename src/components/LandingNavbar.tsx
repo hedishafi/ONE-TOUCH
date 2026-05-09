@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useMediaQuery } from '@mantine/hooks';
+import { DarkModeToggle } from './DarkModeToggle';
 
 const NAV_STYLE = `
 @keyframes slideInDown {
@@ -93,20 +94,6 @@ export function LandingNavbar() {
         <Group justify="space-between" align="center" maw={1200} mx="auto">
           {/* Logo - Always visible */}
           <Group gap="xs" style={{ cursor: 'pointer', minWidth: 'fit-content' }} onClick={() => navigate(ROUTES.landing)}>
-            <Box
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 11,
-                background: `linear-gradient(135deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,137,0.25)',
-              }}
-            >
-              <IconShieldCheck size={20} color="white" stroke={2.5} />
-            </Box>
             <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing: '-0.3px', whiteSpace: 'nowrap' }}>
               ONE TOUCH
             </Text>
@@ -134,6 +121,7 @@ export function LandingNavbar() {
               {/* Right Actions */}
               <Group gap="lg" align="center" wrap="nowrap">
                 <LanguageSwitcher />
+                <DarkModeToggle size="sm" />
                 <Button
                   variant="subtle"
                   size="sm"
@@ -169,6 +157,7 @@ export function LandingNavbar() {
             /* Mobile Hamburger Menu */
             <Group gap="sm" align="center" wrap="nowrap">
               <LanguageSwitcher />
+              <DarkModeToggle size="sm" />
               <ThemeIcon
                 variant="subtle"
                 size="lg"
