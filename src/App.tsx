@@ -37,7 +37,7 @@ import {
   BookingHistory,
   SavedProviders,
   ClientWallet,
-  ClientLoyalty,
+  ClientLoyalty
 } from './pages/ClientDashboard';
 import { ClientMessages } from './pages/ClientMessages';
 import { ClientSettings } from './pages/ClientSettings';
@@ -69,6 +69,9 @@ import {
   TransactionMonitoring,
   ContentManager,
 } from './pages/AdminDashboard';
+
+// Orders pages
+import { CreateOrder, MyOrders, OrderDetails, AvailableOrders, ActiveOrder } from './pages/orders';
 
 // Protected route wrapper
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -112,6 +115,13 @@ function App() {
         <Route path="/provider/onboarding/step1" element={<ProviderOnboardingStep1 />} />
         <Route path="/provider/onboarding/phone-choice" element={<ProviderSignupPhoneChoice />} />
         <Route path="/provider/onboarding/step3/verify-otp" element={<ProviderOnboardingStep3OTPVerify />} />
+
+        {/* ── Orders ─────────────────────────────────────────────── */}
+        <Route path="/orders/create" element={<CreateOrder />} />
+        <Route path="/orders/available" element={<AvailableOrders />} />
+        <Route path="/orders/active/:id" element={<ActiveOrder />} />
+        <Route path="/orders/:id" element={<OrderDetails />} />
+        <Route path="/orders" element={<MyOrders />} />
 
         {/* ── Client ─────────────────────────────────────────────── */}
         <Route

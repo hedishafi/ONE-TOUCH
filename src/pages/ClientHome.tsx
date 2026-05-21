@@ -99,6 +99,7 @@ const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
 const NAV=[
+  {label:'My Orders',        icon:<IconBriefcase size={16}/>,r:'/orders'},
   {label:'Explore Services', icon:<IconSearch  size={16}/>,r:ROUTES.clientBrowse},
   {label:'My Requests',      icon:<IconHistory size={16}/>,r:ROUTES.clientHistory},
   {label:'Messages',         icon:<IconMessage size={16}/>,r:ROUTES.clientMessages},
@@ -478,7 +479,7 @@ export function ClientHome() {
                   <Text size="xs" c="dimmed">Browse services and request a provider</Text>
                 </Box>
               </Group>
-              <Button size="sm" radius="xl" onClick={()=>nav(ROUTES.services)}
+              <Button size="sm" radius="xl" onClick={()=>nav('/orders/create')}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
                 leftSection={<IconBriefcase size={14}/>}> 
                 Request Service

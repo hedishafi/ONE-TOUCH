@@ -25,6 +25,7 @@ import { RoleSwitcher } from '../components/RoleSwitcher';
 import { OnlineOfflineToggle } from '../components/OnlineOfflineToggle';
 import { OSMProviderMap } from '../components/OSMProviderMap';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
+import { getAvailableOrders, acceptOrder, declineOrder } from '../api/ordersApi';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile, User } from '../types';
 
@@ -131,6 +132,7 @@ export function ProviderHome() {
   const [profile,   setProfile]   = useState<ProviderProfile|null>(authProf);
   const [online,    setOnline]    = useState(authProf?.isOnline ?? false);
   const [sidebar,   setSidebar]   = useState(false);
+  const [realOrders, setRealOrders] = useState<any[]>([]);
 
   const [trials,    setTrials]    = useState(FREE_TRIAL_TOTAL);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
@@ -178,6 +180,21 @@ export function ProviderHome() {
       sessionStorage.removeItem(RESUBMIT_SUCCESS_FLAG);
     }
   }, []);
+
+  useEffect(() => {
+    if (!online) return;
+    const fetchOrders = async () => {
+      try {
+        const data = await getAvailableOrders();
+        setRealOrders(Array.isArray(data) ? data : data.results ?? []);
+      } catch (err) {
+        console.error('Failed to fetch orders:', err);
+      }
+    };
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [online]);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'provider') return;
@@ -228,7 +245,7 @@ export function ProviderHome() {
     };
   }, [currentUser]);
 
-  const visible   = DEMO.filter(r=>!dismissed.has(r.id)&&online);
+  const visible   = online ? realOrders : [];
   const myJobs    = jobs.filter(j=>j.providerId===currentUser?.id);
   const done      = myJobs.filter(j=>j.status==='completed');
   
@@ -557,64 +574,70 @@ export function ProviderHome() {
             ):(
               <ScrollArea.Autosize mah={440} scrollbarSize={4}>
                 <Stack gap={12}>
-                  {visible.map(req=>{
-                    const isFree = trials>0;
-                    const commissionLabel = isFree ? 'FREE' : `${commPct}% platform fee`;
-                    return (
-                      <Paper key={req.id} p="md" radius="xl"
-                        style={{background:'var(--ot-bg-card)',border:`2px solid ${COLORS.warning}55`,
-                          position:'relative',overflow:'hidden'}}>
-                        <Box style={{position:'absolute',top:0,left:0,width:4,height:'100%',
-                          background:COLORS.warning,borderRadius:'4px 0 0 4px'}}/>
-                        <Stack gap={10} pl={8}>
-                          {/* Client info row */}
-                          <Group gap={10} wrap="nowrap">
-                            <Avatar size={36} radius="xl" color="teal" style={{flexShrink:0}}>
-                              {req.clientName.charAt(0)}
-                            </Avatar>
-                            <Box style={{flex:1,minWidth:0}}>
-                              <Group gap={6}>
-                                <Text size="sm" fw={700} c={N}>{req.clientName}</Text>
-                                <Group gap={3}>
-                                  <IconStarFilled size={11} color={COLORS.warning}/>
-                                  <Text size="xs" fw={700}>{req.clientRating}</Text>
-                                </Group>
-                                <Text size="xs" c="dimmed">· {req.clientJobsDone} jobs</Text>
-                              </Group>
-                              <Text size="xs" c="var(--ot-text-sub)" lineClamp={1}>{req.desc}</Text>
-                            </Box>
-                            <Badge color="yellow" variant="light" size="xs" style={{flexShrink:0}}>New</Badge>
+                  {visible.map((order: any) => (
+                    <Paper key={order.id} p="md" radius="xl"
+                      style={{background:'var(--ot-bg-card)', border:`2px solid ${COLORS.warning}55`,
+                        position:'relative', overflow:'hidden'}}>
+                      <Box style={{position:'absolute',top:0,left:0,width:4,height:'100%',
+                        background:COLORS.warning,borderRadius:'4px 0 0 4px'}}/>
+                      <Stack gap={10} pl={8}>
+                        <Text size="sm" fw={700} c={N} lineClamp={2}>{order.description}</Text>
+                        <Group gap={14}>
+                          <Group gap={4}>
+                            <IconMapPin size={11}/>
+                            <Text size="xs" c="var(--ot-text-muted)">
+                              {order.distance_km?.toFixed(1) ?? 'N/A'} km
+                            </Text>
                           </Group>
-                          <Group gap={14}>
-                            <Group gap={4}><IconMapPin size={11}/><Text size="xs" c="var(--ot-text-muted)">{req.dist} km</Text></Group>
-                            <Group gap={4}><IconClock   size={11}/><Text size="xs" c="var(--ot-text-muted)">{ago(req.at)}</Text></Group>
+                          <Group gap={4}>
+                            <IconClock size={11}/>
+                            <Text size="xs" c="var(--ot-text-muted)">
+                              {order.expires_at ? Math.max(0, Math.floor((new Date(order.expires_at).getTime() - new Date().getTime()) / 60000)) + ' min left' : 'N/A'}
+                            </Text>
                           </Group>
-                          <Group gap={4} py={8} px={12} style={{background:'var(--ot-bg-row)',borderRadius:10}}>
-                            <Box style={{flex:1,textAlign:'center'}}>
-                              <Text size="10px" c="var(--ot-text-muted)">Commission</Text>
-                              {isFree
-                                ? <Badge size="xs" color="teal" variant="light">FREE</Badge>
-                                : <Text size="xs" fw={700} c={COLORS.error}>{commissionLabel}</Text>}
-                            </Box>
-                          </Group>
-                          <Group gap={8}>
-                            <Button flex={1} size="xs" radius="xl"
-                              style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-                              leftSection={<IconCheck size={13}/>} 
-                              disabled={isRestricted}
-                              onClick={() => {
-                                try { accept(req); }
-                                catch { notifications.show({title:'Error',message:'Failed to accept request.',color:'red'}); }
-                              }}>
-                              {isFree ? 'Accept (Free Trial)' : 'Accept & Pay'}
-                            </Button>
-                            <ActionIcon size="lg" radius="xl" variant="light" color="red"
-                              onClick={()=>decline(req.id)}><IconX size={15}/></ActionIcon>
-                          </Group>
-                        </Stack>
-                      </Paper>
-                    );
-                  })}
+                        </Group>
+                        <Group gap={4} py={8} px={12} style={{background:'var(--ot-bg-row)',borderRadius:10}}>
+                          <Box style={{flex:1,textAlign:'center'}}>
+                            <Text size="10px" c="var(--ot-text-muted)">
+                              {trials > 0 ? 'Free Trial' : 'Commission Fee'}
+                            </Text>
+                            {trials > 0 ? (
+                              <Badge size="xs" color="teal" variant="light">FREE (Trial {FREE_TRIAL_TOTAL - trials + 1}/{FREE_TRIAL_TOTAL})</Badge>
+                            ) : (
+                              <Text size="xs" fw={700} c={COLORS.error}>{order.estimated_commission ?? 'Calculated on accept'} ETB</Text>
+                            )}
+                          </Box>
+                        </Group>
+                        <Group gap={8}>
+                          <Button flex={1} size="xs" radius="xl"
+                            style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
+                            leftSection={<IconCheck size={13}/>}
+                            onClick={async () => {
+                              try {
+                                await acceptOrder(order.id);
+                                setRealOrders(prev => prev.filter(o => o.id !== order.id));
+                                notifications.show({title:'Order Accepted!', message:'Check your active orders.', color:'teal'});
+                              } catch(err: any) {
+                                notifications.show({title:'Error', message: err?.detail || 'Failed to accept', color:'red'});
+                              }
+                            }}>
+                            Accept
+                          </Button>
+                          <Button flex={1} size="xs" radius="xl" variant="light" color="red"
+                            onClick={async () => {
+                              try {
+                                await declineOrder(order.id);
+                                setRealOrders(prev => prev.filter(o => o.id !== order.id));
+                              } catch(err: any) {
+                                notifications.show({title:'Error', message: err?.detail || 'Failed to decline', color:'red'});
+                              }
+                            }}>
+                            Decline
+                          </Button>
+                        </Group>
+                      </Stack>
+                    </Paper>
+                  ))}
                 </Stack>
               </ScrollArea.Autosize>
             )}

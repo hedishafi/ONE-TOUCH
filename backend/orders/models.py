@@ -1,182 +1,136 @@
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
 from accounts.models import User, ProviderProfile
-from services.models import Service
+from services.models import ServiceCategory, SubService
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AI SESSION  (groups a full AI chat or voice conversation)
-# ─────────────────────────────────────────────────────────────────────────────
-class AISession(models.Model):
-    SESSION_CHAT  = 'chat'
-    SESSION_VOICE = 'voice'
-    SESSION_CHOICES = [
-        (SESSION_CHAT,  'Chat'),
-        (SESSION_VOICE, 'Voice'),
+class Order(models.Model):
+    INPUT_VOICE = 'voice'
+    INPUT_TEXT = 'text'
+    INPUT_TYPE_CHOICES = [
+        (INPUT_VOICE, 'Voice'),
+        (INPUT_TEXT, 'Text'),
     ]
 
-    user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_sessions')
-    session_type  = models.CharField(max_length=10, choices=SESSION_CHOICES, default=SESSION_CHAT)
-    started_at    = models.DateTimeField(auto_now_add=True)
-    ended_at      = models.DateTimeField(null=True, blank=True)
+    STATUS_PENDING = 'pending'
+    STATUS_MATCHING = 'matching'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_MATCHING, 'Matching'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_IN_PROGRESS, 'In Progress'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_EXPIRED, 'Expired'),
+    ]
+
+    client = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='orders',
+        limit_choices_to={'role': User.ROLE_CLIENT},
+    )
+    category = models.ForeignKey(
+        ServiceCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders',
+    )
+    sub_service = models.ForeignKey(
+        SubService,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='orders',
+    )
+    input_type = models.CharField(max_length=10, choices=INPUT_TYPE_CHOICES)
+    voice_file = models.FileField(upload_to='orders/voice/', null=True, blank=True)
+    transcription = models.TextField(blank=True)
+    description = models.TextField(blank=True)
+    client_latitude = models.FloatField()
+    client_longitude = models.FloatField()
+    client_address = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        verbose_name = 'AI Session'
-        ordering = ['-started_at']
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f'AISession({self.user.username}, {self.session_type}, {self.started_at:%Y-%m-%d})'
+        return f'Order#{self.pk} ({self.status})'
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# AI MESSAGE  (individual turn within a session)
-# ─────────────────────────────────────────────────────────────────────────────
-class AIMessage(models.Model):
-    SENDER_USER = 'user'
-    SENDER_AI   = 'ai'
-    SENDER_CHOICES = [
-        (SENDER_USER, 'User'),
-        (SENDER_AI,   'AI'),
+class OrderMatch(models.Model):
+    STATUS_NOTIFIED = 'notified'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_NOTIFIED, 'Notified'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_DECLINED, 'Declined'),
+        (STATUS_EXPIRED, 'Expired'),
     ]
 
-    session    = models.ForeignKey(AISession, on_delete=models.CASCADE, related_name='messages')
-    sender     = models.CharField(max_length=5, choices=SENDER_CHOICES)
-    content    = models.TextField()
-    # Structured intent extracted by the AI (e.g. "book_service", "get_price")
-    intent_tag = models.CharField(max_length=60, blank=True)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='matches')
+    provider = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='order_matches')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NOTIFIED)
+    notified_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('order', 'provider')
+        ordering = ['notified_at']
+
+    def __str__(self):
+        return f'OrderMatch(order={self.order_id}, provider={self.provider_id}, status={self.status})'
+
+
+class OrderAssignment(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='assignment')
+    provider = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='assignments')
+    commission_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    commission_paid = models.BooleanField(default=False)
+    commission_paid_at = models.DateTimeField(null=True, blank=True)
+    client_contact_released = models.BooleanField(default=False)
+    contact_released_at = models.DateTimeField(null=True, blank=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def release_contact(self):
+        self.client_contact_released = True
+        self.contact_released_at = timezone.now()
+        self.save(update_fields=['client_contact_released', 'contact_released_at'])
+
+    def __str__(self):
+        return f'OrderAssignment(order={self.order_id}, provider={self.provider_id})'
+
+
+class OrderStatusLog(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='status_logs')
+    old_status = models.CharField(max_length=20, blank=True)
+    new_status = models.CharField(max_length=20)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = 'AI Message'
         ordering = ['created_at']
 
     def __str__(self):
-        return f'[{self.sender}] {self.content[:60]}'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ORDER  (central business entity — tracks the full job lifecycle)
-#
-# State machine:
-#   pending → accepted → commission_pending → commission_paid
-#          → in_progress → completed | cancelled
-#
-# client_phone_visible is set True only after CommissionPayment succeeds.
-# ─────────────────────────────────────────────────────────────────────────────
-class Order(models.Model):
-    STATUS_PENDING            = 'pending'
-    STATUS_ACCEPTED           = 'accepted'
-    STATUS_COMMISSION_PENDING = 'commission_pending'
-    STATUS_COMMISSION_PAID    = 'commission_paid'
-    STATUS_IN_PROGRESS        = 'in_progress'
-    STATUS_COMPLETED          = 'completed'
-    STATUS_CANCELLED          = 'cancelled'
-    STATUS_CHOICES = [
-        (STATUS_PENDING,            'Pending'),
-        (STATUS_ACCEPTED,           'Accepted'),
-        (STATUS_COMMISSION_PENDING, 'Commission Pending'),
-        (STATUS_COMMISSION_PAID,    'Commission Paid'),
-        (STATUS_IN_PROGRESS,        'In Progress'),
-        (STATUS_COMPLETED,          'Completed'),
-        (STATUS_CANCELLED,          'Cancelled'),
-    ]
-
-    client      = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders_as_client')
-    provider    = models.ForeignKey(
-        ProviderProfile, on_delete=models.PROTECT,
-        related_name='orders_as_provider',
-        null=True, blank=True,           # null until a provider is matched/accepted
-    )
-    service     = models.ForeignKey(Service, on_delete=models.PROTECT, related_name='orders')
-    # Optional: link back to the AI session that created this order
-    ai_session  = models.ForeignKey(
-        AISession, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='orders'
-    )
-
-    status               = models.CharField(max_length=25, choices=STATUS_CHOICES, default=STATUS_PENDING)
-
-    # Problem context captured from client (via UI or AI)
-    problem_description  = models.TextField(blank=True)
-    budget_min           = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    budget_max           = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
-    # Job location (client's site, not provider's home)
-    address              = models.CharField(max_length=255, blank=True)
-    client_latitude      = models.FloatField(null=True, blank=True)
-    client_longitude     = models.FloatField(null=True, blank=True)
-
-    # KEY BUSINESS RULE: flipped to True only when CommissionPayment succeeds
-    client_phone_visible = models.BooleanField(default=False)
-
-    scheduled_at         = models.DateTimeField(null=True, blank=True)
-    cancellation_reason  = models.TextField(blank=True)
-    notes                = models.TextField(blank=True)
-    created_at           = models.DateTimeField(auto_now_add=True)
-    updated_at           = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'Order#{self.pk} [{self.status}] {self.client.username} → {self.service.title}'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# REVIEW  (one per completed order — supports two-way ratings)
-#
-# reviewer = person leaving the review (client or provider)
-# reviewee = person being reviewed     (provider or client)
-# This design supports client→provider AND provider→client reviews
-# without any schema change.
-# Rating is updated to ProviderProfile.avg_rating via a post-save signal.
-# ─────────────────────────────────────────────────────────────────────────────
-class Review(models.Model):
-    RATING_CHOICES = [(i, str(i)) for i in range(1, 6)]  # 1–5 stars
-
-    order    = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='review')
-    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_given')
-    reviewee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_received')
-    rating   = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
-    comment  = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Review'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'Review#{self.pk} — {self.rating}★ by {self.reviewer.username}'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# REWARD TRANSACTION  (append-only points ledger — never mutate rows)
-#
-# Balance = SUM(points WHERE type='earned') - SUM(points WHERE type='redeemed')
-# ─────────────────────────────────────────────────────────────────────────────
-class RewardTransaction(models.Model):
-    TYPE_EARNED   = 'earned'
-    TYPE_REDEEMED = 'redeemed'
-    TYPE_CHOICES  = [
-        (TYPE_EARNED,   'Earned'),
-        (TYPE_REDEEMED, 'Redeemed'),
-    ]
-
-    user        = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reward_transactions')
-    # null=True: rewards can be granted manually (e.g. sign-up bonus) without an order
-    order       = models.ForeignKey(
-        Order, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='reward_transactions'
-    )
-    points      = models.IntegerField(help_text='Positive = earned, Negative = redeemed')
-    type        = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    description = models.CharField(max_length=255, blank=True)
-    created_at  = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Reward Transaction'
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'Reward({self.user.username}, {self.type}, {self.points}pts)'
+        return f'OrderStatusLog(order={self.order_id}, {self.old_status} -> {self.new_status})'
