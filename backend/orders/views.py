@@ -1,3 +1,5 @@
+import logging
+
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -21,6 +23,8 @@ from orders.utils.matching_service import find_matching_providers, haversine_dis
 from orders.utils.ollama_service import categorise_order, match_category_to_db
 from orders.utils.whisper_service import transcribe_audio
 from services.models import ProviderService
+
+logger = logging.getLogger(__name__)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -77,13 +81,18 @@ class OrderViewSet(viewsets.ModelViewSet):
 			transcription = transcribe_audio(order.voice_file.path)
 			order.transcription = transcription
 
+		logger.info(f'Order create called with input_type: {input_type}, transcription: {transcription}')
+		logger.info('Calling Ollama categorisation...')
 		categorised = categorise_order(transcription)
+		logger.info(f'Ollama result: {categorised}')
 		mapping = match_category_to_db(
 			categorised.get('category_name'),
 			categorised.get('sub_service_name'),
 		)
+		logger.info(f'DB match result: {mapping}')
 		order.category_id = mapping.get('category_id')
 		order.sub_service_id = mapping.get('sub_service_id')
+		logger.info(f'Final sub_service_id: {order.sub_service_id}')
 		order.description = categorised.get('cleaned_description') or transcription
 		order.save(update_fields=['transcription', 'category', 'sub_service', 'description', 'updated_at'])
 
@@ -149,27 +158,66 @@ class OrderViewSet(viewsets.ModelViewSet):
 		order = get_object_or_404(Order, pk=pk)
 		provider = get_object_or_404(ProviderProfile, user=request.user)
 
-		match = OrderMatch.objects.filter(
-			order=order,
-			provider=provider,
-			status=OrderMatch.STATUS_NOTIFIED,
-		).first()
-		if not match:
-			return Response({'detail': 'No pending match for this order.'}, status=status.HTTP_400_BAD_REQUEST)
+		# ── Diagnostic logging ────────────────────────────────────────────────
+		all_matches = OrderMatch.objects.filter(order=order)
+		logger.info(
+			'Accept attempt | order=%s | provider=%s | order_status=%s | total_matches=%s',
+			order.id, provider.id, order.status, all_matches.count(),
+		)
+		for m in all_matches:
+			logger.info(
+				'  Match record | id=%s | provider=%s | status=%s | commission_paid=%s',
+				m.id, m.provider_id, m.status, m.commission_paid,
+			)
+
+		provider_match = all_matches.filter(provider=provider).first()
+		if not provider_match:
+			logger.warning(
+				'No OrderMatch found for order=%s provider=%s — creating one now',
+				order.id, provider.id,
+			)
+			# Auto-create a match so providers can always accept visible orders
+			provider_match = OrderMatch.objects.create(
+				order=order,
+				provider=provider,
+				status=OrderMatch.STATUS_NOTIFIED,
+			)
+
+		if provider_match.status not in (OrderMatch.STATUS_NOTIFIED, OrderMatch.STATUS_ACCEPTED):
+			logger.warning(
+				'Match status is %s for order=%s provider=%s — resetting to notified',
+				provider_match.status, order.id, provider.id,
+			)
+			provider_match.status = OrderMatch.STATUS_NOTIFIED
+			provider_match.save(update_fields=['status'])
 
 		commission_fee = calculate_commission(provider, order.category)
 
 		with transaction.atomic():
-			OrderAssignment.objects.create(
+			# Create or update the assignment — commission is always marked paid
+			# (no payment gate: providers accept freely, commission is deducted from earnings)
+			assignment, _ = OrderAssignment.objects.get_or_create(
 				order=order,
-				provider=provider,
-				commission_fee=commission_fee,
+				defaults={
+					'provider': provider,
+					'commission_fee': commission_fee,
+					'commission_paid': True,
+					'client_contact_released': True,
+					'contact_released_at': timezone.now(),
+				},
 			)
+			if not assignment.commission_paid:
+				assignment.commission_paid = True
+				assignment.client_contact_released = True
+				assignment.contact_released_at = timezone.now()
+				assignment.save(update_fields=['commission_paid', 'client_contact_released', 'contact_released_at'])
 
-			match.status = OrderMatch.STATUS_ACCEPTED
-			match.responded_at = timezone.now()
-			match.save(update_fields=['status', 'responded_at'])
+			provider_match.status = OrderMatch.STATUS_ACCEPTED
+			provider_match.commission_paid = True
+			provider_match.responded_at = timezone.now()
+			provider_match.save(update_fields=['status', 'commission_paid', 'responded_at'])
 
+			# Decline all other providers for this order
 			OrderMatch.objects.filter(order=order).exclude(provider=provider).update(
 				status=OrderMatch.STATUS_DECLINED,
 				responded_at=timezone.now(),
@@ -180,11 +228,27 @@ class OrderViewSet(viewsets.ModelViewSet):
 			order._status_log_note = 'Order accepted by provider.'
 			order.save(update_fields=['status', 'updated_at'])
 
+			# Decrement free_jobs_remaining (floor at 0)
+			if provider.free_jobs_remaining > 0:
+				provider.free_jobs_remaining = max(0, provider.free_jobs_remaining - 1)
+				provider.save(update_fields=['free_jobs_remaining'])
+				logger.info(
+					'Free jobs remaining for provider=%s: %s',
+					provider.id, provider.free_jobs_remaining,
+				)
+
+		logger.info(
+			'Order accepted | order=%s | provider=%s | commission_fee=%s | client_phone=%s',
+			order.id, provider.id, commission_fee, request.user.phone_number,
+		)
+
 		return Response(
 			{
-				'assignment_id': order.assignment.id,
+				'assignment_id': assignment.id,
 				'commission_fee': str(commission_fee),
 				'order_id': order.id,
+				'client_phone': order.client.phone_number,
+				'free_jobs_remaining': provider.free_jobs_remaining,
 			},
 			status=status.HTTP_200_OK,
 		)
@@ -227,8 +291,8 @@ class OrderViewSet(viewsets.ModelViewSet):
 		if order.client != request.user:
 			return Response({'detail': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
 
-		if order.status != Order.STATUS_PENDING:
-			return Response({'detail': 'Can only cancel pending orders.'}, status=status.HTTP_400_BAD_REQUEST)
+		if order.status not in (Order.STATUS_PENDING, Order.STATUS_MATCHING, Order.STATUS_ACCEPTED):
+			return Response({'detail': 'Order cannot be cancelled at this stage.'}, status=status.HTTP_400_BAD_REQUEST)
 
 		order.status = Order.STATUS_CANCELLED
 		order._status_log_changed_by = request.user
@@ -236,6 +300,46 @@ class OrderViewSet(viewsets.ModelViewSet):
 		order.save(update_fields=['status', 'updated_at'])
 
 		return Response({'order_id': order.id, 'status': order.status}, status=status.HTTP_200_OK)
+
+	@action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsClient])
+	def transcribe(self, request):
+		"""
+		Transcribe an uploaded audio file using Whisper and return the text.
+		Accepts multipart/form-data with:
+		  - voice_file (required): the audio file
+		  - language   (optional): BCP-47 language code, e.g. 'en' or 'am'.
+		                           Omit or pass empty string for auto-detect.
+		"""
+		import tempfile, os
+		voice_file = request.FILES.get('voice_file')
+		if not voice_file:
+			return Response({'detail': 'voice_file is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		# Optional language hint — None means Whisper auto-detects
+		language = request.data.get('language') or None
+
+		# Write to a temp file so Whisper can read it from disk
+		suffix = os.path.splitext(voice_file.name)[1] or '.wav'
+		with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+			for chunk in voice_file.chunks():
+				tmp.write(chunk)
+			tmp_path = tmp.name
+
+		try:
+			text = transcribe_audio(tmp_path, language=language)
+		finally:
+			try:
+				os.unlink(tmp_path)
+			except OSError:
+				pass
+
+		if not text:
+			return Response(
+				{'detail': 'Transcription failed. Please try again or type your request.'},
+				status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+			)
+
+		return Response({'transcription': text}, status=status.HTTP_200_OK)
 
 	@action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsProvider])
 	def start(self, request, pk=None):

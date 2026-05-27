@@ -85,6 +85,7 @@ class OrderMatch(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='matches')
     provider = models.ForeignKey(ProviderProfile, on_delete=models.CASCADE, related_name='order_matches')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NOTIFIED)
+    commission_paid = models.BooleanField(default=False)
     notified_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
 

@@ -169,6 +169,7 @@ class ProviderProfile(models.Model):
     avg_rating         = models.FloatField(default=0.0)
     total_reviews      = models.PositiveIntegerField(default=0)
     total_jobs         = models.PositiveIntegerField(default=0)
+    free_jobs_remaining = models.PositiveIntegerField(default=0)
     created_at         = models.DateTimeField(auto_now_add=True)
     updated_at         = models.DateTimeField(auto_now=True)
 

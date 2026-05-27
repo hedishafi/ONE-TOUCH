@@ -78,8 +78,8 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'created_at')
-    list_filter = ('is_available',)
+    list_display = ('provider_name_display', 'provider_uid_display', 'is_online', 'is_available', 'avg_rating', 'total_jobs', 'created_at')
+    list_filter = ('is_online', 'is_available')
     search_fields = ('user__username', 'user__phone_number', 'user__first_name', 'user__last_name', 'user__provider_uid', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
 

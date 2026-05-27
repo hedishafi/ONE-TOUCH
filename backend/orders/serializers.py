@@ -31,6 +31,8 @@ class OrderStatusLogSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+	client_name = serializers.SerializerMethodField()
+	client_phone = serializers.SerializerMethodField()
 	category_name = serializers.SerializerMethodField()
 	sub_service_name = serializers.SerializerMethodField()
 	assignment = OrderAssignmentSerializer(read_only=True)
@@ -40,6 +42,8 @@ class OrderSerializer(serializers.ModelSerializer):
 		fields = [
 			'id',
 			'client',
+			'client_name',
+			'client_phone',
 			'category',
 			'category_name',
 			'sub_service',
@@ -57,6 +61,14 @@ class OrderSerializer(serializers.ModelSerializer):
 			'expires_at',
 			'assignment',
 		]
+
+	def get_client_name(self, obj):
+		if not obj.client:
+			return None
+		return obj.client.get_full_name() or obj.client.username
+
+	def get_client_phone(self, obj):
+		return obj.client.phone_number if obj.client else None
 
 	def get_category_name(self, obj):
 		return obj.category.name if obj.category else None

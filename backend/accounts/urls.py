@@ -18,6 +18,7 @@ from .views import (
     ProviderGoOfflineView,
     ProviderUpdateLocationView,
     ProviderStatusView,
+    ProviderMeView,
     SearchNearbyProvidersView,
 )
 
@@ -53,6 +54,7 @@ urlpatterns = [
     path('provider/go-offline/', ProviderGoOfflineView.as_view(), name='provider-go-offline'),
     path('provider/update-location/', ProviderUpdateLocationView.as_view(), name='provider-update-location'),
     path('provider/status/', ProviderStatusView.as_view(), name='provider-status'),
+    path('provider/me/',     ProviderMeView.as_view(),     name='provider-me'),
     
     # ── Client Search Providers ────────────────────────────────────────────────
     path('client/search-providers/', SearchNearbyProvidersView.as_view(), name='search-nearby-providers'),

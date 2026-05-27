@@ -12,6 +12,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -1306,4 +1307,25 @@ class SearchNearbyProvidersView(APIView):
         return Response({
             'results': results,
             'count': len(results),
+        }, status=status.HTTP_200_OK)
+
+
+class ProviderMeView(APIView):
+    """
+    GET /api/v1/provider/me/
+    Returns the logged-in provider's profile summary including free_jobs_remaining.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            provider_profile = request.user.provider_profile
+        except ProviderProfile.DoesNotExist:
+            return _error_response('Provider profile not found.', http_status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'free_jobs_remaining': provider_profile.free_jobs_remaining,
+            'is_online': provider_profile.is_online,
+            'avg_rating': provider_profile.avg_rating,
+            'total_jobs': provider_profile.total_jobs,
         }, status=status.HTTP_200_OK)

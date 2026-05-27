@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from orders.models import Order, OrderAssignment, OrderStatusLog
+from orders.models import Order, OrderAssignment, OrderMatch, OrderStatusLog
 
 
 @receiver(pre_save, sender=Order)
@@ -42,10 +42,24 @@ def set_provider_unavailable(sender, instance, created, **kwargs):
 def set_provider_available_on_complete(sender, instance, **kwargs):
 	if instance.status != Order.STATUS_COMPLETED:
 		return
-	assignment = OrderAssignment.objects.filter(order=instance).first()
-	if assignment is None:
+	previous_status = getattr(instance, '_previous_status', '')
+	if previous_status == Order.STATUS_COMPLETED:
 		return
-	provider = assignment.provider
+
+	match = OrderMatch.objects.filter(
+		order=instance,
+		status=OrderMatch.STATUS_ACCEPTED,
+	).select_related('provider').first()
+	provider = match.provider if match else None
+	if provider is None:
+		assignment = OrderAssignment.objects.filter(order=instance).select_related('provider').first()
+		provider = assignment.provider if assignment else None
+	if provider is None:
+		return
+
+	provider.total_jobs = (provider.total_jobs or 0) + 1
+	if provider.free_jobs_remaining > 0:
+		provider.free_jobs_remaining -= 1
 	if not provider.is_available:
 		provider.is_available = True
-		provider.save(update_fields=['is_available', 'updated_at'])
+	provider.save(update_fields=['is_available', 'total_jobs', 'free_jobs_remaining', 'updated_at'])

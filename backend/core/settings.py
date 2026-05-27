@@ -193,3 +193,26 @@ CHAPA_BASE_URL        = 'https://api.chapa.co/v1'
 
 # ─── OpenAI (AI phase) ───────────────────────────────────────────────────────
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
+# ─── Logging ───────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'orders': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'services': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
