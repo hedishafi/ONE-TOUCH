@@ -7,6 +7,7 @@ import {
   IconShield,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -18,67 +19,68 @@ const ANIMATIONS = `
 .afu { animation: fadeUp 0.6s ease both; }
 `;
 
-const FAQ_CATEGORIES = [
-  {
-    icon: <IconBook size={20} />,
-    title: 'Booking & Services',
-    color: '#3498DB',
-    items: [
-      { q: 'How do I book a service on ONE TOUCH?', a: 'Browse available services, select a provider, call them via in-app VoIP to confirm details and pricing, then book through the platform. You\'ll receive instant confirmation.' },
-      { q: 'Can I reschedule or cancel a booking?', a: 'Yes, you can reschedule or cancel up to 2 hours before the scheduled time without penalty. Late cancellations may result in fees.' },
-      { q: 'What if the provider doesn\'t show up?', a: 'If a provider doesn\'t arrive as scheduled, contact our support team immediately. Your payment will be refunded and you\'ll be offered an alternative provider.' },
-      { q: 'How do I know if a provider is verified?', a: 'All providers on ONE TOUCH are verified through government ID checks. Look for the Verified badge on their profile.' },
-    ]
-  },
-  {
-    icon: <IconWallet size={20} />,
-    title: 'Payments & Wallet',
-    color: '#1ABC9C',
-    items: [
-      { q: 'What payment methods do you accept?', a: 'We accept mobile money (Telebirr, M-Pesa), bank transfers, and card payments. All payments are processed securely through our escrow system.' },
-      { q: 'How does escrow protection work?', a: 'Payment is held safely until you confirm the job is complete. Once confirmed, the provider receives the payment instantly.' },
-      { q: 'Can I get a refund?', a: 'Refunds are available if the service wasn\'t completed as agreed. Contact support within 24 hours with evidence, and we\'ll investigate and process refunds.' },
-      { q: 'Is there a transaction fee?', a: 'ONE TOUCH charges a small platform fee (varies by service) to process payments securely and maintain the platform.' },
-    ]
-  },
-  {
-    icon: <IconBriefcase size={20} />,
-    title: 'Provider Guidelines',
-    color: '#F39C12',
-    items: [
-      { q: 'How do I become a service provider?', a: 'Sign up as a provider, pass our identity verification, and upload your credentials. Setup takes 2-3 business days.' },
-      { q: 'What are the requirements?', a: 'Valid government ID, proof of skills/certifications (where applicable), and a reliable phone with internet access.' },
-      { q: 'How do I set my rates?', a: 'You control your pricing. Set hourly rates or fixed prices per service. Adjust anytime from your dashboard.' },
-      { q: 'How do I build my reputation?', a: 'Deliver quality work, respond quickly to clients, and encourage them to rate you. Higher ratings increase your visibility and bookings.' },
-    ]
-  },
-  {
-    icon: <IconShield size={20} />,
-    title: 'Account & Security',
-    color: '#E91E63',
-    items: [
-      { q: 'How do I secure my account?', a: 'Use a strong password, enable two-factor authentication, and never share your login details. ONE TOUCH never asks for passwords via email.' },
-      { q: 'Can I have multiple accounts?', a: 'No, each person should have one account. Having multiple accounts violates our terms and may result in permanent ban.' },
-      { q: 'What if I forget my password?', a: 'Click "Forgot Password" on the login page and follow the email instructions. If you don\'t receive the email, check your spam folder.' },
-      { q: 'How is my personal data protected?', a: 'We use bank-level encryption and security measures. Your data is never shared with third parties without your consent. See our Privacy Policy for details.' },
-    ]
-  },
-];
-
 export function HelpCenter() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const FAQ_CATEGORIES = [
+    {
+      icon: <IconBook size={20} />,
+      title: t('helpCenter.cat_booking_title'),
+      color: '#3498DB',
+      items: [
+        { q: t('helpCenter.cat_booking_q1'), a: t('helpCenter.cat_booking_a1') },
+        { q: t('helpCenter.cat_booking_q2'), a: t('helpCenter.cat_booking_a2') },
+        { q: t('helpCenter.cat_booking_q3'), a: t('helpCenter.cat_booking_a3') },
+        { q: t('helpCenter.cat_booking_q4'), a: t('helpCenter.cat_booking_a4') },
+      ],
+    },
+    {
+      icon: <IconWallet size={20} />,
+      title: t('helpCenter.cat_payments_title'),
+      color: '#1ABC9C',
+      items: [
+        { q: t('helpCenter.cat_payments_q1'), a: t('helpCenter.cat_payments_a1') },
+        { q: t('helpCenter.cat_payments_q2'), a: t('helpCenter.cat_payments_a2') },
+        { q: t('helpCenter.cat_payments_q3'), a: t('helpCenter.cat_payments_a3') },
+        { q: t('helpCenter.cat_payments_q4'), a: t('helpCenter.cat_payments_a4') },
+      ],
+    },
+    {
+      icon: <IconBriefcase size={20} />,
+      title: t('helpCenter.cat_provider_title'),
+      color: '#F39C12',
+      items: [
+        { q: t('helpCenter.cat_provider_q1'), a: t('helpCenter.cat_provider_a1') },
+        { q: t('helpCenter.cat_provider_q2'), a: t('helpCenter.cat_provider_a2') },
+        { q: t('helpCenter.cat_provider_q3'), a: t('helpCenter.cat_provider_a3') },
+        { q: t('helpCenter.cat_provider_q4'), a: t('helpCenter.cat_provider_a4') },
+      ],
+    },
+    {
+      icon: <IconShield size={20} />,
+      title: t('helpCenter.cat_security_title'),
+      color: '#E91E63',
+      items: [
+        { q: t('helpCenter.cat_security_q1'), a: t('helpCenter.cat_security_a1') },
+        { q: t('helpCenter.cat_security_q2'), a: t('helpCenter.cat_security_a2') },
+        { q: t('helpCenter.cat_security_q3'), a: t('helpCenter.cat_security_a3') },
+        { q: t('helpCenter.cat_security_q4'), a: t('helpCenter.cat_security_a4') },
+      ],
+    },
+  ];
 
   return (
     <>
       <style>{ANIMATIONS}</style>
       <Box style={{ minHeight: '100vh', background: '#FFFFFF', position: 'relative' }}>
-        
+
         {/* ── Header/Nav ── */}
         <Box px={{ base: 'lg', sm: 'xl' }} py="md"
           style={{
             position: 'sticky', top: 0, zIndex: 200, background: 'rgba(255,255,255,0.88)',
             backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-            borderBottom: '1px solid rgba(0,0,137,0.08)', boxShadow: '0 2px 16px rgba(0,0,137,0.05)'
+            borderBottom: '1px solid rgba(0,0,137,0.08)', boxShadow: '0 2px 16px rgba(0,0,137,0.05)',
           }}>
           <Group justify="space-between" maw={1140} mx="auto">
             <Group gap="md">
@@ -95,19 +97,19 @@ export function HelpCenter() {
               <Box style={{ minWidth: 60 }}>
                 <LanguageSwitcher />
               </Box>
-              <Button size="sm" style={{ color: 'white', fontWeight: 700, background: COLORS.tealBlue }} 
+              <Button size="sm" style={{ color: 'white', fontWeight: 700, background: COLORS.tealBlue }}
                 onClick={() => navigate(ROUTES.signup)}>
-                Sign Up
+                {t('helpCenter.nav_signup')}
               </Button>
             </Group>
           </Group>
         </Box>
 
-        {/* ── Decorative blobs ── */}
+        {/* ── Decorative blob ── */}
         <Box style={{
           position: 'absolute', top: -200, right: -180, width: 600, height: 600,
           borderRadius: '50%', background: 'radial-gradient(circle,rgba(0,0,137,0.05) 0%,transparent 70%)',
-          pointerEvents: 'none'
+          pointerEvents: 'none',
         }} />
 
         {/* ── Hero Section ── */}
@@ -117,15 +119,15 @@ export function HelpCenter() {
         }}>
           <Box style={{
             position: 'absolute', top: -100, right: -80, width: 400, height: 400,
-            borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none'
+            borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none',
           }} />
           <Container size="lg" px={{ base: 'md', sm: 'xl' }}>
             <Stack align="center" ta="center" gap="lg" style={{ position: 'relative' }}>
               <Text fw={900} size="4xl" c="white" style={{ letterSpacing: '-1px' }}>
-                Help Center
+                {t('helpCenter.hero_title')}
               </Text>
               <Text c="rgba(255,255,255,0.80)" size="lg" maw={600} style={{ lineHeight: 1.8 }}>
-                Find answers to common questions. Explore our comprehensive guides and documentation.
+                {t('helpCenter.hero_sub')}
               </Text>
             </Stack>
           </Container>
@@ -142,12 +144,12 @@ export function HelpCenter() {
                 style={{
                   background: 'white', border: '1.5px solid #E9ECEF', borderRadius: 20,
                   boxShadow: '0 4px 16px rgba(0,0,137,0.05)',
-                  animationDelay: `${idx * 0.1}s`
+                  animationDelay: `${idx * 0.1}s`,
                 }}
               >
                 <Group gap="md" mb="xl" align="flex-start">
                   <ThemeIcon size={48} radius="xl" style={{
-                    background: `${category.color}15`, color: category.color, flexShrink: 0
+                    background: `${category.color}15`, color: category.color, flexShrink: 0,
                   }}>
                     {category.icon}
                   </ThemeIcon>
@@ -156,10 +158,7 @@ export function HelpCenter() {
                   </Text>
                 </Group>
 
-                <Accordion
-                  defaultValue={category.items[0]?.q}
-                  style={{ border: 'none' }}
-                >
+                <Accordion defaultValue={category.items[0]?.q} style={{ border: 'none' }}>
                   {category.items.map((item, i) => (
                     <Accordion.Item
                       key={item.q}
@@ -170,15 +169,7 @@ export function HelpCenter() {
                         marginBottom: i < category.items.length - 1 ? '12px' : 0,
                       }}
                     >
-                      <Accordion.Control
-                        style={{
-                          padding: '12px 0',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            color: category.color,
-                          }
-                        }}
-                      >
+                      <Accordion.Control style={{ padding: '12px 0', transition: 'all 0.2s ease' }}>
                         <Text fw={600} size="sm" c={COLORS.navyBlue}>
                           {item.q}
                         </Text>
@@ -204,17 +195,17 @@ export function HelpCenter() {
               borderRadius: 28, position: 'relative', overflow: 'hidden', textAlign: 'center',
             }}>
               <Text fw={900} size="3xl" c="white" mb="sm" style={{ letterSpacing: '-0.5px' }}>
-                Need more help?
+                {t('helpCenter.cta_title')}
               </Text>
               <Text c="rgba(255,255,255,0.65)" mb="xl" size="md">
-                Contact our support team anytime. We're here to help you succeed.
+                {t('helpCenter.cta_sub')}
               </Text>
               <Group justify="center" gap="md" wrap="wrap">
                 <Button size="xl" style={{
                   background: COLORS.lemonYellow, color: COLORS.navyBlue, fontWeight: 800,
-                  padding: '14px 40px'
+                  padding: '14px 40px',
                 }} onClick={() => navigate(ROUTES.support)}>
-                  Contact Support
+                  {t('helpCenter.cta_btn')}
                 </Button>
               </Group>
             </Box>

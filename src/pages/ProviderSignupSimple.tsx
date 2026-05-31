@@ -16,12 +16,14 @@ import {
 import { IconAlertCircle, IconChevronLeft, IconMessageCircle, IconPhone } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import * as authService from '../services/authService';
 
 const PHONE_REGEX = /^(\+251|0)\d{9}$/;
 
 export default function ProviderSignupSimple() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -55,7 +57,7 @@ export default function ProviderSignupSimple() {
 
   const handleRequestOtp = async () => {
     if (!PHONE_REGEX.test(phone.trim())) {
-      setError('Please enter a valid Ethiopian phone number (+251911223344 or 0911223344).');
+      setError(t('providerSignupSimple.err_invalid_phone'));
       return;
     }
 
@@ -67,7 +69,7 @@ export default function ProviderSignupSimple() {
       setDemoOtp(response.otp_code ?? null);
       setStep(2);
       startTimer();
-      notifications.show({ title: 'OTP sent', message: 'Verification code sent successfully.', color: 'green' });
+      notifications.show({ title: t('providerSignupSimple.otp_sent_title'), message: t('providerSignupSimple.otp_sent_msg'), color: 'green' });
     } catch (err: any) {
       const message =
         err?.message ||
@@ -75,7 +77,7 @@ export default function ProviderSignupSimple() {
         err?.response?.data?.errors?.phone_number?.[0] ||
         err?.response?.data?.phone_number?.[0] ||
         err?.response?.data?.non_field_errors?.[0] ||
-        'Failed to send OTP. Please try again.';
+        t('providerSignupSimple.err_send_otp');
       setError(message);
       setPhoneRegistered(message.toLowerCase().includes('already registered'));
     } finally {
@@ -95,7 +97,7 @@ export default function ProviderSignupSimple() {
         otp_code: finalCode,
         role: 'provider',
       });
-      notifications.show({ title: 'Success', message: 'Phone verified successfully.', color: 'green' });
+      notifications.show({ title: t('providerSignupSimple.verify_success_title'), message: t('providerSignupSimple.verify_success_msg'), color: 'green' });
       navigate('/provider/profile-setup');
     } catch (err: any) {
       const message =
@@ -103,7 +105,7 @@ export default function ProviderSignupSimple() {
         err?.response?.data?.detail ||
         err?.response?.data?.errors?.otp_code?.[0] ||
         err?.response?.data?.otp_code?.[0] ||
-        'Failed to verify OTP. Please try again.';
+        t('providerSignupSimple.err_verify_otp');
       setError(message);
     } finally {
       setVerifying(false);
@@ -119,9 +121,9 @@ export default function ProviderSignupSimple() {
       setDemoOtp(response.otp_code ?? null);
       setOtp('');
       startTimer();
-      notifications.show({ title: 'Code resent', message: 'A new OTP has been sent.', color: 'blue' });
+      notifications.show({ title: t('providerSignupSimple.resent_title'), message: t('providerSignupSimple.resent_msg'), color: 'blue' });
     } catch (err: any) {
-      setError(err?.message || err?.response?.data?.detail || 'Failed to resend OTP.');
+      setError(err?.message || err?.response?.data?.detail || t('providerSignupSimple.err_resend'));
     } finally {
       setLoading(false);
     }
@@ -138,8 +140,8 @@ export default function ProviderSignupSimple() {
                   <IconPhone size={24} color="#008080" />
                 </Box>
                 <Stack gap={2}>
-                  <Title order={3}>Service Provider Signup</Title>
-                  <Text size="sm" c="dimmed">Enter your phone number to receive verification code.</Text>
+                  <Title order={3}>{t('providerSignupSimple.title')}</Title>
+                  <Text size="sm" c="dimmed">{t('providerSignupSimple.subtitle')}</Text>
                 </Stack>
               </Group>
 
@@ -149,13 +151,13 @@ export default function ProviderSignupSimple() {
 
               {phoneRegistered && (
                 <Button variant="light" onClick={() => navigate('/login')}>
-                  Go to Login
+                  {t('providerSignupSimple.go_to_login')}
                 </Button>
               )}
 
               <TextInput
-                label="Phone Number"
-                placeholder="+251911223344 or 0911223344"
+                label={t('providerSignupSimple.phone_label')}
+                placeholder={t('providerSignupSimple.phone_placeholder')}
                 value={phone}
                 onChange={(event) => setPhone(event.currentTarget.value)}
                 leftSection={<IconPhone size={16} />}
@@ -164,7 +166,7 @@ export default function ProviderSignupSimple() {
 
               <Group justify="flex-end">
                 <Button onClick={handleRequestOtp} disabled={!phone || loading} loading={loading}>
-                  {loading ? 'Sending...' : 'Send OTP'}
+                  {loading ? t('providerSignupSimple.sending') : t('providerSignupSimple.send_otp')}
                 </Button>
               </Group>
             </>
@@ -175,8 +177,8 @@ export default function ProviderSignupSimple() {
                   <IconMessageCircle size={24} color="#008080" />
                 </Box>
                 <Stack gap={2}>
-                  <Title order={3}>Verify OTP</Title>
-                  <Text size="sm" c="dimmed">Enter the 6-digit code sent to {phone}</Text>
+                  <Title order={3}>{t('providerSignupSimple.verify_title')}</Title>
+                  <Text size="sm" c="dimmed">{t('providerSignupSimple.verify_sub', { phone })}</Text>
                 </Stack>
               </Group>
 
@@ -185,8 +187,8 @@ export default function ProviderSignupSimple() {
               )}
 
               {demoOtp && (
-                <Alert icon={<IconAlertCircle size={16} />} color="blue" title="Demo mode">
-                  OTP code: <strong>{demoOtp}</strong>
+                <Alert icon={<IconAlertCircle size={16} />} color="blue" title={t('providerSignupSimple.demo_title')}>
+                  {t('providerSignupSimple.demo_otp_label')} <strong>{demoOtp}</strong>
                 </Alert>
               )}
 
@@ -213,7 +215,7 @@ export default function ProviderSignupSimple() {
                   }}
                   disabled={loading || verifying}
                 >
-                  Back
+                  {t('providerSignupSimple.back')}
                 </Button>
 
                 <Stack gap={4} align="flex-end">
@@ -222,13 +224,13 @@ export default function ProviderSignupSimple() {
                     disabled={otp.length !== 6 || loading || verifying}
                     loading={verifying}
                   >
-                    {verifying ? 'Verifying...' : 'Verify'}
+                    {verifying ? t('providerSignupSimple.verifying') : t('providerSignupSimple.verify')}
                   </Button>
                   {seconds > 0 ? (
-                    <Text size="xs" c="dimmed">Resend in {seconds}s</Text>
+                    <Text size="xs" c="dimmed">{t('providerSignupSimple.resend_in', { seconds })}</Text>
                   ) : (
                     <Button variant="subtle" size="xs" onClick={handleResendOtp} disabled={loading || verifying}>
-                      Resend code
+                      {t('providerSignupSimple.resend_code')}
                     </Button>
                   )}
                 </Stack>

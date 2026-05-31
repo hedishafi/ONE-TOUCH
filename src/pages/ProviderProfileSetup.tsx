@@ -22,11 +22,13 @@ import {
 import { IconAlertCircle, IconInfoCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
 import { setupProviderProfile } from '../services/providerProfileService';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 export default function ProviderProfileSetup() {
   const MIN_PRICE_RATIO = 0.5;
+  const { t } = useTranslation();
 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -52,14 +54,14 @@ export default function ProviderProfileSetup() {
   })) ?? [];
 
   const validateForm = () => {
-    if (!fullName.trim()) return 'Full name is required.';
-    if (!serviceCategoryId) return 'Service category is required.';
-    if (!subServiceIds.length) return 'Please select at least one sub service.';
-    if (priceMax === '') return 'Maximum price is required.';
-    if (Number(priceMax) <= 0) return 'Maximum price must be greater than 0.';
+    if (!fullName.trim()) return t('providerProfileSetup.err_full_name');
+    if (!serviceCategoryId) return t('providerProfileSetup.err_category');
+    if (!subServiceIds.length) return t('providerProfileSetup.err_sub_service');
+    if (priceMax === '') return t('providerProfileSetup.err_price_max_required');
+    if (Number(priceMax) <= 0) return t('providerProfileSetup.err_price_max_zero');
     const min = Number(calculatedPriceMin);
     const max = Number(priceMax);
-    if (min > max) return 'Calculated minimum price must be less than or equal to maximum price.';
+    if (min > max) return t('providerProfileSetup.err_price_min_exceeds');
     return null;
   };
 
@@ -90,15 +92,15 @@ export default function ProviderProfileSetup() {
       });
 
       notifications.show({
-        title: 'Profile Saved',
-        message: 'Profile setup completed successfully. Proceeding to identity upload.',
+        title: t('providerProfileSetup.saved_title'),
+        message: t('providerProfileSetup.saved_msg'),
         color: 'green',
       });
 
       navigate('/provider/onboarding/step1');
     } catch (err: any) {
       const detail = err?.response?.data;
-      const fallback = 'Failed to save profile setup.';
+      const fallback = t('providerProfileSetup.err_save_fallback');
       const message =
         detail?.detail ||
         detail?.message ||
@@ -132,8 +134,8 @@ export default function ProviderProfileSetup() {
               <IconUserCheck size={24} color="#008080" />
             </Box>
             <Stack gap={2}>
-              <Title order={3}>Profile Setup</Title>
-              <Text size="sm" c="dimmed">Complete your provider profile, then continue to identity upload.</Text>
+              <Title order={3}>{t('providerProfileSetup.title')}</Title>
+              <Text size="sm" c="dimmed">{t('providerProfileSetup.sub')}</Text>
             </Stack>
           </Group>
 
@@ -157,24 +159,28 @@ export default function ProviderProfileSetup() {
               <FileButton accept="image/*" onChange={setProfilePicture}>
                 {(props) => (
                   <Button {...props} variant="light" leftSection={<IconUpload size={16} />}>
-                    {profilePicture ? 'Change Profile Picture' : 'Upload Profile Picture'}
+                    {profilePicture
+                      ? t('providerProfileSetup.photo_change')
+                      : t('providerProfileSetup.photo_upload')}
                   </Button>
                 )}
               </FileButton>
-              <Text size="xs" c="dimmed">Supported: JPG, PNG, WEBP</Text>
+              <Text size="xs" c="dimmed">{t('providerProfileSetup.photo_hint')}</Text>
             </Stack>
           </Group>
 
           <TextInput
-            label="Full Name"
+            label={t('providerProfileSetup.full_name_label')}
             value={fullName}
             onChange={(event) => setFullName(event.currentTarget.value)}
             required
           />
 
           <Select
-            label="Service Category"
-            placeholder={catalogLoading ? 'Loading categories...' : 'Select a category'}
+            label={t('providerProfileSetup.category_label')}
+            placeholder={catalogLoading
+              ? t('providerProfileSetup.category_loading')
+              : t('providerProfileSetup.category_placeholder')}
             data={categories.map((category) => ({ value: category.id, label: category.name }))}
             value={serviceCategoryId}
             onChange={(value) => {
@@ -186,8 +192,10 @@ export default function ProviderProfileSetup() {
           />
 
           <MultiSelect
-            label="Sub Services"
-            placeholder={serviceCategoryId ? 'Select sub services' : 'Select a category first'}
+            label={t('providerProfileSetup.sub_services_label')}
+            placeholder={serviceCategoryId
+              ? t('providerProfileSetup.sub_services_placeholder')
+              : t('providerProfileSetup.sub_services_placeholder_no_category')}
             data={subServiceOptions}
             value={subServiceIds}
             onChange={setSubServiceIds}
@@ -199,14 +207,14 @@ export default function ProviderProfileSetup() {
           <Group grow>
             <Box>
               <Group gap={6} mb={4}>
-                <Text size="sm" fw={500}>Minimum Price (ETB)</Text>
+                <Text size="sm" fw={500}>{t('providerProfileSetup.price_min_label')}</Text>
                 <Tooltip
                   multiline
                   w={280}
                   withArrow
-                  label="Minimum price is automatically set to 50% of your maximum price to support a fair and consistent marketplace policy."
+                  label={t('providerProfileSetup.price_min_tooltip')}
                 >
-                  <ActionIcon variant="subtle" size="sm" aria-label="Minimum price rule information">
+                  <ActionIcon variant="subtle" size="sm" aria-label={t('providerProfileSetup.price_min_aria')}>
                     <IconInfoCircle size={16} />
                   </ActionIcon>
                 </Tooltip>
@@ -220,7 +228,7 @@ export default function ProviderProfileSetup() {
               />
             </Box>
             <NumberInput
-              label="Maximum Price (ETB)"
+              label={t('providerProfileSetup.price_max_label')}
               value={priceMax}
               onChange={(value) => setPriceMax(value === '' ? '' : Number(value))}
               min={0}
@@ -229,16 +237,16 @@ export default function ProviderProfileSetup() {
           </Group>
 
           <Textarea
-            label="Bio"
+            label={t('providerProfileSetup.bio_label')}
             value={bio}
             onChange={(event) => setBio(event.currentTarget.value)}
             minRows={3}
-            placeholder="Tell clients about your experience"
+            placeholder={t('providerProfileSetup.bio_placeholder')}
           />
 
           <Group justify="flex-end">
             <Button onClick={handleSubmit} loading={loading}>
-              Save & Continue to Identity Upload
+              {t('providerProfileSetup.submit_btn')}
             </Button>
           </Group>
         </Stack>

@@ -18,6 +18,7 @@ import {
   IconArrowLeft,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { NearbyProvidersMap } from '../components/NearbyProvidersMap';
 import { COLORS, ROUTES } from '../utils/constants';
@@ -27,13 +28,14 @@ const N = COLORS.navyBlue;
 
 export function SearchProviders() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const { currentUser, clientProfile, logout } = useAuthStore();
   const [sidebar, setSidebar] = useState(false);
 
   const handleProviderSelect = (provider: any) => {
     notifications.show({
-      title: 'Provider Selected',
-      message: `You selected ${provider.full_name}. Call them to book a service.`,
+      title: t('searchProviders.provider_selected_title'),
+      message: t('searchProviders.provider_selected_msg', { name: provider.full_name }),
       color: 'teal',
     });
   };
@@ -104,7 +106,7 @@ export function SearchProviders() {
             </Avatar>
             <Box>
               <Text size="sm" fw={700}>
-                {clientProfile?.fullName ?? 'Client'}
+                {clientProfile?.fullName ?? t('searchProviders.default_client')}
               </Text>
               <Text size="xs" c="var(--ot-text-muted)">
                 {currentUser?.phone}
@@ -129,7 +131,7 @@ export function SearchProviders() {
               cursor: 'pointer',
             }}
           >
-            <IconLogout size={18} /> Sign out
+            <IconLogout size={18} /> {t('searchProviders.sign_out')}
           </Box>
         </Box>
       </Box>
@@ -171,7 +173,7 @@ export function SearchProviders() {
                   </Text>
                 </Box>
                 <Text fw={800} size="sm" c={N} visibleFrom="sm">
-                  Find Nearby Providers
+                  {t('searchProviders.page_title')}
                 </Text>
               </Group>
             </Group>
@@ -212,7 +214,7 @@ export function SearchProviders() {
             leftSection={<IconArrowLeft size={16} />}
             onClick={() => nav(ROUTES.clientDashboard)}
           >
-            Back to Home
+            {t('searchProviders.back_to_home')}
           </Button>
         </Group>
       </Box>

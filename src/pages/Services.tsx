@@ -9,6 +9,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import type { Category } from '../types';
@@ -75,6 +76,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 export function Services() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { categories } = useServiceCatalog();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const selectedSkills = selectedCategory?.subcategories ?? [];
@@ -122,7 +124,7 @@ export function Services() {
               </Box>
               <Button className="btn-teal" size="sm" style={{ color: 'white', fontWeight: 700 }} 
                 onClick={() => navigate(ROUTES.signup)}>
-                Sign Up
+                {t('services.sign_up')}
               </Button>
             </Group>
           </Group>
@@ -151,17 +153,17 @@ export function Services() {
                     background: `${COLORS.tealBlue}15`, color: COLORS.tealBlue,
                     border: `1px solid ${COLORS.tealBlue}25`, fontWeight: 700
                   }}>
-                  Browse Services
+                  {t('services.browse_badge')}
                 </Badge>
                 <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px' }}>
-                  Find the service you need
+                  {t('services.find_title')}
                 </Text>
                 <Box style={{
                   width: 64, height: 4, borderRadius: 2,
                   background: `linear-gradient(90deg,${COLORS.tealBlue},${COLORS.navyBlue})`
                 }} />
                 <Text size="md" c="dimmed" ta="center" maw={500} mt={8}>
-                  Browse verified service categories and select one to see available sub-services and providers near you.
+                  {t('services.find_sub')}
                 </Text>
               </Stack>
 
@@ -196,7 +198,7 @@ export function Services() {
                       </ThemeIcon>
                       <div>
                         <Text fw={700} size="sm" c={COLORS.navyBlue}>{cat.name}</Text>
-                        <Text size="xs" c="dimmed" mt={4}>{cat.subcategories.length} services</Text>
+                        <Text size="xs" c="dimmed" mt={4}>{t('services.services_count', { count: cat.subcategories.length })}</Text>
                       </div>
                     </Stack>
                   </Paper>
@@ -216,7 +218,7 @@ export function Services() {
                     </Button>
                     <Stack gap={0}>
                       <Text fw={900} size="2xl" c={COLORS.navyBlue}>{selectedCategory.name}</Text>
-                      <Text size="sm" c="dimmed">{selectedSkills.length} sub-services available</Text>
+                      <Text size="sm" c="dimmed">{t('services.sub_services_count', { count: selectedSkills.length })}</Text>
                     </Stack>
                   </Group>
                   <ThemeIcon size={60} radius="xl"
@@ -229,7 +231,7 @@ export function Services() {
 
                 {/* Subcategories */}
                 <Stack gap="xs">
-                  <Text fw={700} size="md" c={COLORS.navyBlue} mb="md">Sub-Services:</Text>
+                  <Text fw={700} size="md" c={COLORS.navyBlue} mb="md">{t('services.sub_services_label')}</Text>
                   {selectedSkills.map((sub, i) => (
                     <Paper
                       key={sub.id}
@@ -251,13 +253,13 @@ export function Services() {
                           </Box>
                           <div>
                             <Text fw={600} size="sm" c={COLORS.navyBlue}>{sub.name}</Text>
-                            <Text size="xs" c="dimmed" mt={2}>Find verified providers</Text>
+                            <Text size="xs" c="dimmed" mt={2}>{t('services.find_verified_providers')}</Text>
                           </div>
                         </Group>
                         <Button size="sm" variant="subtle" className="btn-teal"
                           style={{ color: 'white', fontWeight: 700 }}
                           onClick={() => navigate(ROUTES.signup)}>
-                          Browse
+                          {t('services.browse_btn')}
                         </Button>
                       </Group>
                     </Paper>
@@ -281,10 +283,10 @@ export function Services() {
                   borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none'
                 }} />
                 <Text fw={900} size="3xl" c="white" mb="sm" style={{ letterSpacing: '-0.5px', position: 'relative' }}>
-                  Ready to book a service?
+                  {t('services.cta_title')}
                 </Text>
                 <Text c="rgba(255,255,255,0.65)" mb="xl" size="md" style={{ position: 'relative' }}>
-                  Create an account to browse available providers and book instantly.
+                  {t('services.cta_sub')}
                 </Text>
                 <Group justify="center" gap="md" wrap="wrap" style={{ position: 'relative' }}>
                   <Button size="xl" style={{
@@ -300,7 +302,7 @@ export function Services() {
                       (e.currentTarget as HTMLElement).style.boxShadow = '';
                     }}
                     onClick={() => navigate(ROUTES.signup)}>
-                    Sign Up Now
+                    {t('services.cta_btn')}
                   </Button>
                 </Group>
               </Box>

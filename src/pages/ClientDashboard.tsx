@@ -8,7 +8,7 @@ import {
 import {
   IconSearch, IconMapPin, IconFilter, IconList, IconMap,
   IconHeart, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
-  IconCreditCard, IconCircleFilled,
+  IconCreditCard, IconCircleFilled, IconHistory,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -37,7 +37,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// ─── BROWSE SERVICES (MAIN CLIENT PAGE) ───────────────────────────────────────
+// ─── BROWSE SERVICES ──────────────────────────────────────────────────────────
 export function BrowseServices() {
   const { t } = useTranslation();
   const { startCall } = useCallFlowStore();
@@ -49,7 +49,7 @@ export function BrowseServices() {
   const [bookProviderId, setBookProviderId] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
-  const userLat = 9.0320;  // Addis Ababa, Ethiopia
+  const userLat = 9.0320;
   const userLng = 38.7469;
 
   useEffect(() => {
@@ -76,17 +76,11 @@ export function BrowseServices() {
     storage.set(STORAGE_KEYS.savedProviders, next);
   };
 
-  const handleCall = (p: ProviderProfile) => {
-    startCall(p.userId);
-    setCallOpen(true);
-  };
-
-  const handleBook = (p: ProviderProfile) => {
-    setBookProviderId(p.userId);
-  };
+  const handleCall = (p: ProviderProfile) => { startCall(p.userId); setCallOpen(true); };
+  const handleBook = (p: ProviderProfile) => { setBookProviderId(p.userId); };
 
   const catOptions = [
-    { value: '', label: 'All Categories' },
+    { value: '', label: t('client.filter_category') },
     ...categories.map(c => ({ value: c.id, label: c.name })),
   ];
 
@@ -116,18 +110,14 @@ export function BrowseServices() {
           <ActionIcon.Group>
             <ActionIcon
               variant={viewMode === 'list' ? 'filled' : 'default'}
-              color="navy"
-              size="lg"
-              radius="xl"
+              color="navy" size="lg" radius="xl"
               onClick={() => setViewMode('list')}
             >
               <IconList size={18} />
             </ActionIcon>
             <ActionIcon
               variant={viewMode === 'map' ? 'filled' : 'default'}
-              color="teal"
-              size="lg"
-              radius="xl"
+              color="teal" size="lg" radius="xl"
               onClick={() => setViewMode('map')}
             >
               <IconMap size={18} />
@@ -138,10 +128,12 @@ export function BrowseServices() {
         {/* Results count */}
         <Group gap="xs">
           <IconCircleFilled size={8} color={COLORS.tealBlue} />
-          <Text size="sm" c="dimmed">{withDistance.length} providers near you</Text>
+          <Text size="sm" c="dimmed">
+            {t('client.providers_near_you', { count: withDistance.length })}
+          </Text>
           <Badge size="xs" color="teal" variant="light" style={{ marginLeft: 'auto' }}>
             <IconMapPin size={10} style={{ marginRight: 4 }} />
-            New York, NY
+            {t('client.location_label')}
           </Badge>
         </Group>
 
@@ -166,21 +158,21 @@ export function BrowseServices() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution="© OpenStreetMap contributors"
               />
-              {/* User position */}
               <Circle center={[userLat, userLng]} radius={500} color={COLORS.tealBlue} fillOpacity={0.15} />
               {withDistance.map(p => (
-                <Marker key={p.userId} position={[p.lat ?? 40.7128, p.lng ?? -74.006]}>
+                <Marker key={p.userId} position={[p.lat ?? 9.0320, p.lng ?? 38.7469]}>
                   <Popup>
                     <Stack gap={4} p="xs">
-                      <Text fw={700} size="sm">{p.bio?.split('.')[0] ?? 'Service Provider'}</Text>
+                      <Text fw={700} size="sm">
+                        {p.bio?.split('.')[0] ?? t('client.service_provider_default')}
+                      </Text>
                       <Badge size="xs" color={p.isOnline ? 'teal' : 'gray'}>
-                        {p.isOnline ? 'Online' : 'Offline'}
+                        {p.isOnline ? t('provider.online') : t('provider.offline')}
                       </Badge>
                       <Text size="xs">⭐ {p.rating} · ~{p.distance.toFixed(1)} km</Text>
                     </Stack>
                   </Popup>
                 </Marker>
-                
               ))}
             </MapContainer>
           </Box>
@@ -214,24 +206,28 @@ export function BookingHistory() {
   const displayed = filterStatus ? myJobs.filter(j => j.status === filterStatus) : myJobs;
 
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: 'completed', label: '✅ Completed' },
-    { value: 'in_progress', label: '🔨 In Progress' },
-    { value: 'pending_agreement', label: '⏳ Pending' },
-    { value: 'cancelled', label: '❌ Cancelled' },
-    { value: 'disputed', label: '⚖️ Disputed' },
+    { value: '', label: t('client.status_all') },
+    { value: 'completed',         label: t('client.status_completed') },
+    { value: 'in_progress',       label: t('client.status_in_progress') },
+    { value: 'pending_agreement', label: t('client.status_pending') },
+    { value: 'cancelled',         label: t('client.status_cancelled') },
+    { value: 'disputed',          label: t('client.status_disputed') },
   ];
 
   return (
     <DashboardLayout title={t('client.my_bookings')}>
       <Stack gap="md">
         <Group justify="space-between">
-          <Text size="sm" c="dimmed">{displayed.length} {filterStatus ? 'matching' : 'total'} bookings</Text>
+          <Text size="sm" c="dimmed">
+            {filterStatus
+              ? t('client.bookings_count_matching', { count: displayed.length })
+              : t('client.bookings_count_total', { count: displayed.length })}
+          </Text>
           <Select
             data={statusOptions}
             value={filterStatus ?? ''}
             onChange={v => setFilterStatus(v || null)}
-            placeholder="Filter by status"
+            placeholder={t('client.filter_by_status')}
             w={190}
             radius="xl"
             size="sm"
@@ -243,7 +239,7 @@ export function BookingHistory() {
               <ThemeIcon size={56} radius="xl" color="gray" variant="light">
                 <IconHistory size={28} />
               </ThemeIcon>
-              <Text c="dimmed">No bookings found</Text>
+              <Text c="dimmed">{t('client.no_bookings')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -290,7 +286,7 @@ export function SavedProviders() {
                 <IconHeart size={28} />
               </ThemeIcon>
               <Text fw={600}>{t('client.no_saved')}</Text>
-              <Text c="dimmed" size="sm">Browse services and tap the heart to save providers.</Text>
+              <Text c="dimmed" size="sm">{t('client.no_saved_hint')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -309,8 +305,18 @@ export function SavedProviders() {
           </SimpleGrid>
         )}
       </Stack>
-      <CallModal opened={callOpen} onClose={() => setCallOpen(false)} onJobCreated={(pid) => { setBookProviderId(pid); setCallOpen(false); }} />
-      {bookProviderId && <JobFlowModal providerId={bookProviderId} opened={!!bookProviderId} onClose={() => setBookProviderId(null)} />}
+      <CallModal
+        opened={callOpen}
+        onClose={() => setCallOpen(false)}
+        onJobCreated={(pid) => { setBookProviderId(pid); setCallOpen(false); }}
+      />
+      {bookProviderId && (
+        <JobFlowModal
+          providerId={bookProviderId}
+          opened={!!bookProviderId}
+          onClose={() => setBookProviderId(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }
@@ -321,12 +327,14 @@ export function ClientWallet() {
   const { currentUser } = useAuthStore();
   const [topUpAmount, setTopUpAmount] = useState<number>(50);
   const [isTopping, setIsTopping] = useState(false);
+
   type ClientProfileStore = {
     userId: string;
     walletBalance?: number;
     loyaltyTier?: string;
     totalBookings?: number;
   };
+
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, [])
     .filter(tx => tx.userId === currentUser?.id);
   const profiles = storage.get<ClientProfileStore[]>(STORAGE_KEYS.clientProfiles, []);
@@ -337,7 +345,11 @@ export function ClientWallet() {
     setIsTopping(true);
     setTimeout(() => {
       setIsTopping(false);
-      notifications.show({ title: `+${formatCurrency(topUpAmount)} Added!`, message: 'Wallet topped up successfully.', color: 'teal' });
+      notifications.show({
+        title: t('wallet.topup_success_title'),
+        message: t('wallet.topup_success_msg'),
+        color: 'teal',
+      });
     }, 1500);
   };
 
@@ -357,8 +369,8 @@ export function ClientWallet() {
             <Text size="sm" c="rgba(255,255,255,0.7)" fw={500}>{t('wallet.balance')}</Text>
             <Text style={{ fontSize: 42 }} fw={800} c="white">{formatCurrency(balance)}</Text>
             <Group gap="xs">
-              <Badge color="yellow" variant="filled" size="sm">🔒 Escrow Protected</Badge>
-              <Badge color="teal" variant="light" size="sm">✅ Instant Top-Up</Badge>
+              <Badge color="yellow" variant="filled" size="sm">{t('wallet.escrow_protected')}</Badge>
+              <Badge color="teal" variant="light" size="sm">{t('wallet.instant_topup')}</Badge>
             </Group>
           </Stack>
         </Box>
@@ -371,12 +383,11 @@ export function ClientWallet() {
               <Button
                 key={amt}
                 variant={topUpAmount === amt ? 'filled' : 'light'}
-                color="teal"
-                size="sm"
+                color="teal" size="sm"
                 onClick={() => setTopUpAmount(amt)}
                 radius="xl"
               >
-                +${amt}
+                +{formatCurrency(amt)}
               </Button>
             ))}
           </Group>
@@ -385,7 +396,6 @@ export function ClientWallet() {
               flex={1}
               value={topUpAmount}
               onChange={v => setTopUpAmount(Number(v))}
-              prefix="$"
               min={5}
               leftSection={<IconCreditCard size={16} />}
             />
@@ -399,22 +409,23 @@ export function ClientWallet() {
         <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
           <Group p="lg" pb="xs" justify="space-between">
             <Text fw={700}>{t('wallet.transaction_history')}</Text>
-            <Badge size="sm" color="gray" variant="light">{txns.length} transactions</Badge>
+            <Badge size="sm" color="gray" variant="light">
+              {t('wallet.tx_count', { count: txns.length })}
+            </Badge>
           </Group>
           <Divider />
           <ScrollArea h={360}>
             {txns.length === 0 ? (
               <Center py={40}>
-                <Text c="dimmed" size="sm">No transactions yet</Text>
+                <Text c="dimmed" size="sm">{t('wallet.no_transactions')}</Text>
               </Center>
             ) : (
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Type</Table.Th>
-                    <Table.Th>Amount</Table.Th>
-                    <Table.Th>Date</Table.Th>
-
+                    <Table.Th>{t('wallet.col_type')}</Table.Th>
+                    <Table.Th>{t('wallet.col_amount')}</Table.Th>
+                    <Table.Th>{t('wallet.col_date')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -422,7 +433,9 @@ export function ClientWallet() {
                     <Table.Tr key={tx.id}>
                       <Table.Td>
                         <Group gap="xs">
-                          {tx.amount > 0 ? <IconArrowDown size={14} color="teal" /> : <IconArrowUp size={14} color="red" />}
+                          {tx.amount > 0
+                            ? <IconArrowDown size={14} color="teal" />
+                            : <IconArrowUp size={14} color="red" />}
                           <Text size="sm" tt="capitalize">{tx.type.replace(/_/g, ' ')}</Text>
                         </Group>
                       </Table.Td>
@@ -431,7 +444,9 @@ export function ClientWallet() {
                           {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount)}
                         </Text>
                       </Table.Td>
-                      <Table.Td><Text size="xs" c="dimmed">{formatTimeAgo(tx.createdAt)}</Text></Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c="dimmed">{formatTimeAgo(tx.createdAt)}</Text>
+                      </Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
@@ -448,12 +463,14 @@ export function ClientWallet() {
 export function ClientLoyalty() {
   const { t } = useTranslation();
   const { currentUser } = useAuthStore();
+
   type ClientProfileStore = {
     userId: string;
     walletBalance?: number;
     loyaltyTier?: string;
     totalBookings?: number;
   };
+
   const profiles = storage.get<ClientProfileStore[]>(STORAGE_KEYS.clientProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
   const tier = (myProfile?.loyaltyTier ?? 'bronze') as keyof typeof CLIENT_TIER_COLORS;
@@ -466,7 +483,7 @@ export function ClientLoyalty() {
     : 100;
 
   const tierColor = (CLIENT_TIER_COLORS as Record<string, string>)[tier] ?? '#CD7F32';
-  const tierLabel = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' }[tier] ?? tier;
+  const tierLabel = t(`loyalty.${tier}`, { defaultValue: tier });
 
   return (
     <DashboardLayout title={t('client.loyalty')}>
@@ -496,10 +513,15 @@ export function ClientLoyalty() {
                 <Badge size="lg" style={{ background: tierColor, color: 'white' }}>{tierLabel}</Badge>
                 <Text fw={800} size="xl" c={COLORS.navyBlue}>{t('loyalty.member')}</Text>
               </Group>
-              <Text size="sm" c="dimmed">{totalBookings} bookings completed</Text>
+              <Text size="sm" c="dimmed">
+                {t('loyalty.bookings_completed', { count: totalBookings })}
+              </Text>
               {nextTierConfig && (
                 <Text size="xs" c="dimmed">
-                  {nextTierConfig.minBookings - totalBookings} more to reach {nextTierConfig.tier.charAt(0).toUpperCase() + nextTierConfig.tier.slice(1)}
+                  {t('loyalty.more_to_reach', {
+                    remaining: nextTierConfig.minBookings - totalBookings,
+                    tier: nextTierConfig.tier.charAt(0).toUpperCase() + nextTierConfig.tier.slice(1),
+                  })}
                 </Text>
               )}
               <Progress value={progress} color={tierColor} radius="xl" size="sm" h={6} w={200} />
@@ -507,7 +529,7 @@ export function ClientLoyalty() {
           </Group>
         </Box>
 
-        {/* Benefits */}
+        {/* Benefits grid */}
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           {tiers.map(ct => {
             const tc = (CLIENT_TIER_COLORS as Record<string, string>)[ct.tier] ?? '#CD7F32';
@@ -517,11 +539,15 @@ export function ClientLoyalty() {
                 style={{ border: isActive ? `2px solid ${tc}` : undefined, opacity: isActive ? 1 : 0.65 }}>
                 <Stack gap="xs">
                   <Group justify="space-between">
-                    <Badge style={{ background: tc, color: 'white' }} size="sm">{ct.tier.toUpperCase()}</Badge>
-                    {isActive && <Badge color="teal" size="xs">Current</Badge>}
+                    <Badge style={{ background: tc, color: 'white' }} size="sm">
+                      {ct.tier.toUpperCase()}
+                    </Badge>
+                    {isActive && <Badge color="teal" size="xs">{t('loyalty.current')}</Badge>}
                   </Group>
                   <Text size="lg" fw={800} c={tc}>{ct.cashbackRate}% {t('loyalty.cashback')}</Text>
-                  <Text size="xs" c="dimmed">From {ct.minBookings} bookings</Text>
+                  <Text size="xs" c="dimmed">
+                    {t('loyalty.from_bookings', { count: ct.minBookings })}
+                  </Text>
                   <Divider />
                   <Stack gap={4}>
                     {ct.benefits.map((perk: string) => (
@@ -537,16 +563,17 @@ export function ClientLoyalty() {
           })}
         </SimpleGrid>
 
-        {/* Cashback History */}
+        {/* Cashback History — mock data, labels translated */}
         <Card radius="lg" withBorder p="lg">
-          <Text fw={700} mb="md">💰 Cashback Earned</Text>
+          <Text fw={700} mb="md">{t('loyalty.cashback_earned')}</Text>
           <Stack gap="xs">
             {[
               { label: 'Completed "Plumbing Fix"', amount: '+$4.50', date: '2 days ago', color: 'teal' },
               { label: 'Completed "Electrical Repair"', amount: '+$7.20', date: '5 days ago', color: 'teal' },
               { label: 'Completed "House Cleaning"', amount: '+$6.00', date: '1 week ago', color: 'teal' },
             ].map((item, i) => (
-              <Group key={i} justify="space-between" p="sm" style={{ borderRadius: 10, background: '#F8F9FA' }}>
+              <Group key={i} justify="space-between" p="sm"
+                style={{ borderRadius: 10, background: '#F8F9FA' }}>
                 <Stack gap={2}>
                   <Text size="sm" fw={500}>{item.label}</Text>
                   <Text size="xs" c="dimmed">{item.date}</Text>

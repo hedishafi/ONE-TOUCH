@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -200,6 +202,8 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=255)
     service_category = serializers.CharField(max_length=100)
     sub_services = serializers.ListField(child=serializers.CharField(max_length=100), allow_empty=False)
+    price_min = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, min_value=Decimal('0'))
+    price_max = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True, min_value=Decimal('0'))
     bio = serializers.CharField(required=False, allow_blank=True)
     profile_picture = serializers.ImageField(required=False, allow_null=True)
 
@@ -245,6 +249,13 @@ class ProviderProfileSetupSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {'sub_services': f'Invalid sub services for selected category: {", ".join(invalid_sub_services)}'}
             )
+
+        # Validate price range if both are provided
+        price_min = attrs.get('price_min')
+        price_max = attrs.get('price_max')
+        if price_min is not None and price_max is not None:
+            if price_min >= price_max:
+                raise serializers.ValidationError({'price_max': 'Maximum price must be greater than minimum price.'})
 
         attrs['service_category_obj'] = category
         attrs['sub_service_objects'] = resolved_sub_services

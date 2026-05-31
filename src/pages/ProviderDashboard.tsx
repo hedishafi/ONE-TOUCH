@@ -25,7 +25,7 @@ import { storage, STORAGE_KEYS } from '../utils/storage';
 import { formatCurrency, formatTimeAgo, formatProviderTier } from '../utils/formatting';
 import { COLORS, ROUTES, PROVIDER_TIER_COLORS } from '../utils/constants';
 import { LOYALTY_CONFIG } from '../mock/mockLoyalty';
-import type { WalletTransaction, ProviderProfile, PricingModel } from '../types';
+import type { WalletTransaction, ProviderProfile, PricingModel, JobStatus } from '../types';
 // ─── MOCK incoming job request (replace with real data source as needed) ─────
 const MOCK_JOB_REQUEST = {
   clientName:    'Selam A.',
@@ -40,14 +40,14 @@ const MOCK_JOB_REQUEST = {
   phone:         '+251911234567',
 };
 
-const CANCEL_REASONS = [
-  'Already on another job',
-  'Location is too far',
-  'Price does not match my rate',
-  'Service outside my expertise',
-  'Personal emergency',
-  'Other',
-];
+const CANCEL_REASON_KEYS = [
+  'cancel_reason_already_on_job',
+  'cancel_reason_too_far',
+  'cancel_reason_price_mismatch',
+  'cancel_reason_outside_expertise',
+  'cancel_reason_personal_emergency',
+  'cancel_reason_other',
+] as const;
 
 // ─── ACTIVE JOBS ─────────────────────────────────────────────────────────────
 export function ActiveJobs() {
@@ -88,11 +88,11 @@ export function ActiveJobs() {
   function handlePay() {
     // Client-side validation
     if (!telebirrPass.trim()) {
-      setPayError('Please enter your TeleBirr password.');
+      setPayError(t('providerDashboard.telebirr_err_empty'));
       return;
     }
     if (telebirrPass.trim().length < 4) {
-      setPayError('Password must be at least 4 characters.');
+      setPayError(t('providerDashboard.telebirr_err_short'));
       return;
     }
 
@@ -110,17 +110,17 @@ export function ActiveJobs() {
         setPhoneVisible(true);
         setTelebirrPass('');
         notifications.show({
-          title: '✅ Payment Verified',
-          message: "Client's phone number is now visible on your dashboard.",
+          title: t('providerDashboard.telebirr_verified_title'),
+          message: t('providerDashboard.telebirr_verified_msg'),
           color: 'teal',
           autoClose: 5000,
         });
       } else {
         setPayStep('error');
-        setPayError('Incorrect TeleBirr password. Please try again.');
+        setPayError(t('providerDashboard.telebirr_err_wrong'));
         notifications.show({
-          title: 'Verification Failed',
-          message: 'TeleBirr could not verify your password. Please retry.',
+          title: t('providerDashboard.telebirr_failed_title'),
+          message: t('providerDashboard.telebirr_failed_msg'),
           color: 'red',
         });
       }
@@ -166,7 +166,7 @@ export function ActiveJobs() {
                 <Box style={{ width: 10, height: 10, borderRadius: '50%',
                   background: COLORS.success, boxShadow: `0 0 0 3px ${COLORS.success}44`,
                   animation: 'pulse 1.6s ease-in-out infinite' }}/>
-                <Text size="xs" fw={700} c={T}>New Job Request</Text>
+                <Text size="xs" fw={700} c={T}>{t('providerDashboard.new_job_request')}</Text>
               </Group>
               <Badge size="sm" color="teal" variant="light">{MOCK_JOB_REQUEST.service}</Badge>
             </Group>
@@ -183,7 +183,7 @@ export function ActiveJobs() {
                     <IconStarFilled size={12} color={COLORS.warning}/>
                     <Text size="xs" fw={700}>{MOCK_JOB_REQUEST.clientRating}</Text>
                   </Group>
-                  <Text size="xs" c="dimmed">· {MOCK_JOB_REQUEST.clientJobs} jobs done</Text>
+                  <Text size="xs" c="dimmed">· {t('providerDashboard.jobs_done', { count: MOCK_JOB_REQUEST.clientJobs })}</Text>
                 </Group>
                 <Text size="sm" c="dimmed" lineClamp={2}>{MOCK_JOB_REQUEST.description}</Text>
               </Stack>
@@ -198,11 +198,11 @@ export function ActiveJobs() {
                   <Text size="sm" fw={600} c={N}>{MOCK_JOB_REQUEST.location}</Text>
                 </Group>
                 <Badge size="sm" color="blue" variant="light">
-                  {MOCK_JOB_REQUEST.distance} km away
+                  {t('providerDashboard.km_away', { dist: MOCK_JOB_REQUEST.distance })}
                 </Badge>
               </Group>
               <Group justify="space-between" mt={8}>
-                <Text size="xs" c="dimmed">Estimated pay</Text>
+                <Text size="xs" c="dimmed">{t('providerDashboard.estimated_pay')}</Text>
                 <Text size="sm" fw={800} c={N}>
                   ETB {MOCK_JOB_REQUEST.priceMin}–{MOCK_JOB_REQUEST.priceMax}
                 </Text>
@@ -217,10 +217,10 @@ export function ActiveJobs() {
               {phoneVisible
                 ? <><IconLockOpen size={16} color={T}/>
                     <Text size="sm" fw={700} c={N}>{MOCK_JOB_REQUEST.phone}</Text>
-                    <Badge size="xs" color="teal" variant="light" ml="auto">Visible</Badge>
+                    <Badge size="xs" color="teal" variant="light" ml="auto">{t('providerDashboard.phone_visible')}</Badge>
                   </>
                 : <><IconLock size={16} color="gray"/>
-                    <Text size="sm" c="dimmed">Client phone hidden · Confirm &amp; pay to reveal</Text>
+                    <Text size="sm" c="dimmed">{t('providerDashboard.phone_hidden')}</Text>
                   </>
               }
             </Paper>
@@ -231,12 +231,12 @@ export function ActiveJobs() {
                 style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
                 leftSection={<IconCheck size={16}/>}
                 onClick={handleConfirm}>
-                Confirm
+                {t('providerDashboard.confirm_btn')}
               </Button>
               <Button flex={1} size="md" radius="xl" variant="light" color="red"
                 leftSection={<IconX size={16}/>}
                 onClick={() => setCancelOpen(true)}>
-                Cancel
+                {t('providerDashboard.cancel_btn')}
               </Button>
             </Group>
           </Paper>
@@ -265,8 +265,8 @@ export function ActiveJobs() {
                   <Text fw={900} size="xs" c="white">TB</Text>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>TeleBirr Secure Payment</Text>
-                  <Text size="10px" c="dimmed">End-to-end encrypted · Ethio Telecom</Text>
+                  <Text fw={800} size="sm" c={N}>{t('providerDashboard.telebirr_title')}</Text>
+                  <Text size="10px" c="dimmed">{t('providerDashboard.telebirr_subtitle')}</Text>
                 </Box>
               </Group>
               {payStep !== 'verifying' && payStep !== 'success' && (
@@ -283,21 +283,21 @@ export function ActiveJobs() {
                 <Paper p="md" radius="lg"
                   style={{ background: `${T}10`, border: `1px solid ${T}33` }}>
                   <Group justify="space-between" mb={6}>
-                    <Text size="sm" c="dimmed">Service fee</Text>
+                    <Text size="sm" c="dimmed">{t('providerDashboard.telebirr_service_fee')}</Text>
                     <Text fw={800} size="lg" c={N}>
                       ETB {MOCK_JOB_REQUEST.priceMin}
                     </Text>
                   </Group>
                   <Group justify="space-between">
-                    <Text size="xs" c="dimmed">Job</Text>
+                    <Text size="xs" c="dimmed">{t('providerDashboard.telebirr_job')}</Text>
                     <Text size="xs" fw={600} c={N}>{MOCK_JOB_REQUEST.service}</Text>
                   </Group>
                   <Group justify="space-between" mt={4}>
-                    <Text size="xs" c="dimmed">Client</Text>
+                    <Text size="xs" c="dimmed">{t('providerDashboard.telebirr_client')}</Text>
                     <Text size="xs" fw={600} c={N}>{MOCK_JOB_REQUEST.clientName}</Text>
                   </Group>
                   <Text size="xs" c="dimmed" mt={8}>
-                    After payment, the client's phone number is immediately revealed.
+                    {t('providerDashboard.telebirr_after_payment')}
                   </Text>
                 </Paper>
 
@@ -312,14 +312,14 @@ export function ActiveJobs() {
                     <IconShieldLock size={26} color="white" />
                   </Box>
                   <Text size="xs" c="dimmed" ta="center">
-                    Enter your TeleBirr account password to authorise
+                    {t('providerDashboard.telebirr_password_hint')}
                   </Text>
                 </Stack>
 
                 {/* Password field */}
                 <PasswordInput
-                  label="TeleBirr Password"
-                  placeholder="Enter your TeleBirr password"
+                  label={t('providerDashboard.telebirr_password_label')}
+                  placeholder={t('providerDashboard.telebirr_password_placeholder')}
                   value={telebirrPass}
                   onChange={e => {
                     setTelebirrPass(e.currentTarget.value);
@@ -354,26 +354,21 @@ export function ActiveJobs() {
                   style={{ background: `${N}06`, border: `1px solid ${N}18`, display: 'flex', gap: 8, alignItems: 'center' }}>
                   <IconLock size={14} color="gray" style={{ flexShrink: 0 }} />
                   <Text size="xs" c="dimmed">
-                    Your password is never stored. It is used only to authenticate this
-                    single transaction with TeleBirr.
+                    {t('providerDashboard.telebirr_security_note')}
                   </Text>
                 </Paper>
 
                 <Button
-                  size="md"
-                  radius="xl"
-                  fullWidth
+                  size="md" radius="xl" fullWidth
                   disabled={!telebirrPass.trim()}
                   style={{
-                    background: telebirrPass.trim()
-                      ? 'linear-gradient(135deg,#E6007A,#FF6B35)'
-                      : undefined,
+                    background: telebirrPass.trim() ? 'linear-gradient(135deg,#E6007A,#FF6B35)' : undefined,
                     border: 'none',
                   }}
                   leftSection={<IconCurrencyDollar size={16} />}
                   onClick={handlePay}
                 >
-                  Pay ETB {MOCK_JOB_REQUEST.priceMin} via TeleBirr
+                  {t('providerDashboard.telebirr_pay_btn', { amount: MOCK_JOB_REQUEST.priceMin })}
                 </Button>
               </>
             )}
@@ -390,21 +385,14 @@ export function ActiveJobs() {
                   <IconShieldLock size={32} color="#E6007A" />
                 </Box>
                 <Stack gap={4} align="center">
-                  <Text fw={800} size="md" c={N}>Verifying with TeleBirr…</Text>
+                  <Text fw={800} size="md" c={N}>{t('providerDashboard.telebirr_verifying')}</Text>
                   <Text size="xs" c="dimmed" ta="center">
-                    Authenticating your credentials securely.
-                    <br />Please do not close this window.
+                    {t('providerDashboard.telebirr_verifying_hint')}
+                    <br />{t('providerDashboard.telebirr_no_close')}
                   </Text>
                 </Stack>
-                <Progress
-                  value={100}
-                  animated
-                  color="pink"
-                  radius="xl"
-                  size="sm"
-                  w="100%"
-                />
-                <Text size="xs" c="dimmed">Connecting to Ethio Telecom servers…</Text>
+                <Progress value={100} animated color="pink" radius="xl" size="sm" w="100%" />
+                <Text size="xs" c="dimmed">{t('providerDashboard.telebirr_connecting')}</Text>
               </Stack>
             )}
 
@@ -420,43 +408,32 @@ export function ActiveJobs() {
                   <IconCheck size={36} color="white" />
                 </Box>
                 <Stack gap={2} align="center">
-                  <Text fw={800} size="lg" c={N}>Payment Confirmed!</Text>
+                  <Text fw={800} size="lg" c={N}>{t('providerDashboard.telebirr_success_title')}</Text>
                   <Text size="xs" c="dimmed">
-                    ETB {MOCK_JOB_REQUEST.priceMin} deducted from your TeleBirr account
+                    {t('providerDashboard.telebirr_success_hint', { amount: MOCK_JOB_REQUEST.priceMin })}
                   </Text>
                 </Stack>
 
                 {/* Phone reveal */}
                 <Paper p="md" radius="lg" w="100%"
-                  style={{
-                    background: `${T}12`,
-                    border: `1.5px solid ${T}55`,
-                    textAlign: 'center',
-                  }}>
+                  style={{ background: `${T}12`, border: `1.5px solid ${T}55`, textAlign: 'center' }}>
                   <Text size="xs" c="dimmed" mb={6} fw={600}>
-                    CLIENT'S PHONE NUMBER
+                    {t('providerDashboard.telebirr_phone_label')}
                   </Text>
                   <Group gap={8} justify="center">
                     <IconPhone size={20} color={T} />
                     <Text fw={800} size="xl" c={N}>{MOCK_JOB_REQUEST.phone}</Text>
                   </Group>
                   <Text size="xs" c="dimmed" mt={6}>
-                    Tap to call or save this number
+                    {t('providerDashboard.telebirr_phone_hint')}
                   </Text>
                 </Paper>
 
-                <Button
-                  size="md"
-                  radius="xl"
-                  fullWidth
+                <Button size="md" radius="xl" fullWidth
                   leftSection={<IconCheck size={16} />}
-                  style={{
-                    background: `linear-gradient(135deg,${N},${T})`,
-                    border: 'none',
-                  }}
-                  onClick={() => { setPayOpen(false); setReqState('dismissed'); }}
-                >
-                  Start the Job
+                  style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
+                  onClick={() => { setPayOpen(false); setReqState('dismissed'); }}>
+                  {t('providerDashboard.telebirr_start_job')}
                 </Button>
               </Stack>
             )}
@@ -472,22 +449,22 @@ export function ActiveJobs() {
             {!cancelDone ? (
               <>
                 <Group justify="space-between">
-                  <Text fw={800} size="md" c={N}>Why are you cancelling?</Text>
+                <Text fw={800} size="md" c={N}>{t('providerDashboard.cancel_why')}</Text>
                   <ActionIcon variant="subtle" onClick={() => setCancelOpen(false)}>
                     <IconX size={18}/>
                   </ActionIcon>
                 </Group>
                 <Text size="xs" c="dimmed">
-                  Select a reason — this helps us improve job matching.
+                  {t('providerDashboard.cancel_reason_hint')}
                 </Text>
                 <Stack gap={8}>
-                  {CANCEL_REASONS.map(r => (
-                    <Button key={r} size="sm" radius="xl" fullWidth
-                      variant={cancelReason === r ? 'filled' : 'light'}
-                      color={cancelReason === r ? 'red' : 'gray'}
+                  {CANCEL_REASON_KEYS.map(key => (
+                    <Button key={key} size="sm" radius="xl" fullWidth
+                      variant={cancelReason === key ? 'filled' : 'light'}
+                      color={cancelReason === key ? 'red' : 'gray'}
                       styles={{ root: { justifyContent: 'flex-start', paddingLeft: 20, fontWeight: 600 } }}
-                      onClick={() => setCancelReason(r)}>
-                      {r}
+                      onClick={() => setCancelReason(key)}>
+                      {t(`providerDashboard.${key}`)}
                     </Button>
                   ))}
                 </Stack>
@@ -498,24 +475,25 @@ export function ActiveJobs() {
                   <Group gap={8}>
                     <IconAlertCircle size={16} color={COLORS.warning}/>
                     <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      If you're not available, consider switching to
-                      <Text span fw={700} c={N}> Offline</Text> so clients don't send requests.
+                      {t('providerDashboard.cancel_offline_hint')}
+                      <Text span fw={700} c={N}> {t('providerDashboard.cancel_offline_word')}</Text>
+                      {' '}{t('providerDashboard.cancel_offline_sub')}
                     </Text>
                   </Group>
                   <Group gap={8} mt={10}>
                     <IconWifiOff size={14} color={COLORS.warning}/>
-                    <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
+                    <Text size="xs" fw={600} c={COLORS.warning}>{t('providerDashboard.cancel_go_offline')}</Text>
                     <Switch size="xs" color="orange"
                       onChange={e => {
                         if (e.currentTarget.checked)
-                          notifications.show({ title: 'You are now Offline', message: 'No new requests will be sent your way.', color: 'orange' });
+                          notifications.show({ title: t('provider.now_offline'), message: t('provider.now_offline_msg'), color: 'orange' });
                       }}/>
                   </Group>
                 </Paper>
 
                 <Button size="md" radius="xl" color="red" disabled={!cancelReason}
                   onClick={handleCancelSubmit}>
-                  Submit Cancellation
+                  {t('providerDashboard.cancel_submit')}
                 </Button>
               </>
             ) : (
@@ -525,9 +503,9 @@ export function ActiveJobs() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <IconCheck size={32} color="white"/>
                 </Box>
-                <Text fw={800} size="lg" c={N}>Cancellation recorded</Text>
+                <Text fw={800} size="lg" c={N}>{t('providerDashboard.cancel_done_title')}</Text>
                 <Text size="sm" c="dimmed" ta="center">
-                  We've noted your reason. Consider going Offline if you're unavailable for a while.
+                  {t('providerDashboard.cancel_done_hint')}
                 </Text>
               </Stack>
             )}
@@ -541,7 +519,7 @@ export function ActiveJobs() {
                 <IconBriefcase size={28} />
               </ThemeIcon>
               <Text c="dimmed">{t('provider.no_jobs')}</Text>
-              <Text size="xs" c="dimmed">Set yourself as Online to receive job requests</Text>
+              <Text size="xs" c="dimmed">{t('providerDashboard.no_jobs_hint')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -590,8 +568,8 @@ export function Earnings() {
         {/* KPI Row */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           {[
-            { label: `Commission (10%)`, value: `-${formatCurrency(totalCommission)}`, color: '#E63946', icon: <IconCurrencyDollar size={20} /> },
-            { label: 'Net Earnings', value: formatCurrency(netEarnings), color: COLORS.navyBlue, icon: <IconCheck size={20} /> },
+            { label: t('providerDashboard.earnings_commission_pct'), value: `-${formatCurrency(totalCommission)}`, color: '#E63946', icon: <IconCurrencyDollar size={20} /> },
+            { label: t('providerDashboard.earnings_net'), value: formatCurrency(netEarnings), color: COLORS.navyBlue, icon: <IconCheck size={20} /> },
           ].map(kpi => (
             <Card key={kpi.label} radius="lg" withBorder p="lg">
               <Group justify="space-between" mb="xs">
@@ -607,14 +585,14 @@ export function Earnings() {
 
         {/* Chart */}
         <Card radius="lg" withBorder p="lg">
-          <Text fw={700} mb="md">Monthly Earnings vs Commission</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.earnings_chart_title')}</Text>
           <BarChart
             h={240}
             data={chartData}
             dataKey="month"
             series={[
-              { name: 'earnings', color: COLORS.tealBlue, label: 'Gross Earnings' },
-              { name: 'commission', color: '#E63946', label: 'Commission' },
+              { name: 'earnings',   color: COLORS.tealBlue, label: t('providerDashboard.earnings_gross') },
+              { name: 'commission', color: '#E63946',        label: t('providerDashboard.earnings_commission') },
             ]}
             barProps={{ radius: [4, 4, 0, 0] }}
           />
@@ -622,16 +600,16 @@ export function Earnings() {
 
         {/* Transaction Table */}
         <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
-          <Text fw={700} p="lg" pb="xs">Transaction History</Text>
+          <Text fw={700} p="lg" pb="xs">{t('providerDashboard.tx_history')}</Text>
           <Divider />
           <ScrollArea h={320}>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Amount</Table.Th>
-                  <Table.Th>Date</Table.Th>
-                  <Table.Th>Status</Table.Th>
+                  <Table.Th>{t('providerDashboard.col_type')}</Table.Th>
+                  <Table.Th>{t('providerDashboard.col_amount')}</Table.Th>
+                  <Table.Th>{t('providerDashboard.col_date')}</Table.Th>
+                  <Table.Th>{t('providerDashboard.col_status')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -668,7 +646,7 @@ export function ProviderProfile() {
     setIsSaving(true);
     setTimeout(() => {
       setIsSaving(false);
-      notifications.show({ title: 'Profile Updated!', message: 'Your changes have been saved.', color: 'teal' });
+      notifications.show({ title: t('providerDashboard.profile_saved_title'), message: t('providerDashboard.profile_saved_msg'), color: 'teal' });
     }, 1000);
   };
 
@@ -690,7 +668,7 @@ export function ProviderProfile() {
               <Text fw={700} size="lg">{myProfile?.fullName}</Text>
               <Text c="dimmed" size="sm">{currentUser?.email}</Text>
               <Group gap="xs">
-                <Badge color="teal" size="sm" leftSection={<IconShieldCheck size={10} />}>Verified Provider</Badge>
+                <Badge color="teal" size="sm" leftSection={<IconShieldCheck size={10} />}>{t('providerDashboard.profile_verified')}</Badge>
                 <Badge color="yellow" size="sm">⭐ {myProfile?.rating ?? 4.7}</Badge>
               </Group>
             </Stack>
@@ -698,7 +676,7 @@ export function ProviderProfile() {
               <FileButton onChange={() => { }} accept="image/*">
                 {(props) => (
                   <Button {...props} variant="light" color="teal" size="sm" leftSection={<IconUpload size={14} />}>
-                    Update Photo
+                    {t('providerDashboard.profile_update_photo')}
                   </Button>
                 )}
               </FileButton>
@@ -708,28 +686,28 @@ export function ProviderProfile() {
 
         {/* Service Info */}
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Service Details</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.profile_service_details')}</Text>
           <Stack gap="md">
             <Textarea
-              label="Professional Bio"
+              label={t('providerDashboard.profile_bio_label')}
               value={bio}
               onChange={e => setBio(e.target.value)}
               rows={3}
-              placeholder="Describe your expertise..."
+              placeholder={t('providerDashboard.profile_bio_placeholder')}
             />
             <Select
-              label="Pricing Model"
+              label={t('providerDashboard.profile_pricing_model')}
               data={[
-                { value: 'hourly', label: '⏱ Hourly Rate' },
-                { value: 'fixed', label: '💰 Fixed Price' },
-                { value: 'custom', label: '🤝 Custom Estimate' },
+                { value: 'hourly', label: t('providerDashboard.profile_pricing_hourly') },
+                { value: 'fixed',  label: t('providerDashboard.profile_pricing_fixed') },
+                { value: 'custom', label: t('providerDashboard.profile_pricing_custom') },
               ]}
               value={pricingModel}
               onChange={v => setPricingModel((v as PricingModel) ?? 'hourly')}
             />
             {pricingModel !== 'custom' && (
               <NumberInput
-                label={pricingModel === 'hourly' ? 'Hourly Rate (USD)' : 'Fixed Price (USD)'}
+                label={pricingModel === 'hourly' ? t('providerDashboard.profile_hourly_rate') : t('providerDashboard.profile_fixed_price')}
                 value={rate}
                 onChange={v => setRate(Number(v))}
                 prefix="$"
@@ -737,7 +715,7 @@ export function ProviderProfile() {
               />
             )}
             <Box>
-              <Text size="sm" fw={600} mb="xs">Coverage Radius: {radius} km</Text>
+              <Text size="sm" fw={600} mb="xs">{t('providerDashboard.profile_coverage_radius', { radius })}</Text>
               <Slider value={radius} onChange={setRadius} min={1} max={50} step={1} color="teal" />
             </Box>
           </Stack>
@@ -750,7 +728,7 @@ export function ProviderProfile() {
             <FileButton onChange={() => { }} accept="image/*" multiple>
               {(props) => (
                 <Button {...props} variant="light" color="teal" size="sm" leftSection={<IconPhoto size={14} />}>
-                  Add Photos
+                  {t('providerDashboard.profile_add_photos')}
                 </Button>
               )}
             </FileButton>
@@ -762,7 +740,7 @@ export function ProviderProfile() {
                 style={{ gridColumn: '1/-1', borderRadius: 12, border: '2px dashed #DEE2E6', textAlign: 'center' }}
               >
                 <IconPhoto size={32} color="#DEE2E6" style={{ margin: '0 auto' }} />
-                <Text c="dimmed" size="sm" mt="xs">No portfolio photos yet</Text>
+                <Text c="dimmed" size="sm" mt="xs">{t('providerDashboard.profile_no_photos')}</Text>
               </Box>
             ) : (
               (myProfile?.portfolioImages ?? []).map((url, i) => (
@@ -775,7 +753,7 @@ export function ProviderProfile() {
         </Card>
 
         <Button size="md" onClick={save} loading={isSaving} style={{ background: COLORS.navyBlue }}>
-          Save Changes
+          {t('providerDashboard.profile_save')}
         </Button>
       </Stack>
     </DashboardLayout>
@@ -794,13 +772,13 @@ export function ProviderWallet() {
 
   const withdraw = () => {
     if (withdrawAmount > balance) {
-      notifications.show({ title: 'Insufficient Balance', message: 'Withdrawal amount exceeds wallet balance.', color: 'red' });
+      notifications.show({ title: t('providerDashboard.wallet_insufficient'), message: t('providerDashboard.wallet_insufficient_msg'), color: 'red' });
       return;
     }
     setIsWithdrawing(true);
     setTimeout(() => {
       setIsWithdrawing(false);
-      notifications.show({ title: 'Withdrawal Requested!', message: `${formatCurrency(withdrawAmount)} will be deposited in 1-2 business days.`, color: 'teal' });
+      notifications.show({ title: t('providerDashboard.wallet_requested_title'), message: t('providerDashboard.wallet_requested_msg', { amount: formatCurrency(withdrawAmount) }), color: 'teal' });
     }, 1500);
   };
 
@@ -815,16 +793,16 @@ export function ProviderWallet() {
             boxShadow: `0 8px 32px ${COLORS.navyBlue}40`,
           }}
         >
-          <Text size="sm" c="rgba(255,255,255,0.7)">Available Balance</Text>
+          <Text size="sm" c="rgba(255,255,255,0.7)">{t('providerDashboard.wallet_available')}</Text>
           <Text style={{ fontSize: 42 }} fw={800} c="white">{formatCurrency(balance)}</Text>
-          <Text size="xs" c="rgba(255,255,255,0.5)">After commission deductions</Text>
+          <Text size="xs" c="rgba(255,255,255,0.5)">{t('providerDashboard.wallet_after_commission')}</Text>
         </Box>
 
         <Card radius="lg" withBorder p="lg">
           <Text fw={700} mb="md">{t('wallet.withdraw')}</Text>
           <Stack gap="md">
             <NumberInput
-              label="Withdrawal Amount"
+              label={t('providerDashboard.wallet_withdraw_amount')}
               value={withdrawAmount}
               onChange={v => setWithdrawAmount(Number(v))}
               prefix="$"
@@ -832,11 +810,11 @@ export function ProviderWallet() {
               max={balance}
             />
             <Select
-              label="Withdrawal Method"
+              label={t('providerDashboard.wallet_withdraw_method')}
               data={[
-                { value: 'bank', label: '🏦 Bank Transfer (1-2 days)' },
-                { value: 'mpesa', label: '📱 M-Pesa (instant)' },
-                { value: 'paypal', label: '💳 PayPal (instant)' },
+                { value: 'bank',   label: t('providerDashboard.wallet_method_bank') },
+                { value: 'mpesa',  label: t('providerDashboard.wallet_method_mpesa') },
+                { value: 'paypal', label: t('providerDashboard.wallet_method_paypal') },
               ]}
               defaultValue="bank"
             />
@@ -889,10 +867,10 @@ export function ProviderLoyalty() {
               <Badge size="lg" style={{ background: tc, color: 'white' }} w="fit-content">
                 {formatProviderTier(tier)}
               </Badge>
-              <Text size="sm" c="dimmed">{completedJobs} jobs completed</Text>
+              <Text size="sm" c="dimmed">{t('providerDashboard.loyalty_jobs_completed', { count: completedJobs })}</Text>
               {nextTier && (
                 <Text size="xs" c="dimmed">
-                  {nextTier.minCompletions - completedJobs} more jobs to reach {formatProviderTier(nextTier.tier)}
+                  {t('providerDashboard.loyalty_more_jobs', { remaining: nextTier.minCompletions - completedJobs, tier: formatProviderTier(nextTier.tier) })}
                 </Text>
               )}
               <Progress value={progress} color={tc} size="sm" h={6} w={200} radius="xl" />
@@ -902,24 +880,29 @@ export function ProviderLoyalty() {
 
         {/* Tier comparison */}
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-          {tiers.map(t => {
-            const color = PROVIDER_TIER_COLORS[t.tier as keyof typeof PROVIDER_TIER_COLORS] ?? '#777';
-            const isActive = t.tier === tier;
+          {tiers.map(tierItem => {
+            const color = PROVIDER_TIER_COLORS[tierItem.tier as keyof typeof PROVIDER_TIER_COLORS] ?? '#777';
+            const isActive = tierItem.tier === tier;
             return (
-              <Card key={t.tier} radius="lg" withBorder p="lg"
+              <Card key={tierItem.tier} radius="lg" withBorder p="lg"
                 style={{ border: isActive ? `2px solid ${color}` : undefined, opacity: isActive ? 1 : 0.65 }}>
                 <Stack gap="xs">
                   <Group justify="space-between">
-                    <Badge style={{ background: color, color: 'white' }} size="sm">{formatProviderTier(t.tier)}</Badge>
-                    {isActive && <Badge color="teal" size="xs">Current</Badge>}
+                    <Badge style={{ background: color, color: 'white' }} size="sm">{formatProviderTier(tierItem.tier)}</Badge>
+                    {isActive && <Badge color="teal" size="xs">{t('providerDashboard.loyalty_current')}</Badge>}
                   </Group>
                   <Text fw={700} size="sm">
-                    {t.commissionDiscount > 0 ? `-${t.commissionDiscount}%` : 'Standard'} Commission
+                    {tierItem.commissionDiscount > 0
+                      ? t('providerDashboard.loyalty_commission_discount', { pct: tierItem.commissionDiscount })
+                      : t('providerDashboard.loyalty_standard_commission')}{' '}
+                    {t('providerDashboard.loyalty_commission_suffix')}
                   </Text>
-                  <Text size="xs" c="dimmed">From {t.minCompletions} jobs</Text>
+                  <Text size="xs" c="dimmed">
+                    {t('providerDashboard.loyalty_from_jobs', { count: tierItem.minCompletions })}
+                  </Text>
                   <Divider />
                   <Stack gap={4}>
-                    {t.benefits.map(perk => (
+                    {tierItem.benefits.map(perk => (
                       <Group key={perk} gap="xs">
                         <IconGift size={12} color={color} />
                         <Text size="xs">{perk}</Text>

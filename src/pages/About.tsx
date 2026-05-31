@@ -7,6 +7,7 @@ import {
   IconUsers, IconTrendingUp, IconHeart, IconArrowRight,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -50,48 +51,49 @@ const ANIMATIONS = `
 }
 `;
 
-const COMPANY_VALUES = [
-  {
-    icon: <IconShieldCheck size={28} />,
-    title: 'Trust First',
-    desc: 'Every provider is government-ID verified. We build on trust, not just ratings.',
-    color: '#000089',
-  },
-  {
-    icon: <IconBolt size={28} />,
-    title: 'Speed & Efficiency',
-    desc: 'Book in minutes, connect instantly. One tap away from getting help.',
-    color: '#008080',
-  },
-  {
-    icon: <IconMapPin size={28} />,
-    title: 'Local Focus',
-    desc: 'Built for Addis Ababa and Ethiopia. Understanding local needs and culture.',
-    color: '#F39C12',
-  },
-  {
-    icon: <IconUsers size={28} />,
-    title: 'Community Powered',
-    desc: 'Supporting local professionals and businesses. Growing together.',
-    color: '#E91E63',
-  },
-];
-
 const IMPACT_STATS = [
-  { value: '2,000+', label: 'Verified Providers', delay: '0.1s' },
-  { value: '15,000+', label: 'Jobs Completed', delay: '0.2s' },
-  { value: '4.8★', label: 'Average Rating', delay: '0.3s' },
-  { value: '98%', label: 'Satisfaction Rate', delay: '0.4s' },
+  { value: '2,000+', labelKey: 'about.stat_providers', delay: '0.1s' },
+  { value: '15,000+', labelKey: 'about.stat_jobs', delay: '0.2s' },
+  { value: '4.8★', labelKey: 'about.stat_rating', delay: '0.3s' },
+  { value: '98%', labelKey: 'about.stat_satisfaction', delay: '0.4s' },
 ];
 
 export function About() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const COMPANY_VALUES = [
+    {
+      icon: <IconShieldCheck size={28} />,
+      titleKey: 'about.value_trust_title',
+      descKey: 'about.value_trust_desc',
+      color: '#000089',
+    },
+    {
+      icon: <IconBolt size={28} />,
+      titleKey: 'about.value_speed_title',
+      descKey: 'about.value_speed_desc',
+      color: '#008080',
+    },
+    {
+      icon: <IconMapPin size={28} />,
+      titleKey: 'about.value_local_title',
+      descKey: 'about.value_local_desc',
+      color: '#F39C12',
+    },
+    {
+      icon: <IconUsers size={28} />,
+      titleKey: 'about.value_community_title',
+      descKey: 'about.value_community_desc',
+      color: '#E91E63',
+    },
+  ];
 
   return (
     <>
       <style>{ANIMATIONS}</style>
       <Box style={{ minHeight: '100vh', background: '#FFFFFF', position: 'relative' }}>
-        
+
         {/* ── Header/Nav ── */}
         <Box px={{ base: 'lg', sm: 'xl' }} py="md"
           style={{
@@ -117,9 +119,9 @@ export function About() {
               <Box style={{ minWidth: 60 }}>
                 <LanguageSwitcher />
               </Box>
-              <Button className="btn-teal" size="sm" style={{ color: 'white', fontWeight: 700 }} 
+              <Button className="btn-teal" size="sm" style={{ color: 'white', fontWeight: 700 }}
                 onClick={() => navigate(ROUTES.signup)}>
-                Sign Up
+                {t('about.nav_signup')}
               </Button>
             </Group>
           </Group>
@@ -155,17 +157,17 @@ export function About() {
                 background: 'rgba(255,255,255,0.15)', color: 'white',
                 border: '1px solid rgba(255,255,255,0.25)', fontWeight: 700, animation: 'fadeUp 0.6s ease both'
               }}>
-                About ONE TOUCH
+                {t('about.badge_about')}
               </Badge>
               <Text fw={900} size="4xl" c="white" style={{
                 letterSpacing: '-1px', animation: 'fadeUp 0.6s 0.1s ease both'
               }}>
-                Connecting Trust  <br /> & Opportunity in Ethiopia
+                {t('about.hero_title')}
               </Text>
               <Text c="rgba(255,255,255,0.80)" size="lg" maw={600} style={{
                 lineHeight: 1.8, animation: 'fadeUp 0.6s 0.2s ease both'
               }}>
-                ONE TOUCH is building the trusted digital infrastructure for service delivery in Addis Ababa and beyond. We believe in transparent communication, secure transactions, and empowering local professionals.
+                {t('about.hero_subtitle')}
               </Text>
             </Stack>
           </Container>
@@ -176,7 +178,7 @@ export function About() {
           <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="lg" mb={80}>
             {IMPACT_STATS.map((stat) => (
               <Paper
-                key={stat.label}
+                key={stat.labelKey}
                 className="stat-card afu-stat"
                 p="xl"
                 ta="center"
@@ -192,7 +194,7 @@ export function About() {
                   {stat.value}
                 </Text>
                 <Text size="sm" fw={600} c="dimmed">
-                  {stat.label}
+                  {t(stat.labelKey)}
                 </Text>
               </Paper>
             ))}
@@ -207,10 +209,10 @@ export function About() {
                 background: `${COLORS.navyBlue}10`, color: COLORS.navyBlue,
                 border: `1px solid ${COLORS.navyBlue}20`, fontWeight: 700
               }}>
-                Our Story
+                {t('about.story_badge')}
               </Badge>
               <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px' }}>
-                Why we built ONE TOUCH
+                {t('about.story_heading')}
               </Text>
             </Stack>
 
@@ -220,15 +222,9 @@ export function About() {
               borderRadius: 20,
             }}>
               <Stack gap="lg" style={{ animation: 'fadeUp 0.7s ease both' }}>
-                <Text size="md" lh={1.8} c="dimmed">
-                  In Ethiopia, finding trusted service providers has been challenging. People worry about safety, transparent pricing, and payment security. Professionals struggle to build reputation and reach customers reliably.
-                </Text>
-                <Text size="md" lh={1.8} c="dimmed">
-                  ONE TOUCH was created to solve this problem. We built a platform that combines identity verification, secure in-app communication, escrow protection, and digital payments. It's the bridge between clients and professionals — safe, instant, and transparent.
-                </Text>
-                <Text size="md" lh={1.8} c="dimmed">
-                  Our mission is simple: empower Ethiopians to connect, serve, and grow. One touch. One transaction. One community.
-                </Text>
+                <Text size="md" lh={1.8} c="dimmed">{t('about.story_p1')}</Text>
+                <Text size="md" lh={1.8} c="dimmed">{t('about.story_p2')}</Text>
+                <Text size="md" lh={1.8} c="dimmed">{t('about.story_p3')}</Text>
               </Stack>
             </Paper>
           </Stack>
@@ -249,12 +245,10 @@ export function About() {
                     <IconTrendingUp size={24} />
                   </ThemeIcon>
                   <div>
-                    <Text fw={800} size="lg" c={COLORS.navyBlue}>Our Mission</Text>
+                    <Text fw={800} size="lg" c={COLORS.navyBlue}>{t('about.mission_heading')}</Text>
                   </div>
                 </Group>
-                <Text size="md" lh={1.7} c="dimmed">
-                  To connect trusted service providers with clients through secure digital infrastructure, enabling transparent communication, fair pricing, and reliable transactions in Ethiopia.
-                </Text>
+                <Text size="md" lh={1.7} c="dimmed">{t('about.mission_text')}</Text>
               </Stack>
             </Paper>
 
@@ -272,12 +266,10 @@ export function About() {
                     <IconHeart size={24} />
                   </ThemeIcon>
                   <div>
-                    <Text fw={800} size="lg" c={COLORS.tealBlue}>Our Vision</Text>
+                    <Text fw={800} size="lg" c={COLORS.tealBlue}>{t('about.vision_heading')}</Text>
                   </div>
                 </Group>
-                <Text size="md" lh={1.7} c="dimmed">
-                  A thriving ecosystem where every professional can reach their potential and every client can find trusted help instantly. Empowering local businesses and building a digital Ethiopia.
-                </Text>
+                <Text size="md" lh={1.7} c="dimmed">{t('about.vision_text')}</Text>
               </Stack>
             </Paper>
           </SimpleGrid>
@@ -289,17 +281,17 @@ export function About() {
                 background: `${COLORS.tealBlue}12`, color: COLORS.tealBlue,
                 border: `1px solid ${COLORS.tealBlue}25`, fontWeight: 700
               }}>
-                Our Core Values
+                {t('about.values_badge')}
               </Badge>
               <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px' }}>
-                What we stand for
+                {t('about.values_heading')}
               </Text>
             </Stack>
 
             <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }} spacing="lg">
               {COMPANY_VALUES.map((value, i) => (
                 <Paper
-                  key={value.title}
+                  key={value.titleKey}
                   className="value-item"
                   p="xl"
                   style={{
@@ -317,10 +309,10 @@ export function About() {
                     </ThemeIcon>
                     <div>
                       <Text fw={800} size="md" c={COLORS.navyBlue} mb="xs">
-                        {value.title}
+                        {t(value.titleKey)}
                       </Text>
                       <Text size="sm" c="dimmed" lh={1.6}>
-                        {value.desc}
+                        {t(value.descKey)}
                       </Text>
                     </div>
                   </Stack>
@@ -342,13 +334,13 @@ export function About() {
                 background: `${COLORS.lemonYellow}30`, color: '#7A6B00',
                 border: `1px solid ${COLORS.lemonYellow}`, fontWeight: 700
               }}>
-                Our Commitment
+                {t('about.commitment_badge')}
               </Badge>
               <Text fw={900} size="3xl" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px', maxWidth: '700px' }}>
-                Supporting Local Businesses & Professionals
+                {t('about.commitment_heading')}
               </Text>
               <Text size="md" c="dimmed" lh={1.8} maw={700}>
-                ONE TOUCH is committed to empowering local service providers, informal sector workers, and small businesses in Ethiopia. We provide fair opportunities, secure payment channels, and digital visibility. Together, we're building a more connected, trustworthy, and prosperous economy.
+                {t('about.commitment_text')}
               </Text>
             </Stack>
           </Container>
@@ -369,10 +361,10 @@ export function About() {
                 borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none'
               }} />
               <Text fw={900} size="3xl" c="white" mb="sm" style={{ letterSpacing: '-0.5px', position: 'relative' }}>
-                Join the ONE TOUCH Community
+                {t('about.cta_heading')}
               </Text>
               <Text c="rgba(255,255,255,0.65)" mb="xl" size="md" style={{ position: 'relative' }}>
-                Whether you're a client looking for trusted help or a professional ready to grow — let's transform service delivery in Ethiopia together.
+                {t('about.cta_sub')}
               </Text>
               <Group justify="center" gap="md" wrap="wrap" style={{ position: 'relative' }}>
                 <Button size="xl" style={{
@@ -390,7 +382,7 @@ export function About() {
                   onClick={() => navigate(ROUTES.signup)}
                   rightSection={<IconArrowRight size={18} />}
                 >
-                  Get Started Now
+                  {t('about.cta_btn')}
                 </Button>
               </Group>
             </Box>

@@ -24,7 +24,7 @@ export const oneTouchTheme = createTheme({
   primaryColor: 'teal',
   primaryShade: { light: 5, dark: 7 },
 
-  fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+  fontFamily: "'Inter', 'Noto Sans Ethiopic', 'Segoe UI', system-ui, sans-serif",
   fontFamilyMonospace: "'Fira Code', monospace",
 
   defaultRadius: 'md',
@@ -38,7 +38,7 @@ export const oneTouchTheme = createTheme({
   },
 
   headings: {
-    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+    fontFamily: "'Inter', 'Noto Sans Ethiopic', 'Segoe UI', system-ui, sans-serif",
     fontWeight: '700',
   },
 

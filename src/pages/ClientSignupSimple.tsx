@@ -1,10 +1,10 @@
 /**
  * ClientSignupSimple.tsx
- * 
+ *
  * Simplified client onboarding:
  * Step 1: Enter phone number
  * Step 2: Verify OTP → Account created → Dashboard
- * 
+ *
  * No profile setup, no identity verification, no biometrics.
  */
 
@@ -30,6 +30,7 @@ import {
   IconChevronLeft,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import * as authService from '../services/authService';
 import { storage, STORAGE_KEYS } from '../utils/storage';
@@ -77,17 +78,17 @@ interface Step1Props {
 }
 
 const Step1PhoneEntry: React.FC<Step1Props> = ({ onPhoneSubmit, loading, error }) => {
+  const { t } = useTranslation();
   const [phone, setPhone] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate phone format: +251XXXXXXXXX or 0XXXXXXXXX
     const phoneRegex = /^(\+251|0)\d{9}$/;
     if (!phoneRegex.test(phone)) {
       notifications.show({
-        title: 'Invalid Phone',
-        message: 'Please enter a valid Ethiopian phone number (+251911223344 or 0911223344)',
+        title: t('clientSignup.invalid_phone_title'),
+        message: t('clientSignup.invalid_phone_msg'),
         color: 'red',
       });
       return;
@@ -114,9 +115,9 @@ const Step1PhoneEntry: React.FC<Step1Props> = ({ onPhoneSubmit, loading, error }
             <IconPhone size={24} color="#008080" />
           </Box>
           <Stack gap={2}>
-            <Title order={3}>Enter Your Phone Number</Title>
+            <Title order={3}>{t('clientSignup.phone_title')}</Title>
             <Text size="sm" color="dimmed">
-              We'll send you a one-time code to verify your phone
+              {t('clientSignup.phone_sub')}
             </Text>
           </Stack>
         </Group>
@@ -130,13 +131,13 @@ const Step1PhoneEntry: React.FC<Step1Props> = ({ onPhoneSubmit, loading, error }
         <form onSubmit={handleSubmit}>
           <Stack gap="lg">
             <TextInput
-              label="Phone Number"
-              placeholder="+251911223344 or 0911223344"
+              label={t('clientSignup.phone_label')}
+              placeholder={t('clientSignup.phone_placeholder')}
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.currentTarget.value)}
               disabled={loading}
-              description="Ethiopian phone numbers only"
+              description={t('clientSignup.phone_description')}
               leftSection={<IconPhone size={16} />}
             />
 
@@ -146,7 +147,7 @@ const Step1PhoneEntry: React.FC<Step1Props> = ({ onPhoneSubmit, loading, error }
                 disabled={!phone || loading}
                 loading={loading}
               >
-                {loading ? 'Sending...' : 'Send OTP'}
+                {loading ? t('clientSignup.sending') : t('clientSignup.send_otp')}
               </Button>
             </Group>
           </Stack>
@@ -170,12 +171,12 @@ interface Step2Props {
 }
 
 const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loading, error, demoOtp }) => {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState('');
   const [seconds, setSeconds] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start OTP timer
   useEffect(() => {
     setSeconds(60);
     timerRef.current = setInterval(() => {
@@ -199,7 +200,6 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
     try {
       setVerifying(true);
 
-      // Verify OTP with backend
       const response = await authService.signupVerify({
         phone,
         otp_code: code,
@@ -225,17 +225,17 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       });
 
       notifications.show({
-        title: 'Success',
-        message: 'Welcome! Your account has been created.',
+        title: t('clientSignup.success_title'),
+        message: t('clientSignup.success_msg'),
         color: 'green',
       });
 
       onSuccess();
     } catch (err: unknown) {
-      const message = getErrorMessage(err, 'Invalid OTP. Please try again.');
+      const message = getErrorMessage(err, t('clientSignup.invalid_otp_fallback'));
 
       notifications.show({
-        title: 'Verification Failed',
+        title: t('clientSignup.verify_failed_title'),
         message,
         color: 'red',
       });
@@ -252,14 +252,14 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
       setSeconds(60);
       setOtp('');
       notifications.show({
-        title: 'Code Resent',
-        message: `New OTP sent to ${phone}`,
+        title: t('clientSignup.resent_title'),
+        message: t('clientSignup.resent_msg', { phone }),
         color: 'blue',
       });
     } catch (err: unknown) {
       notifications.show({
-        title: 'Resend Failed',
-        message: getErrorMessage(err, 'Could not resend OTP'),
+        title: t('clientSignup.resend_failed_title'),
+        message: getErrorMessage(err, t('clientSignup.resend_failed_fallback')),
         color: 'red',
       });
     }
@@ -283,9 +283,9 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
             <IconMessageCircle size={24} color="#008080" />
           </Box>
           <Stack gap={2}>
-            <Title order={3}>Verify Your Phone</Title>
+            <Title order={3}>{t('clientSignup.verify_title')}</Title>
             <Text size="sm" color="dimmed">
-              Enter the 6-digit code we sent to {phone}
+              {t('clientSignup.verify_sub', { phone })}
             </Text>
           </Stack>
         </Group>
@@ -297,10 +297,10 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
         )}
 
         {demoOtp && (
-          <Alert icon={<IconAlertCircle size={16} />} color="blue" title="Demo Mode">
-            For testing: <strong>OTP Code: {demoOtp}</strong>
+          <Alert icon={<IconAlertCircle size={16} />} color="blue" title={t('clientSignup.demo_mode_title')}>
+            {t('clientSignup.demo_mode_msg', { otp: demoOtp })}
             <br />
-            <Text size="xs" mt={6}>This appears because SMS is in mock mode. In production, you'll receive the code via SMS.</Text>
+            <Text size="xs" mt={6}>{t('clientSignup.demo_mode_note')}</Text>
           </Alert>
         )}
 
@@ -319,7 +319,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
 
           <Group justify="space-between">
             <Button variant="default" onClick={onBack} disabled={verifying || loading}>
-              <IconChevronLeft size={16} /> Back
+              <IconChevronLeft size={16} /> {t('clientSignup.back')}
             </Button>
             <Stack gap={4} align="flex-end">
               <Button
@@ -327,15 +327,15 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
                 disabled={otp.length !== 6 || verifying || loading}
                 loading={verifying}
               >
-                {verifying ? 'Verifying...' : 'Verify'}
+                {verifying ? t('clientSignup.verifying') : t('clientSignup.verify_btn')}
               </Button>
               {seconds > 0 ? (
                 <Text size="xs" color="dimmed">
-                  Resend in {seconds}s
+                  {t('clientSignup.resend_in', { seconds })}
                 </Text>
               ) : (
                 <Button variant="subtle" size="xs" onClick={handleResend}>
-                  Resend Code
+                  {t('clientSignup.resend_code')}
                 </Button>
               )}
             </Stack>
@@ -352,6 +352,7 @@ const Step2OTPVerify: React.FC<Step2Props> = ({ phone, onBack, onSuccess, loadin
 
 export const ClientSignupSimple: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -363,27 +364,25 @@ export const ClientSignupSimple: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Request OTP from backend
       const response = await authService.signupRequestOTP({ phone: phoneInput, role: 'client' });
 
       setPhone(phoneInput);
       setStep(2);
-      
-      // Show actual OTP code from backend response (in DEBUG mode)
+
       if (response.otp_code) {
         setDemoOtp(response.otp_code);
       }
 
       notifications.show({
-        title: 'OTP Sent',
-        message: `Check the blue box below for the code`,
+        title: t('clientSignup.otp_sent_title'),
+        message: t('clientSignup.otp_sent_msg'),
         color: 'blue',
       });
     } catch (err: unknown) {
-      const message = getErrorMessage(err, 'Failed to send OTP. Please try again.');
+      const message = getErrorMessage(err, t('clientSignup.failed_send_otp'));
       setError(message);
       notifications.show({
-        title: 'Error',
+        title: t('clientSignup.error_title'),
         message,
         color: 'red',
       });
@@ -394,11 +393,10 @@ export const ClientSignupSimple: React.FC = () => {
 
   const handleSuccess = () => {
     notifications.show({
-      title: 'Welcome to OneTouch',
-      message: 'Redirecting to your dashboard...',
+      title: t('clientSignup.welcome_title'),
+      message: t('clientSignup.welcome_msg'),
       color: 'green',
     });
-    // Redirect to client dashboard
     setTimeout(() => {
       navigate('/client/dashboard');
     }, 800);
@@ -408,11 +406,9 @@ export const ClientSignupSimple: React.FC = () => {
     <Container size="sm" py="xl">
       <Stack gap="xl">
         <Box ta="center">
-          <Title order={2}>
-            Client Sign Up
-          </Title>
+          <Title order={2}>{t('clientSignup.page_title')}</Title>
           <Text size="sm" color="dimmed" mt={8}>
-            Simple, secure, and fast
+            {t('clientSignup.page_sub')}
           </Text>
         </Box>
 

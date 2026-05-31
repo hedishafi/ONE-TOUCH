@@ -3,6 +3,7 @@ import {
 } from '@mantine/core';
 import { IconArrowLeft, IconShieldCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -14,43 +15,16 @@ const ANIMATIONS = `
 .afu { animation: fadeUp 0.6s ease both; }
 `;
 
+const SECTION_NUMS = ['1','2','3','4','5','6','7','8'];
+
 export function PrivacyPolicy() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
-  const sections = [
-    {
-      title: '1. Information We Collect',
-      content: 'We collect information you provide directly (name, email, phone, payment details) and information automatically when you use the platform (IP address, device info, usage patterns). We also collect data from third parties when you authorize them (e.g., payment processors).'
-    },
-    {
-      title: '2. How We Use Your Information',
-      content: 'We use your information to provide and improve our services, process payments, communicate with you, prevent fraud, comply with legal requirements, and personalize your experience. Your data is never sold to third parties without explicit consent.'
-    },
-    {
-      title: '3. Data Security',
-      content: 'We implement bank-level encryption and security measures to protect your personal and financial data. All data is transmitted securely over HTTPS, and sensitive information is encrypted in storage. We regularly audit our security practices.'
-    },
-    {
-      title: '4. Your Rights',
-      content: 'You have the right to access, correct, or delete your personal information. You can opt out of marketing communications anytime. To exercise these rights, contact our privacy team at privacy@onetouch.et.'
-    },
-    {
-      title: '5. Third-Party Services',
-      content: 'We use trusted third-party services (payment processors, analytics, hosting providers). These partners have their own privacy policies and security measures. We only share data necessary for them to provide their services.'
-    },
-    {
-      title: '6. Cookies & Tracking',
-      content: 'We use cookies to remember your preferences and improve your experience. You can disable cookies in your browser settings, but some features may not work properly. We do not track you across third-party websites.'
-    },
-    {
-      title: '7. Children\'s Privacy',
-      content: 'ONE TOUCH is not intended for users under 18. We do not knowingly collect information from minors. If we discover a user is under 18, we will delete their account and data immediately.'
-    },
-    {
-      title: '8. Policy Updates',
-      content: 'We may update this privacy policy periodically. We will notify you of significant changes via email or prominent notification on the platform. Your continued use of ONE TOUCH after changes constitutes acceptance.'
-    },
-  ];
+  const sections = SECTION_NUMS.map(num => ({
+    title: t(`privacyPolicy.s${num}_title`),
+    content: t(`privacyPolicy.s${num}_content`),
+  }));
 
   return (
     <>
@@ -109,10 +83,10 @@ export function PrivacyPolicy() {
                 </ThemeIcon>
               </Group>
               <Text fw={900} size="4xl" c="white" style={{ letterSpacing: '-1px' }}>
-                Privacy Policy
+                {t('privacyPolicy.page_title')}
               </Text>
               <Text c="rgba(255,255,255,0.80)" size="lg" maw={600} style={{ lineHeight: 1.8 }}>
-                We respect your privacy and are committed to protecting your personal data. Last updated: February 2026.
+                {t('privacyPolicy.page_sub')}
               </Text>
             </Stack>
           </Container>
@@ -146,10 +120,10 @@ export function PrivacyPolicy() {
             }}>
               <Stack gap="sm">
                 <Text fw={700} size="sm" c={COLORS.tealBlue} style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Questions About Your Privacy?
+                  {t('privacyPolicy.contact_title')}
                 </Text>
                 <Text size="sm" c={COLORS.navyBlue}>
-                  Email us at <strong>privacy@onetouch.et</strong> or contact our support team anytime.
+                  {t('privacyPolicy.contact_body')}
                 </Text>
               </Stack>
             </Box>

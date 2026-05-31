@@ -71,7 +71,7 @@ import {
 } from './pages/AdminDashboard';
 
 // Orders pages
-import { CreateOrder, MyOrders, OrderDetails, AvailableOrders, ActiveOrder } from './pages/orders';
+import { CreateOrder, MyOrders, OrderDetails, AvailableOrders, ActiveOrder, ProviderMyOrders } from './pages/orders';
 
 // Protected route wrapper
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -146,6 +146,7 @@ function App() {
           element={<ProtectedRoute allowedRoles={['provider']} />}
         >
           <Route path="dashboard" element={<ProviderHome />} />
+          <Route path="orders" element={<ProviderMyOrders />} />
           <Route path="jobs" element={<ActiveJobs />} />
           <Route path="earnings" element={<Earnings />} />
           <Route path="profile" element={<ProviderProfile />} />

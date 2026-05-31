@@ -1,8 +1,5 @@
 /**
  * Login.tsx — Functional phone OTP authentication (zero demo code)
- *
- * Users enter phone number → receive OTP via SMS → verify → authenticated
- * Role-based redirect to appropriate dashboard
  */
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -14,6 +11,7 @@ import {
   IconShieldCheck, IconAlertCircle, IconMessageCircle,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import * as authService from '../services/authService';
@@ -21,7 +19,6 @@ import { ROUTES } from '../utils/constants';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type Screen = 'phone' | 'otp';
 
 const getErrorMessage = (err: unknown, fallback: string): string => {
@@ -37,7 +34,6 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
       };
       message?: string;
     };
-
     return (
       maybe.response?.data?.detail ||
       maybe.response?.data?.errors?.phone_number?.[0] ||
@@ -47,11 +43,9 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
       fallback
     );
   }
-
   return fallback;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function useCountdown(start: number) {
   const [seconds, setSeconds] = useState(0);
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -67,17 +61,15 @@ function useCountdown(start: number) {
   return { seconds, begin };
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [screen, setScreen] = useState<Screen>('phone');
 
-  // ── Phone entry ────────────────────────────────────────────────────────────
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [phoneLoading, setPhoneLoading] = useState(false);
 
-  // ── OTP verification ───────────────────────────────────────────────────────
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState('');
   const [otpAttempts, setOtpAttempts] = useState(0);
@@ -87,21 +79,19 @@ export default function Login() {
 
   const colors = { navy: '#1A365D', teal: '#16A085' };
 
-  // ─── Validate phone number (Ethiopian standard) ───────────────────────────
   const validatePhone = (phoneInput: string) => {
     const regex = /^(\+251|0|251)\d{9}$/;
     return regex.test(phoneInput.replace(/[\s\-()]/g, ''));
   };
 
-  // ─── Step 1: Request OTP ──────────────────────────────────────────────────
   const handlePhoneSubmit = async () => {
     setPhoneError('');
     if (!phone.trim()) {
-      setPhoneError('Please enter your phone number.');
+      setPhoneError(t('login.err_empty_phone'));
       return;
     }
     if (!validatePhone(phone)) {
-      setPhoneError('Please enter a valid phone number (e.g., 0900000000 or +251900000000).');
+      setPhoneError(t('login.err_invalid_phone'));
       return;
     }
 
@@ -109,38 +99,28 @@ export default function Login() {
     try {
       const response = await authService.loginRequestOTP({ phone_number: phone });
       setPhoneLoading(false);
-      
-      // Display actual OTP code from backend (for development/debugging)
-      if (response.otp_code) {
-        setDemoOtp(response.otp_code);
-      }
-
-      // Reset OTP fields and show OTP screen
+      if (response.otp_code) setDemoOtp(response.otp_code);
       setOtp('');
       setOtpError('');
       setOtpAttempts(0);
       beginOtpTimer();
       setScreen('otp');
-
       notifications.show({
-        title: '📱 Verification Code Sent',
-        message: `A 6-digit code was sent to ${phone}`,
+        title: t('login.otp_sent_title'),
+        message: t('login.otp_sent_msg', { phone }),
         color: 'teal',
         autoClose: 5000,
       });
     } catch (error: unknown) {
       setPhoneLoading(false);
-      const message = getErrorMessage(error, 'Failed to request OTP. Please try again.');
-      setPhoneError(message);
+      setPhoneError(getErrorMessage(error, t('login.err_failed_otp')));
     }
   };
 
-  // ─── Step 2: Verify OTP ───────────────────────────────────────────────────
   const handleOtpVerify = async (code: string) => {
     if (code.length !== 6) return;
-
     if (otpAttempts >= 5) {
-      setOtpError('Too many invalid attempts. Please request a new code.');
+      setOtpError(t('login.err_too_many'));
       return;
     }
 
@@ -148,10 +128,7 @@ export default function Login() {
     setOtpError('');
 
     try {
-      const response = await authService.loginVerify({
-        phone_number: phone,
-        otp_code: code,
-      });
+      const response = await authService.loginVerify({ phone_number: phone, otp_code: code });
 
       const normalizedUser = {
         id: String(response.user.id),
@@ -163,124 +140,81 @@ export default function Login() {
         providerUid: response.user.provider_uid,
       };
 
-      console.log('🔐 Login successful, user:', normalizedUser);
-
-      // Update authStore with user data
       storage.set(STORAGE_KEYS.currentUser, normalizedUser);
-      useAuthStore.setState({
-        currentUser: normalizedUser,
-        isAuthenticated: true,
-      });
+      useAuthStore.setState({ currentUser: normalizedUser, isAuthenticated: true });
 
-      console.log('✅ AuthStore updated:', {
-        currentUser: useAuthStore.getState().currentUser,
-        isAuthenticated: useAuthStore.getState().isAuthenticated,
-      });
-
-      // Wait a bit for state to settle
       await new Promise(resolve => setTimeout(resolve, 150));
-      
       setOtpVerifying(false);
-      
-      // Call handleSuccess after state is settled
-      handleSuccess();
+      await handleSuccess();
     } catch (error: unknown) {
       setOtpVerifying(false);
       const apiMessage = getErrorMessage(error, '');
-
-      if (apiMessage) {
-        setOtpError(apiMessage);
-        return;
-      }
+      if (apiMessage) { setOtpError(apiMessage); return; }
 
       const remaining = 5 - otpAttempts - 1;
       setOtpAttempts(prev => prev + 1);
-      
       if (remaining > 0) {
-        setOtpError(`Invalid code. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
+        setOtpError(remaining !== 1
+          ? t('login.err_invalid_code_plural', { remaining })
+          : t('login.err_invalid_code', { remaining }));
       } else {
-        setOtpError('No attempts remaining. Please request a new code.');
+        setOtpError(t('login.err_no_attempts'));
       }
     }
   };
 
-  // ─── Resend OTP ──────────────────────────────────────────────────────────
   const handleResend = async () => {
     if (otpSeconds > 0) return;
-
     try {
       const response = await authService.loginRequestOTP({ phone_number: phone });
-
-      // Display actual OTP code from backend
-      if (response.otp_code) {
-        setDemoOtp(response.otp_code);
-      }
-
-      // Reset countdown and attempts
+      if (response.otp_code) setDemoOtp(response.otp_code);
       setOtp('');
       setOtpError('');
       setOtpAttempts(0);
       beginOtpTimer();
-
       notifications.show({
-        title: '📱 New Code Sent',
-        message: `A new 6-digit code was sent to ${phone}`,
+        title: t('login.resent_title'),
+        message: t('login.resent_msg', { phone }),
         color: 'teal',
         autoClose: 5000,
       });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Failed to resend code. Please try again.');
-      setOtpError(message);
+      setOtpError(getErrorMessage(error, t('login.err_resend')));
     }
   };
 
-  // ─── Handle successful login ──────────────────────────────────────────────
   const handleSuccess = async () => {
     const { currentUser } = useAuthStore.getState();
-    
     if (!currentUser) {
-      console.error('❌ No currentUser found after login');
-      notifications.show({
-        title: 'Error',
-        message: 'User data not found. Please try again.',
-        color: 'red',
-      });
+      notifications.show({ title: t('common.error'), message: t('login.err_no_user'), color: 'red' });
       return;
     }
-    
-    notifications.show({
-      title: 'Welcome back!',
-      message: 'Signed in successfully.',
-      color: 'teal',
-    });
+    notifications.show({ title: t('login.welcome_back'), message: t('login.signed_in'), color: 'teal' });
 
-    if (currentUser.role === 'client') {
-      navigate(ROUTES.clientDashboard, { replace: true });
-      return;
-    }
-
+    if (currentUser.role === 'client') { navigate(ROUTES.clientDashboard, { replace: true }); return; }
     if (currentUser.role === 'provider') {
       try {
         const status = await authService.getProviderOnboardingStatus();
         if (status.verification_status === 'rejected' && status.rejection_reason) {
           notifications.show({
-            title: 'Verification Update',
-            message: `Admin feedback: ${status.rejection_reason}`,
-            color: 'orange',
-            autoClose: 8000,
+            title: t('login.verification_update'),
+            message: t('login.admin_feedback', { reason: status.rejection_reason }),
+            color: 'orange', autoClose: 8000,
           });
         }
-        navigate(status.next_route, { replace: true });
-      } catch {
-        navigate(ROUTES.providerDashboard, { replace: true });
-      }
+        navigate(status.next_route || ROUTES.providerDashboard, { replace: true });
+      } catch { navigate(ROUTES.providerDashboard, { replace: true }); }
       return;
     }
-
-    navigate(ROUTES.adminDashboard, { replace: true });
+    if (currentUser.role === 'admin') { navigate(ROUTES.adminDashboard, { replace: true }); return; }
+    navigate(ROUTES.clientDashboard, { replace: true });
   };
 
-  // ─── Layout components ───────────────────────────────────────────────────
+  const inputStyles = {
+    input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' },
+    label: { color: 'var(--ot-text-body)' },
+  };
+
   const header = (
     <Center mb="xl">
       <Box style={{ textAlign: 'center' }}>
@@ -292,7 +226,7 @@ export default function Login() {
           <IconShieldCheck size={28} color="#fff" />
         </Box>
         <Text fw={800} size="xl" style={{ color: 'var(--ot-text-navy)' }}>OneTouch</Text>
-        <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>Your trusted services platform</Text>
+        <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>{t('login.brand_sub')}</Text>
       </Box>
     </Center>
   );
@@ -317,22 +251,11 @@ export default function Login() {
     </Paper>
   );
 
-  const inputStyles = {
-    input: { background: 'var(--ot-bg-row)', borderColor: 'var(--ot-border-input)', color: 'var(--ot-text-body)' },
-    label: { color: 'var(--ot-text-body)' },
-  };
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ═══════════════════════════════════════════════════════════════════════════
-
   // ── PHONE ENTRY ────────────────────────────────────────────────────────────
   if (screen === 'phone') return wrap(card(
     <>
-      <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>Sign In</Text>
-      <Text size="sm" mb="md" style={{ color: 'var(--ot-text-sub)' }}>
-        Enter your phone number to receive a verification code.
-      </Text>
+      <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>{t('login.title')}</Text>
+      <Text size="sm" mb="md" style={{ color: 'var(--ot-text-sub)' }}>{t('login.sub')}</Text>
 
       {phoneError && (
         <Alert icon={<IconAlertCircle size={16} />} color="orange" mb="md" radius="md">{phoneError}</Alert>
@@ -340,8 +263,8 @@ export default function Login() {
 
       <Stack gap="md">
         <TextInput
-          label="Phone Number"
-          placeholder="+251 900 000 000 or 0900000000"
+          label={t('login.phone_label')}
+          placeholder={t('login.phone_placeholder')}
           value={phone}
           onChange={e => { setPhone(e.target.value); setPhoneError(''); }}
           leftSection={<IconPhone size={16} />}
@@ -357,14 +280,14 @@ export default function Login() {
           rightSection={<IconArrowRight size={16} />}
           style={{ background: `linear-gradient(135deg, ${colors.navy}, ${colors.teal})`, border: 'none' }}
         >
-          Continue
+          {t('login.continue_btn')}
         </Button>
       </Stack>
 
       <Text ta="center" size="sm" mt="xl" style={{ color: 'var(--ot-text-sub)' }}>
-        Don't have an account?{' '}
+        {t('login.no_account')}{' '}
         <Anchor onClick={() => navigate(ROUTES.signup)} style={{ color: colors.teal, cursor: 'pointer' }}>
-          Create one
+          {t('login.create_one')}
         </Anchor>
       </Text>
     </>
@@ -378,16 +301,16 @@ export default function Login() {
           <IconMessageCircle size={22} />
         </ThemeIcon>
         <Box>
-          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Verify Your Phone</Text>
+          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>{t('login.verify_title')}</Text>
           <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
-            Code sent to <strong>{phone}</strong>
+            {t('login.code_sent_to')} <strong>{phone}</strong>
           </Text>
         </Box>
       </Group>
 
       {demoOtp && (
         <Alert icon={<IconShieldCheck size={16} />} color="blue" mb="md" radius="md" style={{ fontSize: '16px', fontWeight: 600 }}>
-          Demo code: <strong>{demoOtp}</strong>
+          {t('login.demo_code')} <strong>{demoOtp}</strong>
         </Alert>
       )}
 
@@ -398,7 +321,7 @@ export default function Login() {
       <Stack gap="xl">
         <Box>
           <Text size="sm" fw={600} c="var(--ot-text-body)" mb={12} ta="center">
-            Enter 6-digit code
+            {t('login.enter_6digit')}
           </Text>
           <Center>
             <PinInput
@@ -409,9 +332,7 @@ export default function Login() {
               onChange={(val) => {
                 setOtp(val);
                 setOtpError('');
-                if (val.length === 6) {
-                  handleOtpVerify(val);
-                }
+                if (val.length === 6) handleOtpVerify(val);
               }}
               disabled={otpAttempts >= 5 || otpVerifying}
               autoFocus
@@ -420,26 +341,20 @@ export default function Login() {
         </Box>
 
         {otpVerifying && (
-          <Text size="sm" c="var(--ot-text-sub)" ta="center">Verifying…</Text>
+          <Text size="sm" c="var(--ot-text-sub)" ta="center">{t('login.verifying')}</Text>
         )}
 
         <Group justify="space-between">
-          <Anchor
-            size="sm"
-            onClick={() => setScreen('phone')}
-            style={{ color: colors.teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <IconChevronLeft size={14} /> Change number
+          <Anchor size="sm" onClick={() => setScreen('phone')}
+            style={{ color: colors.teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <IconChevronLeft size={14} /> {t('login.change_number')}
           </Anchor>
-          <Anchor
-            size="sm"
-            onClick={handleResend}
+          <Anchor size="sm" onClick={handleResend}
             style={{
               color: otpSeconds > 0 || otpAttempts >= 5 ? 'var(--ot-text-muted)' : colors.teal,
               cursor: otpSeconds > 0 || otpAttempts >= 5 ? 'default' : 'pointer',
-            }}
-          >
-            {otpSeconds > 0 ? `Resend in ${otpSeconds}s` : 'Resend code'}
+            }}>
+            {otpSeconds > 0 ? t('login.resend_in', { seconds: otpSeconds }) : t('login.resend_code')}
           </Anchor>
         </Group>
       </Stack>

@@ -21,6 +21,7 @@ import {
   IconLock, IconInfoCircle, IconEPassport, IconCar, IconIdBadge2,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { COLORS, MOCK_OTP, ROUTES } from '../../utils/constants';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
@@ -148,6 +149,10 @@ export const MOCK_EXTRACTED: Record<IdType, Record<string, string>> = {
 // ─── Step labels & dot progress ───────────────────────────────────────────────
 export const STEP_LABELS = ['Identity', 'Phone & Biometric', 'Profile'];
 
+export function getStepLabels(t: (k: string) => string): string[] {
+  return [t('signup.step_identity'), t('signup.step_phone_bio'), t('signup.step_profile')];
+}
+
 export function StepDots({ current, labels = STEP_LABELS }: { current: number; labels?: string[] }) {
   return (
     <Group justify="center" gap={0} mb={32} wrap="nowrap">
@@ -221,8 +226,10 @@ export function StepDots({ current, labels = STEP_LABELS }: { current: number; l
 }
 
 // ─── Shell (page wrapper with nav + progress bar) ─────────────────────────────
-export function Shell({ children, step, labels = STEP_LABELS }: { children: React.ReactNode; step: number; labels?: string[] }) {
+export function Shell({ children, step, labels }: { children: React.ReactNode; step: number; labels?: string[] }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const resolvedLabels = labels ?? getStepLabels(t);
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)', display: 'flex', flexDirection: 'column' }}>
       <style>{SHARED_CSS}</style>
@@ -253,7 +260,7 @@ export function Shell({ children, step, labels = STEP_LABELS }: { children: Reac
             <Group gap={8}>
               <LanguageSwitcher />
               <Button variant="subtle" size="xs" color="gray" onClick={() => navigate(ROUTES.login)}>
-                Sign In
+                {t('signup.sign_in')}
               </Button>
             </Group>
           </Group>
@@ -265,7 +272,7 @@ export function Shell({ children, step, labels = STEP_LABELS }: { children: Reac
         <Box
           style={{
             height: '100%',
-            width: `${(step / labels.length) * 100}%`,
+            width: `${(step / resolvedLabels.length) * 100}%`,
             background: `linear-gradient(90deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})`,
             transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)',
             borderRadius: '0 2px 2px 0',
@@ -275,7 +282,7 @@ export function Shell({ children, step, labels = STEP_LABELS }: { children: Reac
 
       <Center flex={1} py={40} px={16}>
         <Container size={600} w="100%">
-          <StepDots current={step} labels={labels} />
+          <StepDots current={step} labels={resolvedLabels} />
           {children}
         </Container>
       </Center>
@@ -333,11 +340,12 @@ export function CardHeader({ icon, title, sub }: { icon: React.ReactNode; title:
 }
 
 // ─── Upload zone ──────────────────────────────────────────────────────────────
-export function UploadZone({ label, preview, onFile, scanning }: {
+export function UploadZone({ label, preview, onFile, scanning, t }: {
   label: string;
   preview: string | null;
   onFile: (f: File | null) => void;
   scanning: boolean;
+  t: (key: string) => string;
 }) {
   return (
     <Box
@@ -374,20 +382,20 @@ export function UploadZone({ label, preview, onFile, scanning }: {
                 <Box className="sf-scanline" />
                 <Loader color="white" size="xs" mt={10} />
                 <Text size="10px" c="white" fw={700} mt={6} style={{ letterSpacing: 1 }}>
-                  EXTRACTING...
+                  {t('signup.extracting_label')}
                 </Text>
               </Box>
             )}
           </Box>
           {!scanning && (
             <Badge color="teal" leftSection={<IconCheck size={10} />} variant="light" size="sm">
-              Uploaded
+              {t('signup.uploaded_badge')}
             </Badge>
           )}
           <FileButton onChange={onFile} accept="image/*">
             {(p) => (
               <Button {...p} variant="subtle" color="gray" size="xs" leftSection={<IconRotate size={12} />}>
-                Replace
+                {t('signup.replace_btn')}
               </Button>
             )}
           </FileButton>
@@ -409,12 +417,12 @@ export function UploadZone({ label, preview, onFile, scanning }: {
           </Box>
           <Stack gap={3}>
             <Text fw={600} size="sm" c="var(--ot-text-navy)">{label}</Text>
-            <Text size="11px" c="var(--ot-text-muted)">JPG, PNG · max 10 MB</Text>
+            <Text size="11px" c="var(--ot-text-muted)">{t('signup.file_hint')}</Text>
           </Stack>
           <FileButton onChange={onFile} accept="image/*">
             {(p) => (
               <Button {...p} variant="light" color="blue" size="sm" radius="xl" leftSection={<IconUpload size={13} />}>
-                Choose File
+                {t('signup.choose_file')}
               </Button>
             )}
           </FileButton>
@@ -427,6 +435,7 @@ export function UploadZone({ label, preview, onFile, scanning }: {
 // ─── STEP 1 — Identity Verification ──────────────────────────────────────────
 export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [idType, setIdType]       = useState<IdType | null>(null);
   const [frontUrl, setFrontUrl]   = useState<string | null>(null);
   const [backUrl, setBackUrl]     = useState<string | null>(null);
@@ -444,10 +453,10 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
   const backRef  = useRef<string | null>(null);
 
   const ID_OPTIONS: { type: IdType; label: string; icon: React.ReactNode; sub: string }[] = [
-    { type: 'passport',        label: 'Passport',        icon: <IconEPassport size={24} color={COLORS.navyBlue} />,  sub: 'Single page scan' },
-    { type: 'driving_license', label: 'Driving License', icon: <IconCar      size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
-    { type: 'national_id',     label: 'National ID',     icon: <IconIdBadge2 size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
-    { type: 'kebele_id',       label: 'Kebele ID',       icon: <IconIdBadge  size={24} color={COLORS.navyBlue} />,  sub: 'Front & back required' },
+    { type: 'passport',        label: t('signup.passport_label'),        icon: <IconEPassport size={24} color={COLORS.navyBlue} />,  sub: t('signup.passport_sub') },
+    { type: 'driving_license', label: t('signup.driving_license_label'), icon: <IconCar      size={24} color={COLORS.navyBlue} />,  sub: t('signup.driving_license_sub') },
+    { type: 'national_id',     label: t('signup.national_id_label'),     icon: <IconIdBadge2 size={24} color={COLORS.navyBlue} />,  sub: t('signup.national_id_sub') },
+    { type: 'kebele_id',       label: t('signup.kebele_id_label'),       icon: <IconIdBadge  size={24} color={COLORS.navyBlue} />,  sub: t('signup.kebele_id_sub') },
   ];
 
   function toDataURL(file: File): Promise<string> {
@@ -474,8 +483,8 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
       setDone(true);
       if (type !== 'passport' && !phoneMode && mock.phone) setPhoneMode('extracted');
       notifications.show({
-        title: 'Extraction Complete',
-        message: 'All available information has been extracted from your document.',
+        title: t('signup.extraction_complete'),
+        message: t('signup.extraction_complete_notify'),
         color: 'teal',
         icon: <IconCircleCheck size={16} />,
       });
@@ -530,13 +539,13 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
     <Card>
       <CardHeader
         icon={<IconFileText size={22} color={COLORS.navyBlue} />}
-        title="Identity Verification"
-        sub="Select your document type and upload — we'll extract your information automatically"
+        title={t('signup.identity_title')}
+        sub={t('signup.identity_sub')}
       />
 
       {/* ID Type Selection */}
       <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={12}>
-        Document Type
+        {t('signup.doc_type_label')}
       </Text>
       <SimpleGrid cols={2} spacing={10} mb={24}>
         {ID_OPTIONS.map(opt => (
@@ -588,33 +597,36 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
           {isPassport ? (
             <>
               <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>
-                Passport Photo Page
+                {t('signup.passport_page_label')}
               </Text>
               <UploadZone
-                label="Upload photo page"
+                label={t('signup.upload_photo_page')}
                 preview={frontUrl}
                 onFile={(f) => handleFront(f, idType)}
                 scanning={scanning}
+                t={t}
               />
             </>
           ) : (
             <SimpleGrid cols={2} spacing={12} mb={4}>
               <Stack gap={6}>
-                <Text size="xs" fw={600} c="var(--ot-text-navy)">Front Side</Text>
+                <Text size="xs" fw={600} c="var(--ot-text-navy)">{t('signup.front_side')}</Text>
                 <UploadZone
-                  label="Front of document"
+                  label={t('signup.front_of_doc')}
                   preview={frontUrl}
                   onFile={(f) => handleFront(f, idType)}
                   scanning={scanning && !!backUrl}
+                  t={t}
                 />
               </Stack>
               <Stack gap={6}>
-                <Text size="xs" fw={600} c="var(--ot-text-navy)">Back Side</Text>
+                <Text size="xs" fw={600} c="var(--ot-text-navy)">{t('signup.back_side')}</Text>
                 <UploadZone
-                  label="Back of document"
+                  label={t('signup.back_of_doc')}
                   preview={backUrl}
                   onFile={(f) => handleBack(f, idType)}
                   scanning={scanning && !!frontUrl}
+                  t={t}
                 />
               </Stack>
             </SimpleGrid>
@@ -623,7 +635,7 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
           {/* Scanning indicator */}
           {scanning && (
             <Alert icon={<Loader size="xs" />} color="blue" variant="light" radius="md" mt={16}>
-              <Text size="sm">Extracting information from your document…</Text>
+              <Text size="sm">{t('signup.extracting_info')}</Text>
             </Alert>
           )}
 
@@ -632,8 +644,8 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
             <Box mt={22} className="sf-fade-up">
               <Group gap={8} mb={14}>
                 <IconCircleCheck size={17} color={COLORS.tealBlue} />
-                <Text size="sm" fw={700} c={COLORS.tealBlue}>Extraction Complete</Text>
-                <Badge size="xs" color="teal" variant="dot">Review & edit if needed</Badge>
+                <Text size="sm" fw={700} c={COLORS.tealBlue}>{t('signup.extraction_complete')}</Text>
+                <Badge size="xs" color="teal" variant="dot">{t('signup.review_edit')}</Badge>
               </Group>
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={10}>
                 {ID_FIELDS[idType]
@@ -660,19 +672,19 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
             <Box mt={24} className="sf-fade-up">
               <Group gap={8} mb={12}>
                 <IconPhone size={16} color={COLORS.navyBlue} />
-                <Text size="sm" fw={700} c="var(--ot-text-navy)">Phone Number for OTP</Text>
+                <Text size="sm" fw={700} c="var(--ot-text-navy)">{t('signup.phone_otp_label')}</Text>
               </Group>
 
               {/* Show extracted phone choice for non-passport with phone */}
               {showPhoneChoice && (
                 <Box mb={14}>
                   <Text size="xs" c="var(--ot-text-sub)" mb={10}>
-                    A phone number was detected on your document. Select which to use for verification:
+                    {t('signup.phone_detected')}
                   </Text>
                   <SimpleGrid cols={2} spacing={8}>
                     {[
-                      { mode: 'extracted' as const, label: 'Use from document', value: docPhone },
-                      { mode: 'manual'   as const, label: 'Enter a different number', value: null },
+                      { mode: 'extracted' as const, label: t('signup.use_from_doc'), value: docPhone },
+                      { mode: 'manual'   as const, label: t('signup.enter_different'), value: null },
                     ].map(opt => (
                       <Box
                         key={opt.mode}
@@ -692,12 +704,12 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
 
               {showManualEntry && (
                 <TextInput
-                  placeholder="+251 9XX XXX XXX"
+                  placeholder={t('signup.phone_placeholder')}
                   leftSection={<IconPhone size={15} />}
                   value={manualPhone}
                   onChange={e => setManualPhone(e.target.value)}
                   size="sm"
-                  description={isPassport ? 'Passport does not contain a phone number — please enter manually' : undefined}
+                  description={isPassport ? t('signup.passport_no_phone') : undefined}
                 />
               )}
             </Box>
@@ -720,7 +732,7 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
                 onChange={e => setAgreed(e.currentTarget.checked)}
                 label={
                   <Text size="sm" c="var(--ot-text-body)">
-                    I agree to the{' '}
+                    {t('signup.agree_label')}{' '}
                     <Text
                       component="span"
                       c={COLORS.tealBlue}
@@ -728,9 +740,9 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
                       style={{ cursor: 'pointer', textDecoration: 'underline' }}
                       onClick={e => { e.preventDefault(); navigate(ROUTES.termsOfService); }}
                     >
-                      Terms of Service
+                      {t('signup.terms')}
                     </Text>
-                    {' '}and{' '}
+                    {' '}{t('signup.and')}{' '}
                     <Text
                       component="span"
                       c={COLORS.tealBlue}
@@ -738,7 +750,7 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
                       style={{ cursor: 'pointer', textDecoration: 'underline' }}
                       onClick={e => { e.preventDefault(); navigate(ROUTES.privacyPolicy); }}
                     >
-                      Privacy Policy
+                      {t('signup.privacy')}
                     </Text>
                   </Text>
                 }
@@ -761,7 +773,7 @@ export function StepIdentity({ onNext }: { onNext: (r: IdentityResult) => void }
               transition: 'all 0.2s',
             }}
           >
-            Continue to Phone & Biometric
+            {t('signup.continue_phone_bio')}
           </Button>
         </Box>
       )}
@@ -789,6 +801,7 @@ export function StepVerify({
   onBack: () => void;
   onDone: (faceUrl: string | null) => void;
 }) {
+  const { t } = useTranslation();
   const [phase, setPhase]           = useState<Phase2>('otp_send');
   const [pin, setPin]               = useState('');
   const [otpError, setOtpError]     = useState('');
@@ -820,7 +833,7 @@ export function StepVerify({
       setOtpError('');
       setPhase('bio_idle');
     } else {
-      setOtpError('Incorrect verification code. Please try again.');
+      setOtpError(t('signup.otp_error'));
     }
   };
 
@@ -892,13 +905,13 @@ export function StepVerify({
             <IconPhone size={20} color={COLORS.navyBlue} />
           </Box>
           <Stack gap={2}>
-            <Text size="xs" c="var(--ot-text-sub)" fw={500}>OTP will be sent to</Text>
+            <Text size="xs" c="var(--ot-text-sub)" fw={500}>{t('signup.otp_send_label')}</Text>
             <Text size="sm" fw={700} c="var(--ot-text-navy)">{phone}</Text>
           </Stack>
         </Group>
       </Box>
       <Alert icon={<IconInfoCircle size={15} />} color="blue" variant="light" radius="md">
-        <Text size="sm">A 6-digit verification code will be sent to your phone number via SMS.</Text>
+        <Text size="sm">{t('signup.otp_sms_info')}</Text>
       </Alert>
       <Button
         fullWidth
@@ -908,10 +921,10 @@ export function StepVerify({
         onClick={sendOtp}
         style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
       >
-        Send Verification Code
+        {t('signup.send_code_btn')}
       </Button>
       <Button variant="subtle" color="gray" size="sm" leftSection={<IconArrowLeft size={14} />} onClick={onBack}>
-        Back to Identity
+        {t('signup.back_to_identity')}
       </Button>
     </Stack>
   );
@@ -919,7 +932,7 @@ export function StepVerify({
   const renderOtpVerify = () => (
     <Stack gap={20} align="center" className="sf-fade-up">
       <Text size="sm" c="var(--ot-text-sub)" ta="center">
-        Enter the 6-digit code sent to <Text component="span" fw={700} c="var(--ot-text-navy)">{phone}</Text>
+        {t('signup.enter_code_hint')} <Text component="span" fw={700} c="var(--ot-text-navy)">{phone}</Text>
       </Text>
       <PinInput
         length={6}
@@ -948,10 +961,10 @@ export function StepVerify({
         }}
         rightSection={<IconArrowRight size={16} />}
       >
-        Verify Code
+        {t('signup.verify_code_btn')}
       </Button>
       <Text size="xs" c="var(--ot-text-muted)">
-        Didn't receive it?{' '}
+        {t('signup.no_code')}{' '}
         <Text
           component="span"
           c={COLORS.tealBlue}
@@ -959,10 +972,10 @@ export function StepVerify({
           style={{ cursor: 'pointer' }}
           onClick={sendOtp}
         >
-          Resend code
+          {t('signup.resend_code')}
         </Text>
       </Text>
-      <Text size="10px" c="var(--ot-text-muted)">(Demo: use <strong>123456</strong>)</Text>
+      <Text size="10px" c="var(--ot-text-muted)">{t('signup.demo_hint')}</Text>
     </Stack>
   );
 
@@ -982,13 +995,13 @@ export function StepVerify({
         <IconCamera size={46} color={COLORS.tealBlue} strokeWidth={1.5} />
       </Box>
       <Stack gap={6} align="center">
-        <Text fw={800} size="lg" c="var(--ot-text-navy)">Biometric Verification</Text>
+        <Text fw={800} size="lg" c="var(--ot-text-navy)">{t('signup.bio_title')}</Text>
         <Text size="sm" c="var(--ot-text-sub)" ta="center" maw={340}>
-          We'll take a live selfie and match it against your identity document to confirm your identity.
+          {t('signup.bio_sub')}
         </Text>
       </Stack>
       <Alert icon={<IconInfoCircle size={15} />} color="teal" variant="light" radius="md" w="100%">
-        <Text size="sm">All biometric data is processed locally on your device and never stored permanently.</Text>
+        <Text size="sm">{t('signup.bio_privacy')}</Text>
       </Alert>
       <Button
         fullWidth
@@ -997,14 +1010,14 @@ export function StepVerify({
         onClick={startCamera}
         style={{ background: `linear-gradient(135deg, ${COLORS.tealDark} 0%, ${COLORS.tealBlue} 100%)` }}
       >
-        Start Face Scan
+        {t('signup.start_face_scan')}
       </Button>
     </Stack>
   );
 
   const renderBioCamera = () => (
     <Stack align="center" gap={20} className="sf-fade-up">
-      <Text fw={700} size="md" c="var(--ot-text-navy)">Position your face within the oval</Text>
+      <Text fw={700} size="md" c="var(--ot-text-navy)">{t('signup.position_face')}</Text>
       <Box style={{ position: 'relative', width: 280, height: 210 }}>
         <video
           ref={videoRef}
@@ -1032,7 +1045,7 @@ export function StepVerify({
         onClick={captureFrame}
         style={{ background: `linear-gradient(135deg, ${COLORS.tealDark} 0%, ${COLORS.tealBlue} 100%)` }}
       >
-        Capture
+        {t('signup.capture_btn')}
       </Button>
     </Stack>
   );
@@ -1049,8 +1062,8 @@ export function StepVerify({
         }
       />
       <Stack gap={4} align="center">
-        <Text fw={700} size="md" c="var(--ot-text-navy)">Analyzing biometric data…</Text>
-        <Text size="sm" c="var(--ot-text-sub)">Please wait while we verify your identity</Text>
+        <Text fw={700} size="md" c="var(--ot-text-navy)">{t('signup.analyzing')}</Text>
+        <Text size="sm" c="var(--ot-text-sub)">{t('signup.analyzing_sub')}</Text>
       </Stack>
     </Stack>
   );
@@ -1059,8 +1072,8 @@ export function StepVerify({
     <Stack align="center" gap={24} className="sf-fade-up">
       <Loader size="lg" color="teal" type="bars" />
       <Stack gap={4} align="center">
-        <Text fw={700} size="md" c="var(--ot-text-navy)">Matching with document…</Text>
-        <Text size="sm" c="var(--ot-text-sub)">Comparing your face scan with uploaded ID</Text>
+        <Text fw={700} size="md" c="var(--ot-text-navy)">{t('signup.matching')}</Text>
+        <Text size="sm" c="var(--ot-text-sub)">{t('signup.matching_sub')}</Text>
       </Stack>
     </Stack>
   );
@@ -1091,9 +1104,9 @@ export function StepVerify({
         <IconCircleCheck size={38} color={COLORS.tealBlue} />
       </Box>
       <Stack gap={6} align="center">
-        <Text fw={800} size="xl" c={COLORS.navyBlue}>Identity Confirmed!</Text>
+        <Text fw={800} size="xl" c={COLORS.navyBlue}>{t('signup.identity_confirmed')}</Text>
         <Text size="sm" c="var(--ot-text-sub)" ta="center">
-          Your face has been successfully verified. Proceeding to profile setup.
+          {t('signup.identity_confirmed_sub')}
         </Text>
       </Stack>
       <Button
@@ -1103,7 +1116,7 @@ export function StepVerify({
         onClick={() => onDone(capturedFaceUrl)}
         style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
       >
-        Continue to Profile Setup
+        {t('signup.continue_profile')}
       </Button>
     </Stack>
   );
@@ -1123,9 +1136,9 @@ export function StepVerify({
         <IconX size={36} color="#E53E3E" />
       </Box>
       <Stack gap={6} align="center">
-        <Text fw={800} size="xl" c="#C53030">Verification Failed</Text>
+        <Text fw={800} size="xl" c="#C53030">{t('signup.bio_failed_title')}</Text>
         <Text size="sm" c="var(--ot-text-sub)" ta="center">
-          We could not match your face with the uploaded document. Please try again in good lighting.
+          {t('signup.bio_failed_sub')}
         </Text>
       </Stack>
       <Button
@@ -1136,7 +1149,7 @@ export function StepVerify({
         leftSection={<IconRotate size={16} />}
         onClick={() => { setPhase('bio_idle'); setScanPct(0); setCapturedFaceUrl(null); }}
       >
-        Try Again
+        {t('signup.try_again')}
       </Button>
     </Stack>
   );
@@ -1145,16 +1158,16 @@ export function StepVerify({
     <Card>
       <CardHeader
         icon={<IconScan size={22} color={COLORS.navyBlue} />}
-        title={phase.startsWith('otp') ? 'Phone Verification' : 'Biometric Verification'}
+        title={phase.startsWith('otp') ? t('signup.phone_verify_title') : t('signup.bio_title')}
         sub={
-          phase === 'otp_send'    ? 'Verify your phone number via SMS OTP'          :
-          phase === 'otp_verify'  ? 'Enter the 6-digit code sent to your phone'     :
-          phase === 'bio_idle'    ? 'Live face scan to confirm your identity'        :
-          phase === 'bio_camera'  ? 'Position your face and capture'                :
-          phase === 'bio_scanning'? 'Analyzing your biometric data'                 :
-          phase === 'bio_matching'? 'Matching face with identity document'           :
-          phase === 'bio_success' ? 'Identity confirmed successfully'               :
-                                    'Biometric match unsuccessful'
+          phase === 'otp_send'     ? t('signup.sub_otp_send')     :
+          phase === 'otp_verify'   ? t('signup.sub_otp_verify')   :
+          phase === 'bio_idle'     ? t('signup.sub_bio_idle')     :
+          phase === 'bio_camera'   ? t('signup.sub_bio_camera')   :
+          phase === 'bio_scanning' ? t('signup.sub_bio_scanning') :
+          phase === 'bio_matching' ? t('signup.sub_bio_matching') :
+          phase === 'bio_success'  ? t('signup.sub_bio_success')  :
+                                     t('signup.sub_bio_failed')
         }
       />
       {phase === 'otp_send'    && renderOtpSend()}

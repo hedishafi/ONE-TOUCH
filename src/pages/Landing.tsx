@@ -10,6 +10,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LandingNavbar } from '../components/LandingNavbar';
 import { AIHelpCenter } from '../components/AIHelpCenter';
@@ -157,29 +158,30 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   'device-laptop': <IconDeviceLaptop size={24} />,
 };
 
-const FEATURES = [
-  { icon: <IconShieldCheck size={24} />, color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Identity Verified', desc: 'Every provider is government-ID checked before being listed on the platform.' },
-  { icon: <IconBolt size={24} />,        color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Instant VoIP Call', desc: 'Connect in seconds with a free in-app call — no phone number sharing needed.' },
-  { icon: <IconMapPin size={24} />,      color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Location-Based',   desc: 'See only providers within your chosen radius on a live Addis Ababa map.' },
-  { icon: <IconWallet size={24} />,      color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Payment Process', desc: 'Payments are processed upfront to confirm the booking. This platform connects clients with service providers and does not hold funds in escrow.' },
-];
-
-const STATS = [
-  { value: '2,000+', label: 'Verified Providers' },
-  { value: '15,000+', label: 'Jobs Completed' },
-  { value: '4.8★', label: 'Average Rating' },
-  { value: '98%', label: 'Satisfaction Rate' },
-];
-
-const STEPS = [
-  { n: '01', title: 'Browse & Discover', desc: 'Search by category and see verified providers near you on a live Addis Ababa map.', icon: <IconMapPin size={20} /> },
-  { n: '02', title: 'Call Free & Agree', desc: 'Free in-app VoIP call. Agree on price with full transparency before any payment.', icon: <IconPhone size={20} /> },
-  { n: '03', title: 'Pay Secure & Review', desc: 'Escrow holds payment and releases it only after you confirm the job is done.', icon: <IconShieldCheck size={20} /> },
-];
-
 export function Landing() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { categories } = useServiceCatalog();
+
+  const FEATURES = [
+    { icon: <IconShieldCheck size={24} />, color: '#000089', bg: 'rgba(0,0,137,0.08)', title: t('landing.feature1_title'), desc: t('landing.feature1_desc') },
+    { icon: <IconBolt size={24} />,        color: '#008080', bg: 'rgba(0,128,128,0.08)', title: t('landing.feature2_title'), desc: t('landing.feature2_desc') },
+    { icon: <IconMapPin size={24} />,      color: '#000089', bg: 'rgba(0,0,137,0.08)', title: t('landing.feature3_title'), desc: t('landing.feature3_desc') },
+    { icon: <IconWallet size={24} />,      color: '#008080', bg: 'rgba(0,128,128,0.08)', title: t('landing.feature4_title'), desc: t('landing.feature4_desc') },
+  ];
+
+  const STATS = [
+    { value: '2,000+', label: t('landing.stats_providers') },
+    { value: '15,000+', label: t('landing.stats_jobs') },
+    { value: '4.8★', label: t('landing.stats_rating') },
+    { value: '98%', label: t('landing.stats_satisfaction') },
+  ];
+
+  const STEPS = [
+    { n: '01', title: t('landing.hiw_step1_title'), desc: t('landing.hiw_step1_desc'), icon: <IconMapPin size={20} /> },
+    { n: '02', title: t('landing.hiw_step2_title'), desc: t('landing.hiw_step2_desc'), icon: <IconPhone size={20} /> },
+    { n: '03', title: t('landing.hiw_step3_title'), desc: t('landing.hiw_step3_desc'), icon: <IconShieldCheck size={20} /> },
+  ];
 
   function CountUp({ end, duration = 1500, decimals = 0, suffix = '' }: { end: number; duration?: number; decimals?: number; suffix?: string }) {
     const [value, setValue] = useState(0);
@@ -228,24 +230,24 @@ export function Landing() {
             <Stack flex={1} miw={280} gap="xl">
               <Badge className="afu1" size="lg"
                 style={{ width:'fit-content',background:`${COLORS.tealBlue}12`,color:COLORS.tealBlue,border:`1px solid ${COLORS.tealBlue}30`,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase',fontSize:11 }}>
-                Now Live in Addis Ababa
+                {t('landing.hero_badge')}
               </Badge>
 
               <Text component="h1" className="afu2" fw={900} lh={1.08}
                 style={{ fontSize:'clamp(2.6rem,5.5vw,4rem)',letterSpacing:'-2px',color:COLORS.navyBlue,margin:0 }}>
-                Find Trusted{' '}
+                {t('landing.hero_title_1')}{' '}
                 <Text component="span" style={{
                   background:`linear-gradient(90deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)`,
                   WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',
                 }}>
-                  Professionals
+                  {t('landing.hero_title_2')}
                 </Text>
-                {'\n'}Near You — Instantly.
+                {'\n'}{t('landing.hero_title_3')}
               </Text>
 
               <Text className="afu3" size="lg" lh={1.7} maw={480}
                 style={{ color:'#555' }}>
-                ONE TOUCH connects clients with verified service providers across Addis Ababa. Book, pay, and review — all in one place.
+                {t('landing.hero_sub')}
               </Text>
 
               <Group className="afu4" gap="md" wrap="wrap">
@@ -253,12 +255,12 @@ export function Landing() {
                   rightSection={<IconArrowRight size={18} />}
                   style={{ color:'white',fontWeight:800,padding:'14px 32px',fontSize:16 }}
                   onClick={() => navigate(ROUTES.signup)}>
-                  Get Started Free
+                  {t('landing.hero_cta_start')}
                 </Button>
                 <Button size="xl" className="btn-outline-navy" variant="outline"
                   style={{ padding:'14px 32px',fontSize:15,fontWeight:700 }}
                   onClick={() => navigate(ROUTES.login)}>
-                  Login to Dashboard
+                  {t('landing.hero_cta_login')}
                 </Button>
               </Group>
 
@@ -270,13 +272,17 @@ export function Landing() {
                   boxShadow:`0 4px 18px ${COLORS.navyBlue}40` }}>
                 <IconPhone size={18} color="white"/>
                 <Box>
-                  <Text size="xs" c="rgba(255,255,255,0.75)" fw={600} lh={1}>Call us free</Text>
-                  <Text size="md" c="white" fw={900} lh={1.2}>8182</Text>
+                  <Text size="xs" c="rgba(255,255,255,0.75)" fw={600} lh={1}>{t('landing.hero_call_label')}</Text>
+                  <Text size="md" c="white" fw={900} lh={1.2}>{t('landing.hero_call_number')}</Text>
                 </Box>
               </Box>
 
               <Group className="afu4" gap="xl" wrap="wrap">
-                {[['10,000+','Happy Users'],['4.8★','Avg Rating'],['98%','Satisfaction']].map(([v,l]) => {
+                {[
+                  ['10,000+', t('landing.hero_stat_users')],
+                  ['4.8★',   t('landing.hero_stat_rating')],
+                  ['98%',    t('landing.hero_stat_satisfaction')],
+                ].map(([v,l]) => {
                   const raw = String(v);
                   const cleaned = raw.replace(/,/g, '');
                   let main = raw;
@@ -306,8 +312,8 @@ export function Landing() {
                 <Box style={{ position:'absolute',top:0,left:0,right:0,height:4,background:`linear-gradient(90deg,${COLORS.navyBlue},${COLORS.tealBlue},${COLORS.lemonYellow})` }} />
 
                 <Group mb="lg" justify="space-between">
-                  <Text fw={800} size="md" c={COLORS.navyBlue}>Nearby Providers</Text>
-                  <Badge size="sm" style={{ background:`${COLORS.tealBlue}15`,color:COLORS.tealBlue }}>Live</Badge>
+                  <Text fw={800} size="md" c={COLORS.navyBlue}>{t('landing.hero_card_nearby')}</Text>
+                  <Badge size="sm" style={{ background:`${COLORS.tealBlue}15`,color:COLORS.tealBlue }}>{t('landing.hero_card_live')}</Badge>
                 </Group>
 
                 <Stack gap="sm">
@@ -334,7 +340,7 @@ export function Landing() {
                         </Group>
                         <Box ta="right" style={{ flexShrink:0 }}>
                           <Text size="xs" fw={700} c={COLORS.tealBlue}>{p.price}</Text>
-                          <Button size="xs" mt={4} className="btn-teal" style={{ color:'white',fontSize:11 }} onClick={() => navigate(ROUTES.signup)}>Call</Button>
+                          <Button size="xs" mt={4} className="btn-teal" style={{ color:'white',fontSize:11 }} onClick={() => navigate(ROUTES.signup)}>{t('landing.hero_card_call')}</Button>
                         </Box>
                       </Group>
                     </Box>
@@ -344,15 +350,15 @@ export function Landing() {
                 <Box mt="md" p="xs" style={{ background:`linear-gradient(135deg,${COLORS.navyBlue}08,${COLORS.tealBlue}08)`,borderRadius:10,textAlign:'center' }}>
                   <Text size="xs" fw={600}>
                     <span style={{ color: COLORS.tealBlue, marginRight: 6 }}>{'📍'}</span>
-                    <span style={{ color: COLORS.lemonYellow, fontWeight: 700 }}>Bole, Addis Ababa</span>
-                    <span style={{ color: '#6B7280', marginLeft: 8 }}>· 12 providers online</span>
+                    <span style={{ color: COLORS.lemonYellow, fontWeight: 700 }}>{t('landing.hero_card_location')}</span>
+                    <span style={{ color: '#6B7280', marginLeft: 8 }}>{t('landing.hero_card_online')}</span>
                   </Text>
                 </Box>
               </Paper>
 
               {/* Floating badge top-right */}
               <Box style={{ position:'absolute',top:-16,right:-16,background:COLORS.lemonYellow,borderRadius:14,padding:'8px 14px',boxShadow:'0 8px 20px rgba(245,230,66,0.4)' }}>
-                <Text fw={800} size="xs" c={COLORS.navyBlue}>Verified ✓</Text>
+                <Text fw={800} size="xs" c={COLORS.navyBlue}>{t('landing.hero_card_verified')}</Text>
               </Box>
 
               {/* Floating badge bottom-left */}
@@ -362,8 +368,8 @@ export function Landing() {
                     <IconShieldCheck size={14} color={COLORS.tealBlue} />
                   </Box>
                   <Box>
-                    <Text size="xs" fw={700} c={COLORS.navyBlue}>Escrow Protected</Text>
-                    <Text size="10px" c="dimmed">Pay only when done</Text>
+                    <Text size="xs" fw={700} c={COLORS.navyBlue}>{t('landing.hero_card_escrow')}</Text>
+                    <Text size="10px" c="dimmed">{t('landing.hero_card_escrow_sub')}</Text>
                   </Box>
                 </Group>
               </Box>
@@ -419,14 +425,14 @@ export function Landing() {
         <Container size="lg" py={80} px={{ base:'md',sm:'xl' }}>
           <Stack align="center" mb={52} gap="sm">
             <Badge size="lg" style={{ background:`${COLORS.navyBlue}10`,color:COLORS.navyBlue,border:`1px solid ${COLORS.navyBlue}20`,fontWeight:700 }}>
-              Our Services
+              {t('landing.services_badge')}
             </Badge>
             <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing:'-0.5px' }}>
-              What can we help you with?
+              {t('landing.services_title')}
             </Text>
             <Box style={{ width:64,height:4,borderRadius:2,background:`linear-gradient(90deg,${COLORS.navyBlue},${COLORS.tealBlue})`,animation:'draw-line 0.8s ease both' }} />
             <Text size="md" c="dimmed" ta="center" maw={480} mt={8}>
-              From auto repairs to home cleaning — find verified professionals near you in Addis Ababa.
+              {t('landing.services_sub')}
             </Text>
           </Stack>
 
@@ -442,7 +448,7 @@ export function Landing() {
                   {CATEGORY_ICONS[cat.icon] ?? <IconBolt size={24} />}
                 </ThemeIcon>
                 <Text fw={700} size="sm" c={COLORS.navyBlue}>{cat.name}</Text>
-                <Text size="xs" c="dimmed" mt={4}>{cat.subcategories.length} services</Text>
+                <Text size="xs" c="dimmed" mt={4}>{t('landing.services_count', { count: cat.subcategories.length })}</Text>
               </Box>
             ))}
           </SimpleGrid>
@@ -452,7 +458,7 @@ export function Landing() {
               className="btn-outline-navy"
               style={{ fontWeight:700 }}
               onClick={() => navigate(ROUTES.services)}>
-              View All Services
+              {t('landing.services_view_all')}
             </Button>
           </Group>
         </Container>
@@ -462,10 +468,10 @@ export function Landing() {
           <Container size="lg">
             <Stack align="center" mb={52} gap="sm">
               <Badge size="lg" style={{ background:`${COLORS.tealBlue}12`,color:COLORS.tealBlue,border:`1px solid ${COLORS.tealBlue}25`,fontWeight:700 }}>
-                Why ONE TOUCH?
+                {t('landing.features_badge')}
               </Badge>
               <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing:'-0.5px' }}>
-                Built for trust, speed & transparency
+                {t('landing.features_title')}
               </Text>
               <Box style={{ width:64,height:4,borderRadius:2,background:`linear-gradient(90deg,${COLORS.tealBlue},${COLORS.navyBlue})` }} />
             </Stack>
@@ -492,10 +498,10 @@ export function Landing() {
         <Container size="lg" py={80} px={{ base:'md',sm:'xl' }}>
           <Stack align="center" mb={60} gap="sm">
             <Badge size="lg" style={{ background:`${COLORS.lemonYellow}30`,color:'#7A6B00',border:`1px solid ${COLORS.lemonYellow}`,fontWeight:700 }}>
-              How It Works
+              {t('landing.hiw_badge')}
             </Badge>
             <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing:'-0.5px' }}>
-              3 steps to get help
+              {t('landing.hiw_title')}
             </Text>
             <Box style={{ width:64,height:4,borderRadius:2,background:`linear-gradient(90deg,${COLORS.lemonYellow},${COLORS.tealBlue})` }} />
           </Stack>
@@ -542,19 +548,19 @@ export function Landing() {
             {/* ── PART 1: GET STARTED — centered hero CTA ── */}
             <Stack align="center" ta="center" mb={72} gap="lg">
               <Badge size="lg" style={{ background:`${COLORS.tealBlue}12`, color:COLORS.tealBlue, border:`1px solid ${COLORS.tealBlue}30`, fontWeight:700, letterSpacing:'0.06em' }}>
-                Ready?
+                {t('landing.cta_badge')}
               </Badge>
 
               <Text fw={900} c={COLORS.navyBlue}
                 style={{ fontSize:'clamp(2rem,4.5vw,3.2rem)', letterSpacing:'-1.2px', lineHeight:1.08 }}>
-                Start finding trusted pros{' '}
+                {t('landing.cta_title_1')}{' '}
                 <Text component="span" style={{ background:`linear-gradient(90deg,${COLORS.navyBlue},${COLORS.tealBlue})`, WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>
-                  today.
+                  {t('landing.cta_title_2')}
                 </Text>
               </Text>
 
               <Text size="md" c="dimmed" maw={480} lh={1.7}>
-                Join thousands of clients and providers on ONE TOUCH Ethiopia — the fastest way to find verified professionals near you.
+                {t('landing.cta_sub')}
               </Text>
 
               <Button
@@ -562,12 +568,8 @@ export function Landing() {
                 rightSection={<IconArrowRight size={18} />}
                 style={{
                   background: `linear-gradient(135deg, ${COLORS.navyBlue}, ${COLORS.tealBlue})`,
-                  color: 'white',
-                  fontWeight: 800,
-                  fontSize: 17,
-                  padding: '16px 44px',
-                  borderRadius: 16,
-                  border: 'none',
+                  color: 'white', fontWeight: 800, fontSize: 17,
+                  padding: '16px 44px', borderRadius: 16, border: 'none',
                   animation: 'btn-glow 3s ease-in-out infinite',
                   transition: 'transform 0.22s ease, box-shadow 0.22s ease',
                 }}
@@ -575,7 +577,7 @@ export function Landing() {
                 onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow=''; }}
                 onClick={() => navigate(ROUTES.signup)}
               >
-                Get Started Free
+                {t('landing.cta_btn')}
               </Button>
             </Stack>
 
@@ -601,13 +603,13 @@ export function Landing() {
                     <IconDeviceMobile size={22} color={COLORS.tealBlue} />
                   </Box>
                   <Box>
-                    <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>Download Our App</Text>
-                    <Text size="xs" c="dimmed">Available on Android & iOS</Text>
+                    <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>{t('landing.app_title')}</Text>
+                    <Text size="xs" c="dimmed">{t('landing.app_sub')}</Text>
                   </Box>
                 </Group>
 
                 <Text size="sm" c="dimmed" lh={1.75} mb={24}>
-                  Book services, track your provider in real-time, and manage payments — all from your phone.
+                  {t('landing.app_desc')}
                 </Text>
 
                 {/* Store badges side-by-side */}
@@ -631,8 +633,8 @@ export function Landing() {
                   >
                     <IconBrandGooglePlay size={28} color="white" style={{ flexShrink:0 }} />
                     <Box>
-                      <Text size="8px" c="rgba(255,255,255,0.85)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Get it on</Text>
-                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.15 }}>Google Play</Text>
+                      <Text size="8px" c="rgba(255,255,255,0.85)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>{t('landing.app_google_label')}</Text>
+                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.15 }}>{t('landing.app_google_store')}</Text>
                     </Box>
                   </Box>
 
@@ -656,8 +658,8 @@ export function Landing() {
                   >
                     <IconBrandApple size={30} color="white" style={{ flexShrink:0 }} />
                     <Box>
-                      <Text size="8px" c="rgba(255,255,255,0.95)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>Download on the</Text>
-                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.12 }}>App Store</Text>
+                      <Text size="8px" c="rgba(255,255,255,0.95)" fw={600} style={{ textTransform:'uppercase', letterSpacing:'0.07em' }}>{t('landing.app_apple_label')}</Text>
+                      <Text size="sm" fw={800} c="white" style={{ lineHeight:1.12 }}>{t('landing.app_apple_store')}</Text>
                     </Box>
                   </Box>
                 </Group>
@@ -666,7 +668,7 @@ export function Landing() {
                   <Group gap={1}>
                     {[1,2,3,4,5].map(s => <IconStar key={s} size={12} fill={COLORS.lemonYellow} color={COLORS.lemonYellow} />)}
                   </Group>
-                  <Text size="xs" c="dimmed" fw={500}>4.8 · 2,000+ reviews</Text>
+                  <Text size="xs" c="dimmed" fw={500}>{t('landing.app_reviews')}</Text>
                 </Group>
               </Paper>
 
@@ -687,13 +689,13 @@ export function Landing() {
                     <Box style={{ position:'absolute', top:-2, right:-2, width:10, height:10, borderRadius:'50%', background:'#22c55e', border:'2px solid white', boxShadow:'0 0 6px #22c55e' }} />
                   </Box>
                   <Box>
-                    <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>Call Center</Text>
-                    <Text size="xs" c="dimmed">24/7 · English & Amharic</Text>
+                    <Text fw={800} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>{t('landing.call_title')}</Text>
+                    <Text size="xs" c="dimmed">{t('landing.call_sub')}</Text>
                   </Box>
                 </Group>
 
                 <Text size="sm" c="dimmed" lh={1.75} mb={24}>
-                  Need help? Our agents handle bookings, disputes, and refunds. Or chat with our AI assistant for instant answers.
+                  {t('landing.call_desc')}
                 </Text>
 
                 {/* Phone number card (softer background) */}
@@ -704,15 +706,15 @@ export function Landing() {
                     border: '1px solid rgba(6,182,212,0.08)'
                   }}>
                   <Text size="xs" c={COLORS.navyBlue} fw={700} mb={6} style={{ textTransform:'uppercase', letterSpacing:'0.08em', opacity:0.95 }}>
-                    Support hotline
+                    {t('landing.call_hotline_label')}
                   </Text>
                   <Group gap={10} align="center">
                     <IconPhone size={18} color={COLORS.tealBlue} />
                     <Text fw={900} c={COLORS.navyBlue} style={{ fontSize:'clamp(1.1rem,2.2vw,1.5rem)', letterSpacing:'-0.5px' }}>
-                      1234
+                      {t('landing.call_number')}
                     </Text>
                   </Group>
-                  <Text size="xs" c="#6B7280" mt={4}>Mon – Sun · 24hrs · Free in-app call</Text>
+                  <Text size="xs" c="#6B7280" mt={4}>{t('landing.call_hours')}</Text>
                 </Box>
 
                 {/* Action buttons row */}
@@ -732,7 +734,7 @@ export function Landing() {
                     onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background=''; el.style.borderColor=`${COLORS.navyBlue}30`; el.style.transform=''; }}
                     onClick={() => navigate(ROUTES.signup)}
                   >
-                    Call Now
+                    {t('landing.call_btn')}
                   </Button>
                   <Button
                     size="sm"
@@ -747,7 +749,7 @@ export function Landing() {
                     onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background=''; el.style.borderColor=`${COLORS.navyBlue}30`; el.style.transform=''; }}
                     onClick={() => navigate(ROUTES.aiBot)}
                   >
-                    Chat with AI
+                    {t('landing.chat_btn')}
                   </Button>
                 </Group>
               </Paper>
@@ -759,10 +761,7 @@ export function Landing() {
         {/* ── FOOTER ── */}
         <Box style={{ background:'linear-gradient(180deg, #E8F6FB 0%, #D6EEF8 100%)', position:'relative', overflow:'hidden' }}>
 
-          {/* Seamless blend from content above */}
           <Box style={{ position:'absolute', top:0, left:0, right:0, height:40, background:'linear-gradient(180deg, #ffffff 0%, transparent 100%)', pointerEvents:'none', zIndex:0 }} />
-
-          {/* Subtle teal glow blobs */}
           <Box style={{ position:'absolute', top:0, left:-80, width:320, height:320, borderRadius:'50%', background:`radial-gradient(circle, rgba(6,182,212,0.10) 0%, transparent 70%)`, pointerEvents:'none' }} />
           <Box style={{ position:'absolute', bottom:0, right:-60, width:280, height:280, borderRadius:'50%', background:`radial-gradient(circle, rgba(0,0,137,0.06) 0%, transparent 70%)`, pointerEvents:'none' }} />
 
@@ -779,30 +778,25 @@ export function Landing() {
                   <Text fw={900} size="lg" c={COLORS.navyBlue} style={{ letterSpacing:'-0.4px' }}>ONE TOUCH</Text>
                 </Group>
                 <Text size="sm" c="#4B6070" lh={1.8} mb={22}>
-                  Connecting you with trusted local service providers — fast, safe & transparent.
+                  {t('landing.footer_brand_desc')}
                 </Text>
-                {/* App store mini badges */}
                 <Stack gap={8}>
-                  <Box
-                    style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #16a34a 0%, #06b6d4 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(6,182,212,0.30)' }}
+                  <Box style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #16a34a 0%, #06b6d4 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(6,182,212,0.30)' }}
                     onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform='translateY(-2px)'; el.style.boxShadow='0 8px 22px rgba(6,182,212,0.50)'; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(6,182,212,0.30)'; }}
-                  >
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(6,182,212,0.30)'; }}>
                     <IconBrandGooglePlay size={15} color="white" />
                     <Box>
-                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>GET IT ON</Text>
-                      <Text size="xs" c="white" fw={700} lh={1.3}>Google Play</Text>
+                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>{t('landing.app_google_label').toUpperCase()}</Text>
+                      <Text size="xs" c="white" fw={700} lh={1.3}>{t('landing.app_google_store')}</Text>
                     </Box>
                   </Box>
-                  <Box
-                    style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #06b6d4 0%, #6366f1 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(99,102,241,0.30)' }}
+                  <Box style={{ display:'flex', alignItems:'center', gap:8, background:'linear-gradient(90deg, #06b6d4 0%, #6366f1 100%)', borderRadius:10, padding:'8px 14px', cursor:'pointer', transition:'all 0.2s', width:'fit-content', boxShadow:'0 4px 14px rgba(99,102,241,0.30)' }}
                     onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.transform='translateY(-2px)'; el.style.boxShadow='0 8px 22px rgba(99,102,241,0.50)'; }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(99,102,241,0.30)'; }}
-                  >
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.transform=''; el.style.boxShadow='0 4px 14px rgba(99,102,241,0.30)'; }}>
                     <IconBrandApple size={15} color="white" />
                     <Box>
-                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>DOWNLOAD ON THE</Text>
-                      <Text size="xs" c="white" fw={700} lh={1.3}>App Store</Text>
+                      <Text size="9px" c="rgba(255,255,255,0.80)" lh={1}>{t('landing.app_apple_label').toUpperCase()}</Text>
+                      <Text size="xs" c="white" fw={700} lh={1.3}>{t('landing.app_apple_store')}</Text>
                     </Box>
                   </Box>
                 </Stack>
@@ -810,13 +804,13 @@ export function Landing() {
 
               {/* Product Column */}
               <Box>
-                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Product</Text>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>{t('landing.footer_product')}</Text>
                 <Stack gap={10}>
                   {[
-                    { label: 'Browse Services', path: ROUTES.services },
-                    { label: 'How It Works', path: ROUTES.howItWorks },
-                    { label: 'Become a Provider', path: ROUTES.signup },
-                    { label: 'Dashboard', path: ROUTES.dashboard },
+                    { label: t('landing.footer_browse'),  path: ROUTES.services },
+                    { label: t('landing.footer_how'),     path: ROUTES.howItWorks },
+                    { label: t('landing.footer_become'),  path: ROUTES.signup },
+                    { label: t('landing.footer_dashboard'), path: ROUTES.dashboard },
                   ].map(link => (
                     <Text key={link.label} size="sm" c="#4B6070" fw={500}
                       onClick={() => navigate(link.path)}
@@ -830,13 +824,13 @@ export function Landing() {
 
               {/* Company Column */}
               <Box>
-                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Company</Text>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>{t('landing.footer_company')}</Text>
                 <Stack gap={10}>
                   {[
-                    { label: 'About Us', path: ROUTES.about },
-                    { label: 'Help Center', path: ROUTES.helpCenter },
-                    { label: 'Contact & Support', path: ROUTES.support },
-                    { label: 'AI Help Bot', path: ROUTES.aiBot },
+                    { label: t('landing.footer_about'),   path: ROUTES.about },
+                    { label: t('landing.footer_help'),    path: ROUTES.helpCenter },
+                    { label: t('landing.footer_contact'), path: ROUTES.support },
+                    { label: t('landing.footer_ai'),      path: ROUTES.aiBot },
                   ].map(link => (
                     <Text key={link.label} size="sm" c="#4B6070" fw={500}
                       onClick={() => navigate(link.path)}
@@ -850,19 +844,19 @@ export function Landing() {
 
               {/* Contact + Legal Column */}
               <Box>
-                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Contact</Text>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={14} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>{t('landing.footer_contact_col')}</Text>
                 <Stack gap={10} mb={24}>
                   <Group gap={8}>
                     <IconPhone size={14} color={COLORS.tealBlue} />
-                    <Text size="sm" c={COLORS.navyBlue} fw={700}>1234</Text>
+                    <Text size="sm" c={COLORS.navyBlue} fw={700}>{t('landing.call_number')}</Text>
                   </Group>
-                  <Text size="sm" c="#4B6070" lh={1.6}>Mon – Sun · 24 hrs<br />English & Amharic</Text>
+                  <Text size="sm" c="#4B6070" lh={1.6}>{t('landing.footer_hours')}<br />{t('landing.footer_languages')}</Text>
                 </Stack>
-                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={10} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>Legal</Text>
+                <Text fw={700} size="xs" c={COLORS.tealBlue} mb={10} style={{ textTransform:'uppercase', letterSpacing:'0.12em' }}>{t('landing.footer_legal')}</Text>
                 <Stack gap={8}>
                   {[
-                    { label: 'Privacy Policy', path: ROUTES.privacyPolicy },
-                    { label: 'Terms of Service', path: ROUTES.termsOfService },
+                    { label: t('landing.footer_privacy'), path: ROUTES.privacyPolicy },
+                    { label: t('landing.footer_terms'),   path: ROUTES.termsOfService },
                   ].map(link => (
                     <Text key={link.label} size="sm" c="#4B6070" fw={500}
                       onClick={() => navigate(link.path)}
@@ -881,39 +875,28 @@ export function Landing() {
           <Box style={{ borderTop:'1px solid rgba(0,128,128,0.12)', background:'rgba(0,128,128,0.06)' }}>
             <Container size="lg">
               <Group justify="space-between" align="center" wrap="wrap" gap="md" py={18}>
-
-                {/* Left: copyright */}
                 <Text size="xs" c="#6B7280">
-                  © 2026{' '}
-                  <Text component="span" c={COLORS.navyBlue} fw={700}
-                    style={{ cursor:'pointer' }}
+                  {t('landing.footer_copyright')}{' '}
+                  <Text component="span" c={COLORS.navyBlue} fw={700} style={{ cursor:'pointer' }}
                     onClick={() => navigate('/')}
                     onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color=COLORS.tealBlue)}
                     onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color=COLORS.navyBlue)}
                   >ONE TOUCH Ethiopia</Text>
-                  {' '}· All rights reserved.
+                  {' '}{t('landing.footer_rights')}
                 </Text>
-
-                {/* Centre: status pill */}
-                <Group gap={6}
-                  style={{ cursor:'default', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.18)', borderRadius:20, padding:'4px 12px' }}>
+                <Group gap={6} style={{ cursor:'default', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.18)', borderRadius:20, padding:'4px 12px' }}>
                   <Box style={{ width:6, height:6, borderRadius:'50%', background:'#22c55e', boxShadow:'0 0 6px #22c55e' }} />
-                  <Text size="xs" c="#4B6070">All systems operational</Text>
+                  <Text size="xs" c="#4B6070">{t('landing.footer_status')}</Text>
                 </Group>
-
-                {/* Right: back to top */}
-                <Box
-                  style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', transition:'all 0.18s', color:'#6B7280' }}
+                <Box style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', transition:'all 0.18s', color:'#6B7280' }}
                   onClick={() => window.scrollTo({ top:0, behavior:'smooth' })}
                   onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color=COLORS.navyBlue; el.style.transform='translateY(-2px)'; }}
-                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color='#6B7280'; el.style.transform=''; }}
-                >
-                  <Text size="xs" fw={600} style={{ color:'inherit' }}>Back to top</Text>
+                  onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color='#6B7280'; el.style.transform=''; }}>
+                  <Text size="xs" fw={600} style={{ color:'inherit' }}>{t('landing.footer_top')}</Text>
                   <Box style={{ width:22, height:22, borderRadius:'50%', border:`1px solid rgba(0,128,128,0.25)`, display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.18s' }}>
                     <Text style={{ color:'inherit', lineHeight:1, fontSize:11 }}>↑</Text>
                   </Box>
                 </Box>
-
               </Group>
             </Container>
           </Box>

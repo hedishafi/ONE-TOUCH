@@ -15,6 +15,7 @@ import {
 import { IconAlertCircle, IconPhone, IconCheck } from '@tabler/icons-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
 import * as providerService from '../services/providerOnboardingService';
 
 interface LocationState {
@@ -24,6 +25,7 @@ interface LocationState {
 }
 
 export const ProviderSignupPhoneChoice: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as LocationState) || {};
@@ -39,11 +41,11 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
   if (!sessionId || !extractedPhone) {
     return (
       <Container size="md" py="xl">
-        <Alert icon={<IconAlertCircle size={16} />} color="red" title="Session Error">
-          Invalid session. Please start the onboarding process again.
+        <Alert icon={<IconAlertCircle size={16} />} color="red" title={t('providerPhoneChoice.session_error_title')}>
+          {t('providerPhoneChoice.session_error_msg')}
         </Alert>
         <Button mt="xl" onClick={() => navigate('/provider/onboarding/step1')}>
-          Start Over
+          {t('providerPhoneChoice.start_over')}
         </Button>
       </Container>
     );
@@ -61,12 +63,12 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
 
       if (phoneOption === 'custom') {
         if (!customPhone.trim()) {
-          setError('Please enter a phone number');
+          setError(t('providerPhoneChoice.err_empty_phone'));
           return;
         }
 
         if (!validatePhone(customPhone)) {
-          setError('Invalid phone format. Use +251XXXXXXXXX or 0XXXXXXXXX');
+          setError(t('providerPhoneChoice.err_invalid_phone'));
           return;
         }
 
@@ -83,8 +85,8 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
       });
 
       notifications.show({
-        title: 'OTP Sent',
-        message: `Code sent to ${phoneToUse}`,
+        title: t('providerPhoneChoice.otp_sent_title'),
+        message: t('providerPhoneChoice.otp_sent_msg', { phone: phoneToUse }),
         color: 'green',
       });
 
@@ -99,10 +101,10 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
       const message =
         err.response?.data?.detail ||
         err.response?.data?.error ||
-        'Failed to send OTP';
+        t('providerPhoneChoice.err_send_otp');
       setError(message);
       notifications.show({
-        title: 'Error',
+        title: t('providerPhoneChoice.err_title'),
         message,
         color: 'red',
       });
@@ -116,10 +118,10 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
       <Stack gap="xl">
         <div>
           <Title order={2} mb="sm">
-            Choose Your Phone Number
+            {t('providerPhoneChoice.title')}
           </Title>
           <Text color="dimmed">
-            We extracted a phone number from your document. You can use it or enter a different one.
+            {t('providerPhoneChoice.sub')}
           </Text>
         </div>
 
@@ -147,11 +149,11 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
                 <Radio value="extracted" />
                 <Stack gap="xs" flex={1}>
                   <Group justify="space-between">
-                    <Text fw={500}>Use Extracted Phone</Text>
+                    <Text fw={500}>{t('providerPhoneChoice.use_extracted_label')}</Text>
                     <IconCheck size={20} color="#008080" />
                   </Group>
                   <Text size="sm" color="dimmed">
-                    Phone number automatically extracted from your document
+                    {t('providerPhoneChoice.use_extracted_sub')}
                   </Text>
                   <Paper p="sm" radius="md" withBorder style={{ backgroundColor: '#f5f5f5' }}>
                     <Group gap="xs">
@@ -180,13 +182,13 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
               <Group gap="md">
                 <Radio value="custom" />
                 <Stack gap="xs" flex={1}>
-                  <Text fw={500}>Use Different Phone</Text>
+                  <Text fw={500}>{t('providerPhoneChoice.use_custom_label')}</Text>
                   <Text size="sm" color="dimmed">
-                    Enter a different phone number if the extracted one is incorrect
+                    {t('providerPhoneChoice.use_custom_sub')}
                   </Text>
                   {phoneOption === 'custom' && (
                     <TextInput
-                      placeholder="+251911223344 or 0911223344"
+                      placeholder={t('providerPhoneChoice.custom_phone_placeholder')}
                       value={customPhone}
                       onChange={(e) => setCustomPhone(e.currentTarget.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -206,10 +208,10 @@ export const ProviderSignupPhoneChoice: React.FC = () => {
             onClick={() => navigate('/provider/onboarding/step1')}
             disabled={loading}
           >
-            Back
+            {t('providerPhoneChoice.back_btn')}
           </Button>
           <Button onClick={handleContinue} disabled={loading} loading={loading}>
-            {loading ? 'Sending OTP...' : 'Continue'}
+            {loading ? t('providerPhoneChoice.sending_btn') : t('providerPhoneChoice.continue_btn')}
           </Button>
         </Group>
       </Stack>

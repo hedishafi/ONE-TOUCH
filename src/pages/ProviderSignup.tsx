@@ -18,6 +18,7 @@ import {
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
@@ -51,6 +52,7 @@ function StepProfileProvider({
   onBack: () => void;
   onDone: (data: ProviderProfileData) => void;
 }) {
+  const { t } = useTranslation();
   const [photoUrl, setPhotoUrl]               = useState<string | null>(faceUrl);
   const [password, setPassword]               = useState('');
   const [confirm, setConfirm]                 = useState('');
@@ -76,14 +78,14 @@ function StepProfileProvider({
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (password.length < 6)              e.password = 'Password must be at least 6 characters';
-    if (password !== confirm)             e.confirm = 'Passwords do not match';
-    if (!categoryId)                      e.category = 'Please select a service category';
-    if (subcategoryIds.length === 0)      e.subcategory = 'Please select at least one sub-service';
+    if (password.length < 6)              e.password = t('providerSignup.err_password_short');
+    if (password !== confirm)             e.confirm = t('providerSignup.err_password_mismatch');
+    if (!categoryId)                      e.category = t('providerSignup.err_category_required');
+    if (subcategoryIds.length === 0)      e.subcategory = t('providerSignup.err_subcategory_required');
     if (priceMin !== null && priceMax !== null && priceMin >= priceMax)
-      e.priceRange = 'Min price must be less than max price';
+      e.priceRange = t('providerSignup.err_price_min_max');
     if (priceMin !== null && priceMax !== null && priceMin > 0 && priceMax > priceMin * 6)
-      e.priceRange = 'Price range is too wide. Max price cannot exceed 500% above minimum.';
+      e.priceRange = t('providerSignup.err_price_range_wide');
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -93,14 +95,14 @@ function StepProfileProvider({
     onDone({ password, photoUrl, categoryId, subcategoryIds, priceMin, priceMax, yearsOfExperience, whatMakesYouSpecial });
   };
 
-  const displayName = prefill.extracted.fullName ?? 'Provider';
+  const displayName = prefill.extracted.fullName ?? t('providerSignup.default_name');
 
   return (
     <Card>
       <CardHeader
         icon={<IconBriefcase size={22} color={COLORS.navyBlue} />}
-        title="Provider Profile Setup"
-        sub="Set up your service profile to start receiving job requests"
+        title={t('providerSignup.step3_title')}
+        sub={t('providerSignup.step3_sub')}
       />
 
       {/* Identity verification summary */}
@@ -126,9 +128,9 @@ function StepProfileProvider({
           <Stack gap={3}>
             <Text fw={700} size="sm" c="var(--ot-text-navy)">{displayName}</Text>
             <Group gap={6}>
-              <Badge size="xs" color="teal" variant="dot">Identity Verified</Badge>
-              <Badge size="xs" color="blue" variant="dot">Phone Verified</Badge>
-              <Badge size="xs" color="green" variant="dot">Biometric Verified</Badge>
+              <Badge size="xs" color="teal" variant="dot">{t('providerSignup.badge_identity')}</Badge>
+              <Badge size="xs" color="blue" variant="dot">{t('providerSignup.badge_phone')}</Badge>
+              <Badge size="xs" color="green" variant="dot">{t('providerSignup.badge_biometric')}</Badge>
             </Group>
           </Stack>
         </Group>
@@ -137,7 +139,7 @@ function StepProfileProvider({
       <Stack gap={18}>
         {/* Profile photo */}
         <Box>
-          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>Profile Photo</Text>
+          <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={10}>{t('providerSignup.photo_label')}</Text>
           <Group gap={14} align="center">
             <Avatar
               src={photoUrl}
@@ -158,14 +160,14 @@ function StepProfileProvider({
                     size="xs"
                     leftSection={<IconCamera size={13} />}
                   >
-                    {photoUrl ? 'Change Photo' : 'Upload Photo'}
+                    {photoUrl ? t('providerSignup.photo_change') : t('providerSignup.photo_upload')}
                   </Button>
                 )}
               </FileButton>
               {faceUrl && photoUrl === faceUrl ? (
-                <Text size="10px" c="var(--ot-text-muted)">Auto-filled from face scan · tap to change</Text>
+                <Text size="10px" c="var(--ot-text-muted)">{t('providerSignup.photo_autofilled')}</Text>
               ) : (
-                <Text size="10px" c="var(--ot-text-muted)">Upload a clear professional photo</Text>
+                <Text size="10px" c="var(--ot-text-muted)">{t('providerSignup.photo_hint')}</Text>
               )}
             </Stack>
           </Group>
@@ -174,8 +176,8 @@ function StepProfileProvider({
         {/* Passwords */}
         <SimpleGrid cols={2} spacing={12}>
           <PasswordInput
-            label="Password"
-            placeholder="Min. 6 characters"
+            label={t('providerSignup.password_label')}
+            placeholder={t('providerSignup.password_placeholder')}
             leftSection={<IconLock size={15} />}
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -184,8 +186,8 @@ function StepProfileProvider({
             styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
           />
           <PasswordInput
-            label="Confirm Password"
-            placeholder="Re-enter password"
+            label={t('providerSignup.confirm_password_label')}
+            placeholder={t('providerSignup.confirm_password_placeholder')}
             leftSection={<IconLock size={15} />}
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
@@ -195,13 +197,11 @@ function StepProfileProvider({
           />
         </SimpleGrid>
 
-        {/* Verified phone removed from profile setup UI */}
-
         {/* Service Category */}
         <Box>
           <Select
-            label="Service Category"
-            placeholder="Select your main service area"
+            label={t('providerSignup.category_label')}
+            placeholder={t('providerSignup.category_placeholder')}
             data={categories.map(c => ({ value: c.id, label: c.name }))}
             value={categoryId}
             onChange={v => { setCategoryId(v ?? ''); setSubcategoryIds([]); }}
@@ -216,8 +216,8 @@ function StepProfileProvider({
         {categoryId && (
           <Box>
             <MultiSelect
-              label="Sub-Services"
-              placeholder="Select all that apply"
+              label={t('providerSignup.subcategory_label')}
+              placeholder={t('providerSignup.subcategory_placeholder')}
               data={subOptions}
               value={subcategoryIds}
               onChange={setSubcategoryIds}
@@ -229,16 +229,17 @@ function StepProfileProvider({
           </Box>
         )}
 
-        {/* Payment structure removed — default platform/negotiated pricing will be used */}
-
         {/* Price Range (optional) */}
         <Box>
           <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={6}>
-            Price Range (ETB) <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+            {t('providerSignup.price_range_label')}{' '}
+            <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>
+              {t('providerSignup.optional')}
+            </Text>
           </Text>
           <SimpleGrid cols={2} spacing={10}>
             <NumberInput
-              placeholder="Min (e.g. 200)"
+              placeholder={t('providerSignup.price_min_placeholder')}
               prefix="ETB "
               min={0}
               value={priceMin ?? ''}
@@ -247,7 +248,7 @@ function StepProfileProvider({
               styles={{ label: { fontWeight: 600, color: 'var(--ot-text-navy)' } }}
             />
             <NumberInput
-              placeholder="Max (e.g. 800)"
+              placeholder={t('providerSignup.price_max_placeholder')}
               prefix="ETB "
               min={0}
               value={priceMax ?? ''}
@@ -258,11 +259,11 @@ function StepProfileProvider({
             />
           </SimpleGrid>
           <Text size="10px" c="var(--ot-text-muted)" mt={4}>
-            Set a price range so clients know what to expect. Leave blank to negotiate per job.
+            {t('providerSignup.price_range_hint')}
           </Text>
           <Box mt={6} p={8} style={{ borderRadius: 8, background: 'rgba(231,76,60,0.07)', border: '1px solid rgba(231,76,60,0.25)' }}>
             <Text size="xs" fw={600} style={{ color: '#C0392B' }}>
-              ⚠️ Per-hour payments are disabled on this platform to prevent fraud.
+              {t('providerSignup.hourly_disabled_warning')}
             </Text>
           </Box>
         </Box>
@@ -271,10 +272,13 @@ function StepProfileProvider({
         <NumberInput
           label={
             <Text size="sm" fw={600} c="var(--ot-text-navy)">
-              Years of Experience <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+              {t('providerSignup.experience_label')}{' '}
+              <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>
+                {t('providerSignup.optional')}
+              </Text>
             </Text>
           }
-          placeholder="e.g. 5"
+          placeholder={t('providerSignup.experience_placeholder')}
           min={0}
           max={50}
           value={yearsOfExperience ?? ''}
@@ -287,10 +291,13 @@ function StepProfileProvider({
         <Textarea
           label={
             <Text size="sm" fw={600} c="var(--ot-text-navy)">
-              What Makes You Special <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>— optional</Text>
+              {t('providerSignup.special_label')}{' '}
+              <Text component="span" size="xs" c="var(--ot-text-muted)" fw={400}>
+                {t('providerSignup.optional')}
+              </Text>
             </Text>
           }
-          placeholder="Tell clients what sets you apart — certifications, unique skills, approach to work…"
+          placeholder={t('providerSignup.special_placeholder')}
           value={whatMakesYouSpecial}
           onChange={e => setWhatMakesYouSpecial(e.target.value)}
           minRows={3}
@@ -308,7 +315,7 @@ function StepProfileProvider({
           onClick={handleSubmit}
           style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.navyLight} 100%)` }}
         >
-          Complete Registration
+          {t('providerSignup.complete_btn')}
         </Button>
       </Stack>
     </Card>
@@ -317,11 +324,19 @@ function StepProfileProvider({
 
 // ─── Done Screen ──────────────────────────────────────────────────────────────
 function StepDone({ name }: { name: string }) {
+  const { t } = useTranslation();
   const [pct, setPct] = useState(0);
   useEffect(() => {
     const iv = setInterval(() => setPct(p => { if (p >= 100) { clearInterval(iv); return 100; } return p + 4; }), 110);
     return () => clearInterval(iv);
   }, []);
+
+  const doneChecks = [
+    t('providerSignup.done_check_identity'),
+    t('providerSignup.done_check_phone'),
+    t('providerSignup.done_check_face'),
+  ];
+
   return (
     <Card>
       <Stack align="center" gap={24} py={12}>
@@ -337,13 +352,15 @@ function StepDone({ name }: { name: string }) {
           <IconShieldCheck size={40} color={COLORS.tealBlue} />
         </Box>
         <Stack gap={6} align="center">
-          <Text fw={900} size="xl" c={COLORS.navyBlue}>Welcome, {name.split(' ')[0]}!</Text>
+          <Text fw={900} size="xl" c={COLORS.navyBlue}>
+            {t('providerSignup.done_welcome', { name: name.split(' ')[0] })}
+          </Text>
           <Text size="sm" c="var(--ot-text-sub)" ta="center">
-            Your provider profile has been created. Taking you to your dashboard…
+            {t('providerSignup.done_sub')}
           </Text>
         </Stack>
         <Stack gap={8} w="100%">
-          {['Identity Verification', 'Phone Verification', 'Face Scan'].map(label => (
+          {doneChecks.map(label => (
             <Group key={label} gap={8}>
               <Box
                 w={22} h={22}
@@ -369,6 +386,7 @@ function StepDone({ name }: { name: string }) {
 
 // ─── ProviderSignup Orchestrator ──────────────────────────────────────────────
 export function ProviderSignup() {
+  const { t } = useTranslation();
   const navigate  = useNavigate();
   const { signup, loginByUserId } = useAuthStore();
   const [step, setStep]         = useState(1);
@@ -392,11 +410,11 @@ export function ProviderSignup() {
 
   const handleProfileDone = (data: ProviderProfileData) => {
     if (!idResult) return;
-    const name = idResult.extracted.fullName ?? 'Provider';
+    const name = idResult.extracted.fullName ?? t('providerSignup.default_name');
     const placeholderEmail = `provider_${Date.now()}@onetouch.local`;
     const result = signup({ email: placeholderEmail, password: data.password, phone: idResult.selectedPhone, role: 'provider' });
     if (!result.success) {
-      notifications.show({ title: 'Sign up failed', message: result.error, color: 'red' });
+      notifications.show({ title: t('providerSignup.signup_failed_title'), message: result.error, color: 'red' });
       return;
     }
     // Authenticate the newly created user so ProtectedRoute lets them through

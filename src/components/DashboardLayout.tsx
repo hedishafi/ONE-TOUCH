@@ -10,13 +10,14 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { IconLogout } from '@tabler/icons-react';
 import { AppHeader } from './AppHeader';
 import { AIHelpCenter } from './AIHelpCenter';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
 import type { NavItem } from '../types/nav';
-import { getRoleNavItems } from './roleNav';
+import { useRoleNavItems } from './roleNav';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -88,6 +89,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const { currentUser, clientProfile, providerProfile, logout } = useAuthStore();
 
   const displayName =
@@ -102,7 +104,10 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
     .slice(0, 2)
     .toUpperCase();
   const role = currentUser?.role ?? 'client';
-  const resolvedNavItems = navItems ?? getRoleNavItems(role);
+
+  // Always call the hook unconditionally so nav labels re-render on language change
+  const roleNavItems = useRoleNavItems(role);
+  const resolvedNavItems = navItems ?? roleNavItems;
 
   function go(path: string) {
     navigate(path);
@@ -226,7 +231,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
                 {displayName.split(' ')[0]}
               </Text>
               <Text size="10px" c="dimmed">
-                {role === 'provider' ? 'Service Provider' : 'Client'}
+                {role === 'provider' ? t('nav.role_provider') : t('nav.role_client')}
               </Text>
             </Box>
             <ActionIcon
@@ -235,7 +240,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
               size="sm"
               radius="xl"
               onClick={handleLogout}
-              title="Log out"
+              title={t('nav.logout')}
             >
               <IconLogout size={15} />
             </ActionIcon>

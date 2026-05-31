@@ -16,6 +16,7 @@ class Order(models.Model):
 
     STATUS_PENDING = 'pending'
     STATUS_MATCHING = 'matching'
+    STATUS_PROVIDER_SELECTED = 'provider_selected'
     STATUS_ACCEPTED = 'accepted'
     STATUS_IN_PROGRESS = 'in_progress'
     STATUS_COMPLETED = 'completed'
@@ -24,6 +25,7 @@ class Order(models.Model):
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Pending'),
         (STATUS_MATCHING, 'Matching'),
+        (STATUS_PROVIDER_SELECTED, 'Provider Selected'),
         (STATUS_ACCEPTED, 'Accepted'),
         (STATUS_IN_PROGRESS, 'In Progress'),
         (STATUS_COMPLETED, 'Completed'),

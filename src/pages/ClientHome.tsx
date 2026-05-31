@@ -16,6 +16,7 @@ import {
   IconMessage,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
@@ -23,6 +24,7 @@ import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { RoleSwitcher } from '../components/RoleSwitcher';
 import { OSMClientMap } from '../components/OSMClientMap';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
@@ -87,7 +89,7 @@ function getNearbyProviders(): Provider[] {
 // keep a single alias so legacy references still compile
 void (PROVIDER_POOL);
 
-const DECLINE_REASONS = [
+const DECLINE_REASONS_KEYS = [
   'Not available right now',
   'Price is too high',
   'Found another provider',
@@ -96,24 +98,30 @@ const DECLINE_REASONS = [
 ];
 
 const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='in_progress'?'blue':'orange';
-const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
 const NAV=[
-  {label:'My Orders',        icon:<IconBriefcase size={16}/>,r:'/orders'},
-  {label:'Explore Services', icon:<IconSearch  size={16}/>,r:ROUTES.clientBrowse},
-  {label:'My Requests',      icon:<IconHistory size={16}/>,r:ROUTES.clientHistory},
-  {label:'Messages',         icon:<IconMessage size={16}/>,r:ROUTES.clientMessages},
-  {label:'Payments',         icon:<IconWallet  size={16}/>,r:ROUTES.clientWallet},
-  {label:'Favorites',        icon:<IconHeart   size={16}/>,r:ROUTES.clientSaved},
-  {label:'Settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
+  {labelKey:'nav.my_orders',        icon:<IconBriefcase size={16}/>,r:'/orders'},
+  {labelKey:'nav.explore_services', icon:<IconSearch  size={16}/>,r:ROUTES.clientBrowse},
+  {labelKey:'nav.my_requests',      icon:<IconHistory size={16}/>,r:ROUTES.clientHistory},
+  {labelKey:'nav.messages',         icon:<IconMessage size={16}/>,r:ROUTES.clientMessages},
+  {labelKey:'nav.payments',         icon:<IconWallet  size={16}/>,r:ROUTES.clientWallet},
+  {labelKey:'nav.favorites',        icon:<IconHeart   size={16}/>,r:ROUTES.clientSaved},
+  {labelKey:'nav.settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
 ];
 
 export function ClientHome() {
   const nav=useNavigate();
+  const { t } = useTranslation();
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
   const { categories } = useServiceCatalog();
+
+  const statusLabel=(s:string)=>
+    s==='pending_agreement'?t('clientHome.status_requested'):
+    s==='in_progress'?t('clientHome.status_in_progress'):
+    s==='completed'?t('clientHome.status_done'):
+    s==='cancelled'?t('clientHome.status_cancelled'):s;
 
   console.log('🏠 ClientHome rendered, currentUser:', currentUser);
 
@@ -215,7 +223,7 @@ export function ClientHome() {
       title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
     addNotification(notificationPayload as any);
     setAStage('confirmed');
-    notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
+    notifications.show({title:t('clientHome.notification_request_sent'),message:t('clientHome.notification_request_msg'),color:'teal'});
   }
   // Open decline voice modal
   function openDecline(){
@@ -269,7 +277,7 @@ export function ClientHome() {
       isRepeatBooking:false,
     } as any);
     closeCall();
-    notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
+    notifications.show({title:t('clientHome.notification_booked'),message:t('clientHome.notification_booked_msg',{cat:cCat}),color:'teal'});
   }
   function closeCall(){if(cTimer.current)clearTimeout(cTimer.current);setCOpen(false);setTimeout(()=>setCStage('idle'),300);}
   // Client declines via category call modal — open voice decline modal
@@ -319,22 +327,23 @@ export function ClientHome() {
         <Divider/>
         <Stack gap={2} p="sm" style={{flex:1}}>
           {NAV.map(n=>(
-            <Box key={n.label} p={10}
+            <Box key={n.labelKey} p={10}
               onClick={()=>{setSidebar(false);nav(n.r);}}
               style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
                 fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
                 cursor:'pointer'}}>
-              {n.icon} {n.label}
+              {n.icon} {t(n.labelKey)}
             </Box>
           ))}
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+          <LanguageSwitcher />
           <RoleSwitcher />
           <Box p={10}
             onClick={()=>{logout();nav(ROUTES.landing);}}
             style={{borderRadius:10,display:'flex',alignItems:'center',
               gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
+            <IconLogout size={18}/> {t('clientHome.sign_out')}
           </Box>
         </Box>
       </Box>
@@ -355,7 +364,7 @@ export function ClientHome() {
             </Group>
             <Box style={{flex:1, maxWidth:360, margin:'0 10px'}} visibleFrom="sm">
               <TextInput
-                placeholder="Search services"
+                placeholder={t('clientHome.search_services')}
                 value={searchQuery}
                 onChange={e=>setSearchQuery(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&submitSearch()}
@@ -376,6 +385,8 @@ export function ClientHome() {
                 <IconPhone size={15} color="white"/>
                 <Text size="xs" fw={800} c="white" visibleFrom="xs">8182</Text>
               </Box>
+              {/* Language Switcher */}
+              <LanguageSwitcher />
               <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}
                 aria-label="Notifications">
                 {unreadCount>0?<IconBellFilled size={22} color={T}/>:<IconBell size={22}/>}
@@ -399,14 +410,14 @@ export function ClientHome() {
           style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
           <Group justify="space-between" align="center" wrap="nowrap" mb={10}>
             <Box>
-              <Text size="xs" c="var(--ot-text-muted)">Welcome</Text>
+              <Text size="xs" c="var(--ot-text-muted)">{t('clientHome.welcome')}</Text>
               <Text fw={800} size="lg" c={N}>
                 {clientProfile?.fullName || currentUser?.email || 'Client'}
               </Text>
             </Box>
-            <Badge size="sm" color="teal" variant="light">Client</Badge>
+            <Badge size="sm" color="teal" variant="light">{t('clientHome.client_badge')}</Badge>
           </Group>
-          <Text size="sm" fw={700} c={N} mb={8}>What do you need today?</Text>
+          <Text size="sm" fw={700} c={N} mb={8}>{t('clientHome.what_today')}</Text>
           <Group gap={8} wrap="wrap">
             {quickActions.map(cat=> (
               <Button key={cat.id} size="xs" radius="xl" variant="light"
@@ -416,11 +427,11 @@ export function ClientHome() {
             ))}
             <Button size="xs" radius="xl" onClick={()=>nav('/client/search-providers')}
               style={{background:`linear-gradient(135deg,${COLORS.success},${T})`,border:'none',color:'white'}}>
-              Find Nearby Providers
+              {t('clientHome.find_nearby')}
             </Button>
             <Button size="xs" radius="xl" onClick={()=>nav(ROUTES.services)}
               style={{background:`linear-gradient(135deg,${T},${N})`,border:'none'}}>
-              View all services
+              {t('clientHome.view_all_services')}
             </Button>
           </Group>
         </Paper>
@@ -435,7 +446,7 @@ export function ClientHome() {
                   <IconBriefcase size={22} color="white"/>
                 </ThemeIcon>
                 <Box>
-                  <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">Active Request</Text><Badge size="xs" color="yellow">Live</Badge></Group>
+                  <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">{t('clientHome.active_request')}</Text><Badge size="xs" color="yellow">{t('clientHome.live_badge')}</Badge></Group>
                   <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
                   <Text size="xs" c="rgba(255,255,255,.7)">{statusLabel(activeJob.status)} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
                 </Box>
@@ -452,8 +463,11 @@ export function ClientHome() {
           <OSMClientMap
             onProviderSelect={(provider) => {
               notifications.show({
-                title: 'Provider Selected',
-                message: `${provider.full_name} - ${provider.distance_km.toFixed(1)}km away`,
+                title: t('clientHome.notification_provider_selected'),
+                message: t('clientHome.notification_provider_msg', {
+                  name: provider.full_name,
+                  dist: provider.distance_km.toFixed(1),
+                }),
                 color: 'teal',
               });
             }}
@@ -475,25 +489,25 @@ export function ClientHome() {
                   <IconBriefcase size={22} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>Request Services</Text>
-                  <Text size="xs" c="dimmed">Browse services and request a provider</Text>
+                  <Text fw={800} size="sm" c={N}>{t('clientHome.request_services')}</Text>
+                  <Text size="xs" c="dimmed">{t('clientHome.request_services_sub')}</Text>
                 </Box>
               </Group>
               <Button size="sm" radius="xl" onClick={()=>nav('/orders/create')}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
                 leftSection={<IconBriefcase size={14}/>}> 
-                Request Service
+                {t('clientHome.request_service_btn')}
               </Button>
             </Group>
           </Paper>
         </Box>
 
         {/* Category grid */}
-        <Text fw={800} size="sm" c={N} mb={14}>All Services</Text>
+        <Text fw={800} size="sm" c={N} mb={14}>{t('clientHome.all_services')}</Text>
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
           {categories.map(cat=>(
             <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
-              role="button" aria-label={`Book ${cat.name}`} tabIndex={0}
+              role="button" aria-label={t('clientHome.book_label', { name: cat.name })} tabIndex={0}
               onKeyDown={e=>e.key==='Enter'&&openPick(cat.name)}
               style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)',
                 cursor:'pointer',textAlign:'center',transition:'transform .18s,box-shadow .18s'}}
@@ -513,9 +527,9 @@ export function ClientHome() {
         {recent.length>0?(
           <Box>
             <Group justify="space-between" mb={14}>
-              <Text fw={800} size="sm" c={N}>Recent Requests</Text>
+              <Text fw={800} size="sm" c={N}>{t('clientHome.recent_requests')}</Text>
               <Text size="xs" c={T} style={{cursor:'pointer'}} onClick={()=>nav(ROUTES.clientHistory)}>
-                View all
+                {t('clientHome.view_all')}
               </Text>
             </Group>
             <Stack gap={10}>
@@ -571,8 +585,8 @@ export function ClientHome() {
               </Box>
             </Box>
             <Stack align="center" gap={4}>
-              <Text fw={800} size="lg" c={N}>Connecting…</Text>
-              <Text size="sm" c="dimmed">Reaching OneTouch AI</Text>
+              <Text fw={800} size="lg" c={N}>{t('clientHome.ai_connecting')}</Text>
+              <Text size="sm" c="dimmed">{t('clientHome.ai_connecting_sub')}</Text>
             </Stack>
             
           </Stack>
@@ -586,8 +600,8 @@ export function ClientHome() {
               display:'flex',alignItems:'center',justifyContent:'center'}}>
               <IconCheck size={38} color="white"/>
             </Box>
-            <Text fw={800} size="lg" c={N}>Connected!</Text>
-            <Text size="sm" c="dimmed">Preparing AI assistant…</Text>
+            <Text fw={800} size="lg" c={N}>{t('clientHome.ai_connected')}</Text>
+            <Text size="sm" c="dimmed">{t('clientHome.ai_connected_sub')}</Text>
           </Stack>
         )}
 
@@ -600,7 +614,7 @@ export function ClientHome() {
               <Box w={8} h={8} style={{borderRadius:'50%',background:COLORS.success,
                 boxShadow:`0 0 0 3px ${COLORS.success}33`,flexShrink:0,
                 animation:'pulse 1.4s ease-in-out infinite'}}/>
-              <Text size="xs" fw={700} c={N}>AI Connected . Start Chatting</Text>
+              <Text size="xs" fw={700} c={N}>{t('clientHome.ai_active_chat')}</Text>
             </Group>
             {/* Pulsing message orb */}
             <Stack align="center" py={20} gap={0}>
@@ -616,10 +630,10 @@ export function ClientHome() {
                   <IconMessage size={46} color="white"/>
                 </Box>
               </Box>
-              <Text size="xs" c="dimmed" mt={16}>Describe what you need below</Text>
+              <Text size="xs" c="dimmed" mt={16}>{t('clientHome.ai_describe_hint')}</Text>
             </Stack>
             <Textarea autosize minRows={2} maxRows={6}
-              placeholder="e.g. My kitchen sink is leaking under the cabinet…"
+              placeholder={t('clientHome.ai_describe_placeholder')}
               value={desc} onChange={e=>setDesc(e.currentTarget.value)}
               radius="lg"
               styles={{input:{border:`2px solid ${T}55`,fontSize:14}}}/>
@@ -627,7 +641,7 @@ export function ClientHome() {
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 disabled={!desc.trim()} onClick={submitDesc}>
-                Continue <IconArrowRight size={16}/>
+                {t('clientHome.ai_continue')} <IconArrowRight size={16}/>
               </Button>
               {/* Removed End Call button */}
             </Group>
@@ -644,19 +658,19 @@ export function ClientHome() {
                 <IconSparkles size={22} color="white"/>
               </Box>
               <Box style={{flex:1}}>
-                <Text fw={700} size="sm" c={N}>One more question…</Text>
+                <Text fw={700} size="sm" c={N}>{t('clientHome.ai_one_more')}</Text>
                 <Text size="sm" c="var(--ot-text-body)" mt={4}>{fQ}</Text>
               </Box>
             </Group>
             <Textarea autosize minRows={2} maxRows={6}
-              placeholder="Your answer…"
+              placeholder={t('clientHome.ai_answer_placeholder')}
               value={fA} onChange={e=>setFA(e.currentTarget.value)}
               radius="lg"
               styles={{input:{border:`2px solid ${N}44`,fontSize:14}}}/>
             <Button size="md" radius="xl"
               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
               disabled={!fA.trim()} onClick={submitFollowup}>
-              Find Me a Provider
+              {t('clientHome.ai_find_provider')}
             </Button>
           </Stack>
         )}
@@ -671,8 +685,8 @@ export function ClientHome() {
                 <IconSearch size={20} color="white"/>
               </Box>
               <Box>
-                <Text fw={700} size="sm" c={N}>Scanning nearby providers…</Text>
-                <Text size="xs" c={T}>Live map search active</Text>
+                <Text fw={700} size="sm" c={N}>{t('clientHome.ai_scanning')}</Text>
+                <Text size="xs" c={T}>{t('clientHome.ai_map_active')}</Text>
               </Box>
             </Group>
             <Progress value={70} color="teal" size="sm" radius="xl" animated/>
@@ -685,9 +699,9 @@ export function ClientHome() {
             <Group gap={8} justify="space-between" align="center">
               <Badge size="lg" variant="filled" color="yellow"
                 leftSection={<IconSparkles size={12}/>}>
-                {foundProviders.length} Nearby Providers Found
+                {t('clientHome.ai_providers_found', { count: foundProviders.length })}
               </Badge>
-              <Text size="xs" c="dimmed">Tap a card to select</Text>
+              <Text size="xs" c="dimmed">{t('clientHome.ai_tap_to_select')}</Text>
             </Group>
             <Box style={{maxHeight:340,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
               {foundProviders.map((prov)=>{
@@ -719,7 +733,7 @@ export function ClientHome() {
                               <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
                             </Group>
                             <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
-                            <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                            <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{t('clientHome.yrs_exp', { count: prov.yearsExp })}</Text>
                           </Group>
                         </Stack>
                       </Group>
@@ -727,7 +741,7 @@ export function ClientHome() {
                         <Text size="sm" fw={900} c={active?'white':N}>
                           {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
                         </Text>
-                        {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                        {active&&<Badge size="xs" color="yellow" variant="filled">{t('clientHome.ai_selected_badge')}</Badge>}
                       </Stack>
                     </Group>
                   </Paper>
@@ -738,9 +752,9 @@ export function ClientHome() {
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 disabled={!selectedProv}
-                onClick={confirmJob}>Confirm &amp; Request</Button>
+                onClick={confirmJob}>{t('clientHome.ai_confirm_request')}</Button>
               <Button flex={1} size="md" radius="xl" variant="light" color="red"
-                onClick={cancelFromFound}>Decline</Button>
+                onClick={cancelFromFound}>{t('clientHome.ai_decline')}</Button>
             </Group>
           </Stack>
         )}
@@ -753,21 +767,21 @@ export function ClientHome() {
               display:'flex',alignItems:'center',justifyContent:'center'}}>
               <IconCheck size={40} color="white"/>
             </Box>
-            <Text fw={900} size="xl" c={N} ta="center">Request Sent!</Text>
+            <Text fw={900} size="xl" c={N} ta="center">{t('clientHome.ai_request_sent')}</Text>
             <Text size="sm" c="dimmed" ta="center">
-              {foundProv.name} has been notified and will contact you shortly.
+              {t('clientHome.ai_notified', { name: foundProv.name })}
             </Text>
             <Paper p="md" radius="lg" w="100%" style={{background:`${T}10`,border:`1px solid ${T}44`}}>
               <Stack gap={6}>
-                <Text size="xs" fw={600} c={T}>What happens next?</Text>
-                <Text size="xs" c="var(--ot-text-sub)">1. Provider calls you within 10 minutes</Text>
-                <Text size="xs" c="var(--ot-text-sub)">2. Confirm arrival time together</Text>
-                <Text size="xs" c="var(--ot-text-sub)">3. Service is performed &amp; you pay in-app</Text>
+                <Text size="xs" fw={600} c={T}>{t('clientHome.ai_what_next')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('clientHome.ai_next_1')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('clientHome.ai_next_2')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('clientHome.ai_next_3')}</Text>
               </Stack>
             </Paper>
             <Button size="md" radius="xl" fullWidth
               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-              onClick={closeAssist}>Back to Home</Button>
+              onClick={closeAssist}>{t('clientHome.ai_back_home')}</Button>
           </Stack>
         )}
       </Modal>
@@ -791,11 +805,11 @@ export function ClientHome() {
                 </Box>
               </Box>
               <Stack align="center" gap={4}>
-                <Text fw={800} size="lg" c={N}>Calling…</Text>
-                <Text size="sm" c="dimmed">Connecting to {cCat} provider</Text>
+                <Text fw={800} size="lg" c={N}>{t('clientHome.call_calling')}</Text>
+                <Text size="sm" c="dimmed">{t('clientHome.call_connecting_to', { cat: cCat })}</Text>
               </Stack>
               <Button variant="light" color="red" radius="xl" size="sm"
-                leftSection={<IconPhoneOff size={14}/>} onClick={closeCall}>Cancel</Button>
+                leftSection={<IconPhoneOff size={14}/>} onClick={closeCall}>{t('clientHome.call_cancel')}</Button>
             </Stack>
           )}
 
@@ -806,8 +820,8 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconPhone size={36} color="white"/>
               </Box>
-              <Text fw={800} size="lg" c={N}>Connected!</Text>
-              <Text size="sm" c="dimmed">Gathering details…</Text>
+              <Text fw={800} size="lg" c={N}>{t('clientHome.call_connected')}</Text>
+              <Text size="sm" c="dimmed">{t('clientHome.call_gathering')}</Text>
             </Stack>
           )}
 
@@ -818,8 +832,8 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconMicrophone size={36} color="white"/>
               </Box>
-              <Text fw={700} size="md" c={N} ta="center">Describe your {cCat} needs…</Text>
-              <Text size="xs" c="dimmed" ta="center">Our AI is listening and matching you with the best provider nearby</Text>
+              <Text fw={700} size="md" c={N} ta="center">{t('clientHome.call_describe', { cat: cCat })}</Text>
+              <Text size="xs" c="dimmed" ta="center">{t('clientHome.call_listening_sub')}</Text>
               <Progress value={55} color="teal" size="sm" radius="xl" w="100%" animated/>
             </Stack>
           )}
@@ -831,7 +845,7 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconSearch size={36} color="white"/>
               </Box>
-              <Text fw={700} size="md" c={N}>Finding best match…</Text>
+              <Text fw={700} size="md" c={N}>{t('clientHome.call_finding')}</Text>
               <Progress value={85} color="teal" size="sm" radius="xl" w="100%" animated/>
             </Stack>
           )}
@@ -841,9 +855,9 @@ export function ClientHome() {
               <Group gap={8} justify="space-between" align="center">
                 <Badge size="lg" color="yellow" variant="filled"
                   leftSection={<IconCheck size={11}/>}>
-                  {cProviders.length} Providers Ready!
+                  {t('clientHome.call_providers_ready', { count: cProviders.length })}
                 </Badge>
-                <Text size="xs" c="dimmed">Tap a card to select</Text>
+                <Text size="xs" c="dimmed">{t('clientHome.ai_tap_to_select')}</Text>
               </Group>
               <Box style={{maxHeight:320,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
                 {cProviders.map((prov)=>{
@@ -875,7 +889,7 @@ export function ClientHome() {
                                 <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
                               </Group>
                               <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
-                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{t('clientHome.yrs_exp', { count: prov.yearsExp })}</Text>
                             </Group>
                           </Stack>
                         </Group>
@@ -883,7 +897,7 @@ export function ClientHome() {
                           <Text size="sm" fw={900} c={active?'white':N}>
                             {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
                           </Text>
-                          {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                          {active&&<Badge size="xs" color="yellow" variant="filled">{t('clientHome.ai_selected_badge')}</Badge>}
                         </Stack>
                       </Group>
                     </Paper>
@@ -894,9 +908,9 @@ export function ClientHome() {
                 <Button flex={1} size="md" radius="xl"
                   style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                   disabled={!cSelectedProv}
-                  onClick={confirmCall}>Confirm</Button>
+                  onClick={confirmCall}>{t('clientHome.call_confirm')}</Button>
                 <Button flex={1} size="md" radius="xl" variant="light" color="red"
-                  onClick={cancelFromCall}>Decline</Button>
+                  onClick={cancelFromCall}>{t('clientHome.ai_decline')}</Button>
               </Group>
             </Stack>
           )}
@@ -924,11 +938,11 @@ export function ClientHome() {
                 </Box>
               </Box>
               <Stack gap={4} align="center">
-                <Text fw={800} size="md" c={N}>Why did you decline?</Text>
-                <Text size="xs" c="dimmed">Select a reason — we'll improve your matches</Text>
+                <Text fw={800} size="md" c={N}>{t('clientHome.decline_why')}</Text>
+                <Text size="xs" c="dimmed">{t('clientHome.decline_sub')}</Text>
               </Stack>
               <Stack gap={10} w="100%">
-                {DECLINE_REASONS.map(r=>(
+                {DECLINE_REASONS_KEYS.map(r=>(
                   <Button key={r} size="sm" radius="xl" variant="light" color="gray"
                     fullWidth onClick={()=>pickReason(r)}
                     styles={{root:{fontWeight:600,justifyContent:'flex-start',paddingLeft:20}}}>
@@ -937,7 +951,7 @@ export function ClientHome() {
                 ))}
               </Stack>
               <Button size="xs" radius="xl" variant="subtle" color="gray"
-                onClick={closeDecline}>Never mind</Button>
+                onClick={closeDecline}>{t('clientHome.decline_never_mind')}</Button>
             </Stack>
           )}
           {declineStage==='confirmed'&&(
@@ -948,9 +962,9 @@ export function ClientHome() {
                 <IconCheck size={40} color="white"/>
               </Box>
               <Stack gap={6} align="center">
-                <Text fw={800} size="lg" c={N}>Noted!</Text>
+                <Text fw={800} size="lg" c={N}>{t('clientHome.decline_noted')}</Text>
                 <Text size="sm" c="dimmed" ta="center">
-                  I've recorded your reason. Feel free to order again anytime.
+                  {t('clientHome.decline_recorded')}
                 </Text>
               </Stack>
             </Stack>
@@ -966,18 +980,18 @@ export function ClientHome() {
         <Box p="xl">
           <Group justify="space-between" mb="lg">
             <Box>
-              <Text fw={900} size="lg" c={N} lh={1}>{pickCat||'Services'}</Text>
-              <Text size="xs" c="dimmed" mt={2}>How would you like to get help?</Text>
+              <Text fw={900} size="lg" c={N} lh={1}>{pickCat || t('nav.explore_services')}</Text>
+              <Text size="xs" c="dimmed" mt={2}>{t('clientHome.pick_how_help')}</Text>
             </Box>
             <ActionIcon variant="subtle" onClick={()=>setPickOpen(false)}
-              aria-label="Close" size="lg"><IconX size={18}/></ActionIcon>
+              aria-label={t('common.close')} size="lg"><IconX size={18}/></ActionIcon>
           </Group>
 
           <Stack gap={12}>
             {/* Option 1 — Call Center */}
             <Paper
               component="a" href="tel:8182"
-              aria-label="Call call center 8182"
+              aria-label={t('clientHome.pick_call_center')}
               p="lg" radius="xl"
               onClick={()=>setPickOpen(false)}
               style={{display:'block',textDecoration:'none',
@@ -989,12 +1003,12 @@ export function ClientHome() {
                   <IconPhone size={26} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="md" c="white">Call Call Center</Text>
+                  <Text fw={800} size="md" c="white">{t('clientHome.pick_call_center')}</Text>
                   <Text size="xs" c="rgba(255,255,255,.8)" mt={2}>
-                    Speaks to a real agent · <Text span fw={800} c="white">📞 8182</Text>
+                    {t('clientHome.pick_call_center_sub')}
                   </Text>
                   <Badge mt={6} size="xs" style={{background:'rgba(255,255,255,.2)',color:'white',border:'none'}}>
-                    Human assistance
+                    {t('clientHome.pick_human')}
                   </Badge>
                 </Box>
               </Group>
@@ -1003,7 +1017,7 @@ export function ClientHome() {
             {/* Option 2 — AI Assistant */}
             <Paper
               p="lg" radius="xl" onClick={pickAI}
-              aria-label="Use in-app AI assistant"
+              aria-label={t('clientHome.pick_ai')}
               role="button" tabIndex={0}
               onKeyDown={e=>e.key==='Enter'&&pickAI()}
               style={{cursor:'pointer',border:`2px solid ${T}55`,
@@ -1014,11 +1028,11 @@ export function ClientHome() {
                   <IconMicrophone size={26} color={T}/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="md" c={N}>Call In-App AI</Text>
-                  <Text size="xs" c="dimmed" mt={2}>AI asks your problem &amp; finds the best pro</Text>
+                  <Text fw={800} size="md" c={N}>{t('clientHome.pick_ai')}</Text>
+                  <Text size="xs" c="dimmed" mt={2}>{t('clientHome.pick_ai_sub')}</Text>
                   <Group gap={6} mt={6}>
-                    <Badge size="xs" variant="light" color="teal">Smart match</Badge>
-                    <Badge size="xs" variant="light" color="blue">Auto-locate</Badge>
+                    <Badge size="xs" variant="light" color="teal">{t('clientHome.pick_smart_match')}</Badge>
+                    <Badge size="xs" variant="light" color="blue">{t('clientHome.pick_auto_locate')}</Badge>
                   </Group>
                 </Box>
               </Group>
@@ -1026,7 +1040,7 @@ export function ClientHome() {
           </Stack>
 
           <Text size="xs" c="dimmed" ta="center" mt={14}>
-            Both options are free to use · tap outside to dismiss
+            {t('clientHome.pick_footer')}
           </Text>
         </Box>
       </Modal>

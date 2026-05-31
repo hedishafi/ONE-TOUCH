@@ -10,6 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from rest_framework import serializers as drf_serializers
+
 from accounts.models import User, ProviderProfile
 from orders.models import Order, OrderAssignment, OrderMatch, OrderStatusLog
 from orders.permissions import IsClient, IsProvider
@@ -23,6 +25,7 @@ from orders.utils.matching_service import find_matching_providers, haversine_dis
 from orders.utils.ollama_service import categorise_order, match_category_to_db
 from orders.utils.whisper_service import transcribe_audio
 from services.models import ProviderService
+from services.models import ProviderCategoryPricing
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +294,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 		if order.client != request.user:
 			return Response({'detail': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
 
-		if order.status not in (Order.STATUS_PENDING, Order.STATUS_MATCHING, Order.STATUS_ACCEPTED):
+		if order.status not in (Order.STATUS_PENDING, Order.STATUS_MATCHING, Order.STATUS_PROVIDER_SELECTED, Order.STATUS_ACCEPTED):
 			return Response({'detail': 'Order cannot be cancelled at this stage.'}, status=status.HTTP_400_BAD_REQUEST)
 
 		order.status = Order.STATUS_CANCELLED
@@ -300,6 +303,164 @@ class OrderViewSet(viewsets.ModelViewSet):
 		order.save(update_fields=['status', 'updated_at'])
 
 		return Response({'order_id': order.id, 'status': order.status}, status=status.HTTP_200_OK)
+
+
+	# ── NEW: suggested providers for client ──────────────────────────────────
+	@action(detail=True, methods=['get'], url_path='suggested-providers',
+	        permission_classes=[IsAuthenticated, IsClient])
+	def suggested_providers(self, request, pk=None):
+		"""
+		GET /api/v1/orders/{id}/suggested-providers/
+		Returns up to 3 nearest providers that match the order category,
+		sorted by distance. Uses the existing haversine_distance utility.
+		"""
+		order = get_object_or_404(Order, pk=pk)
+
+		if order.client != request.user:
+			return Response({'detail': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+		def _build_provider_data(provider, distance_km):
+			service = ProviderService.objects.filter(provider=provider).first()
+			if not service:
+				return None
+			category_match = order.category and service.primary_service_id == order.category_id
+			sub_match = (
+				order.sub_service
+				and service.subservices.filter(id=order.sub_service_id).exists()
+			)
+			if not (category_match or sub_match):
+				return None
+			# Look up real price range from ProviderCategoryPricing
+			pricing = None
+			if order.category:
+				pricing = ProviderCategoryPricing.objects.filter(
+					provider=provider,
+					category=order.category,
+				).first()
+			if pricing is None and service.primary_service:
+				# Fallback: use pricing for the provider's primary service category
+				pricing = ProviderCategoryPricing.objects.filter(
+					provider=provider,
+					category=service.primary_service,
+				).first()
+			if pricing is None:
+				# Last fallback: any pricing record for this provider
+				pricing = ProviderCategoryPricing.objects.filter(provider=provider).first()
+			if pricing is not None:
+				price_range = f'ETB {int(pricing.min_price)}\u2013{int(pricing.max_price)}'
+			else:
+				price_range = 'Negotiable'
+			service_names = []
+			if service.primary_service:
+				service_names.append(service.primary_service.name)
+			for sub in service.subservices.all()[:3]:
+				service_names.append(sub.name)
+			profile_picture_url = None
+			if provider.profile_picture:
+				try:
+					profile_picture_url = request.build_absolute_uri(provider.profile_picture.url)
+				except Exception:
+					pass
+			return {
+				'id': provider.id,
+				'full_name': provider.user.get_full_name() or provider.user.username,
+				'bio': provider.bio or '',
+				'profile_picture': profile_picture_url,
+				'rating': round(provider.avg_rating, 1),
+				'total_reviews': provider.total_reviews,
+				'distance_km': round(distance_km, 2),
+				'price_range': price_range,
+				'services': service_names,
+				'years_of_experience': provider.years_of_experience,
+			}
+
+		def _score_queryset(qs):
+			scored = []
+			for provider in qs.select_related('user'):
+				dist = haversine_distance(
+					order.client_latitude, order.client_longitude,
+					provider.current_latitude, provider.current_longitude,
+				)
+				data = _build_provider_data(provider, dist)
+				if data:
+					scored.append((dist, data))
+			scored.sort(key=lambda x: x[0])
+			return [d for _, d in scored[:3]]
+
+		# First try: online + available providers
+		online_qs = ProviderProfile.objects.filter(
+			is_online=True, is_available=True,
+			current_latitude__isnull=False, current_longitude__isnull=False,
+		)
+		result = _score_queryset(online_qs)
+
+		# Fallback: any provider with coordinates
+		if not result:
+			fallback_qs = ProviderProfile.objects.filter(
+				current_latitude__isnull=False, current_longitude__isnull=False,
+			)
+			result = _score_queryset(fallback_qs)
+
+		return Response(result, status=status.HTTP_200_OK)
+
+	# ── NEW: client selects a specific provider ───────────────────────────────
+	@action(detail=True, methods=['post'], url_path='select-provider',
+	        permission_classes=[IsAuthenticated, IsClient])
+	def select_provider(self, request, pk=None):
+		"""
+		POST /api/v1/orders/{id}/select-provider/
+		Body: { "provider_id": <int> }
+		Assigns the chosen provider, changes status to provider_selected,
+		and ensures an OrderMatch record exists for that provider.
+		"""
+		order = get_object_or_404(Order, pk=pk)
+
+		if order.client != request.user:
+			return Response({'detail': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+		if order.status not in (Order.STATUS_MATCHING, Order.STATUS_PENDING):
+			return Response(
+				{'detail': f'Cannot select provider for order with status "{order.status}".'},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		provider_id = request.data.get('provider_id')
+		if not provider_id:
+			return Response({'detail': 'provider_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		provider = get_object_or_404(ProviderProfile, pk=provider_id)
+
+		with transaction.atomic():
+			# Ensure an OrderMatch exists for this provider
+			OrderMatch.objects.get_or_create(
+				order=order,
+				provider=provider,
+				defaults={'status': OrderMatch.STATUS_NOTIFIED},
+			)
+			# Decline all other existing matches
+			OrderMatch.objects.filter(order=order).exclude(provider=provider).update(
+				status=OrderMatch.STATUS_DECLINED,
+				responded_at=timezone.now(),
+			)
+			order.status = Order.STATUS_PROVIDER_SELECTED
+			order._status_log_changed_by = request.user
+			order._status_log_note = f'Client selected provider #{provider_id}.'
+			order.save(update_fields=['status', 'updated_at'])
+
+		logger.info(
+			'Provider selected | order=%s | provider=%s | client=%s',
+			order.id, provider.id, request.user.id,
+		)
+
+		return Response(
+			{
+				'order_id': order.id,
+				'status': order.status,
+				'provider_id': provider.id,
+				'provider_name': provider.user.get_full_name() or provider.user.username,
+			},
+			status=status.HTTP_200_OK,
+		)
 
 	@action(detail=False, methods=['post'], permission_classes=[IsAuthenticated, IsClient])
 	def transcribe(self, request):

@@ -6,6 +6,7 @@ import {
   IconArrowLeft, IconMail, IconPhone, IconMessageCircle,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -28,39 +29,47 @@ const ANIMATIONS = `
 }
 `;
 
-const SUPPORT_CHANNELS = [
-  {
-    icon: <IconMail size={28} />,
-    title: 'Email Support',
-    desc: 'Get a response within 24 hours',
-    contact: 'support@onetouch.et',
-    color: '#3498DB',
-  },
-  {
-    icon: <IconPhone size={28} />,
-    title: 'Phone Support',
-    desc: 'Call us Mon-Fri, 8AM-6PM',
-    contact: '+251 900 123 456',
-    color: '#1ABC9C',
-  },
-  {
-    icon: <IconMessageCircle size={28} />,
-    title: 'Live Chat',
-    desc: 'Chat with our team instantly',
-    contact: 'Available 8AM-8PM',
-    color: '#F39C12',
-  },
-];
-
-const FAQ_QUICK_LINKS = [
-  { q: 'How do I book a service?', path: ROUTES.helpCenter },
-  { q: 'What payment methods are accepted?', path: ROUTES.helpCenter },
-  { q: 'How is my payment protected?', path: ROUTES.helpCenter },
-  { q: 'How do I rate a provider?', path: ROUTES.helpCenter },
+const FAQ_QUICK_LINK_PATHS = [
+  ROUTES.helpCenter,
+  ROUTES.helpCenter,
+  ROUTES.helpCenter,
+  ROUTES.helpCenter,
 ];
 
 export function Support() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  const SUPPORT_CHANNELS = [
+    {
+      icon: <IconMail size={28} />,
+      title: t('support.email_title'),
+      desc: t('support.email_desc'),
+      contact: 'support@onetouch.et',
+      color: '#3498DB',
+    },
+    {
+      icon: <IconPhone size={28} />,
+      title: t('support.phone_title'),
+      desc: t('support.phone_desc'),
+      contact: '+251 900 123 456',
+      color: '#1ABC9C',
+    },
+    {
+      icon: <IconMessageCircle size={28} />,
+      title: t('support.chat_title'),
+      desc: t('support.chat_desc'),
+      contact: t('support.chat_hours'),
+      color: '#F39C12',
+    },
+  ];
+
+  const FAQ_QUICK_LINKS = [
+    { q: t('support.faq_1'), path: ROUTES.helpCenter },
+    { q: t('support.faq_2'), path: ROUTES.helpCenter },
+    { q: t('support.faq_3'), path: ROUTES.helpCenter },
+    { q: t('support.faq_4'), path: ROUTES.helpCenter },
+  ];
 
   return (
     <>
@@ -91,7 +100,7 @@ export function Support() {
               </Box>
               <Button className="btn-teal" size="sm" style={{ color: 'white', fontWeight: 700, background: COLORS.tealBlue }} 
                 onClick={() => navigate(ROUTES.signup)}>
-                Sign Up
+                {t('support.sign_up')}
               </Button>
             </Group>
           </Group>
@@ -116,10 +125,10 @@ export function Support() {
           <Container size="lg" px={{ base: 'md', sm: 'xl' }}>
             <Stack align="center" ta="center" gap="lg" style={{ position: 'relative' }}>
               <Text fw={900} size="4xl" c="white" style={{ letterSpacing: '-1px' }}>
-                We're Here to Help
+                {t('support.hero_title')}
               </Text>
               <Text c="rgba(255,255,255,0.80)" size="lg" maw={600} style={{ lineHeight: 1.8 }}>
-                Multiple ways to reach our support team. We're committed to resolving your issues quickly and professionally.
+                {t('support.hero_sub')}
               </Text>
             </Stack>
           </Container>
@@ -170,10 +179,10 @@ export function Support() {
                 background: `${COLORS.lemonYellow}30`, color: '#7A6B00',
                 border: `1px solid ${COLORS.lemonYellow}`, fontWeight: 700
               }}>
-                Quick Help
+                {t('support.faq_badge')}
               </Badge>
               <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px' }}>
-                Frequently Asked Questions
+                {t('support.faq_title')}
               </Text>
             </Stack>
 
@@ -213,10 +222,10 @@ export function Support() {
                 borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none'
               }} />
               <Text fw={900} size="3xl" c="white" mb="sm" style={{ letterSpacing: '-0.5px', position: 'relative' }}>
-                Still have questions?
+                {t('support.cta_title')}
               </Text>
               <Text c="rgba(255,255,255,0.65)" mb="xl" size="md" style={{ position: 'relative' }}>
-                Check our Help Center for comprehensive guides and documentation.
+                {t('support.cta_sub')}
               </Text>
               <Group justify="center" gap="md" wrap="wrap" style={{ position: 'relative' }}>
                 <Button size="xl" style={{
@@ -232,7 +241,7 @@ export function Support() {
                     (e.currentTarget as HTMLElement).style.boxShadow = '';
                   }}
                   onClick={() => navigate(ROUTES.helpCenter)}>
-                  Go to Help Center
+                  {t('support.cta_btn')}
                 </Button>
               </Group>
             </Box>

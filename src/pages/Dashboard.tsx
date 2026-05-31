@@ -1,6 +1,7 @@
 import { Box, Stack, Text, Center } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
 
@@ -14,6 +15,7 @@ const ANIMATIONS = `
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const currentUser = useAuthStore(state => state.currentUser);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function Dashboard() {
         <Center style={{ minHeight: '100vh' }}>
           <Stack align="center" gap="md" className="fade-in">
             <Text fw={700} size="lg" c={COLORS.navyBlue}>
-              Redirecting to your dashboard...
+              {t('dashboard.redirecting')}
             </Text>
             <Box style={{
               width: 40,

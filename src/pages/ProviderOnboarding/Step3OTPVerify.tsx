@@ -17,6 +17,7 @@ import {
   IconChevronLeft,
 } from '@tabler/icons-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import * as providerService from '../../services/providerOnboardingService';
 
@@ -28,6 +29,7 @@ interface LocationState {
 export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const state = (location.state as LocationState) || {};
 
   const [otp, setOtp] = useState('');
@@ -39,7 +41,6 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
   const sessionId = state.sessionId || '';
   const phone = state.phone || '';
 
-  // Start OTP timer
   useEffect(() => {
     setSeconds(60);
     timerRef.current = setInterval(() => {
@@ -60,11 +61,11 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
   if (!sessionId || !phone) {
     return (
       <Container size="md" py="xl">
-        <Alert icon={<IconAlertCircle size={16} />} color="red" title="Session Error">
-          Invalid session. Please start the onboarding process again.
+        <Alert icon={<IconAlertCircle size={16} />} color="red" title={t('providerOnboarding.session_error_title')}>
+          {t('providerOnboarding.session_error_msg')}
         </Alert>
         <Button mt="xl" onClick={() => navigate('/provider/onboarding/step1')}>
-          Start Over
+          {t('providerOnboarding.start_over')}
         </Button>
       </Container>
     );
@@ -72,7 +73,7 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
 
   const handleOtpVerify = async () => {
     if (!otp || otp.length !== 6) {
-      setError('Please enter a valid 6-digit OTP');
+      setError(t('providerOnboarding.err_invalid_otp'));
       return;
     }
 
@@ -80,32 +81,29 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Verify OTP with backend
       await providerService.providerOTPVerify({
         session_id: sessionId,
         otp_code: otp,
       });
 
       notifications.show({
-        title: 'Success',
-        message: 'Phone number verified!',
+        title: t('providerOnboarding.verify_success_title'),
+        message: t('providerOnboarding.verify_success_msg'),
         color: 'green',
       });
 
-      // Move to step 4 (biometrics)
       setTimeout(() => {
-        navigate('/provider/onboarding/step4', {
-          state: { sessionId },
-        });
+        navigate('/provider/onboarding/step4', { state: { sessionId } });
       }, 800);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const maybe = err as { response?: { data?: { detail?: string; error?: string } } };
       const message =
-        err.response?.data?.detail ||
-        err.response?.data?.error ||
-        'Failed to verify OTP';
+        maybe.response?.data?.detail ||
+        maybe.response?.data?.error ||
+        t('providerOnboarding.err_verify_fallback');
       setError(message);
       notifications.show({
-        title: 'Error',
+        title: t('providerOnboarding.verify_error_title'),
         message,
         color: 'red',
       });
@@ -118,21 +116,19 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
     if (seconds > 0) return;
 
     try {
-      await providerService.providerOTPRequest({
-        session_id: sessionId,
-        phone: phone,
-      });
+      await providerService.providerOTPRequest({ session_id: sessionId, phone });
       setSeconds(60);
       setOtp('');
       notifications.show({
-        title: 'Code Resent',
-        message: `New OTP sent to ${phone}`,
+        title: t('providerOnboarding.resent_title'),
+        message: t('providerOnboarding.resent_msg', { phone }),
         color: 'blue',
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const maybe = err as { response?: { data?: { detail?: string } } };
       notifications.show({
-        title: 'Resend Failed',
-        message: err.response?.data?.detail || 'Could not resend OTP',
+        title: t('providerOnboarding.resend_failed_title'),
+        message: maybe.response?.data?.detail || t('providerOnboarding.resend_failed_fallback'),
         color: 'red',
       });
     }
@@ -157,9 +153,9 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
               <IconMessageCircle size={24} color="#008080" />
             </Box>
             <Stack gap={2}>
-              <Title order={3}>Verify Your Phone</Title>
+              <Title order={3}>{t('providerOnboarding.step3_title')}</Title>
               <Text size="sm" color="dimmed">
-                Enter the 6-digit code we sent to {phone}
+                {t('providerOnboarding.step3_sub', { phone })}
               </Text>
             </Stack>
           </Group>
@@ -172,8 +168,8 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
 
           <Stack gap="lg">
             <TextInput
-              label="Enter OTP Code"
-              placeholder="000000"
+              label={t('providerOnboarding.otp_label')}
+              placeholder={t('providerOnboarding.otp_placeholder')}
               value={otp}
               onChange={(e) => {
                 const value = e.currentTarget.value.replace(/\D/g, '').slice(0, 6);
@@ -184,7 +180,7 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
               disabled={loading}
             />
             <Text color="dimmed" size="sm">
-              Enter the 6-digit code sent to your phone
+              {t('providerOnboarding.otp_hint')}
             </Text>
 
             <Group justify="space-between">
@@ -193,7 +189,7 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
                 onClick={() => navigate('/provider/onboarding/phone-choice')}
                 disabled={loading}
               >
-                <IconChevronLeft size={16} /> Back
+                <IconChevronLeft size={16} /> {t('providerOnboarding.back_btn')}
               </Button>
               <Stack gap={4} align="flex-end">
                 <Button
@@ -201,15 +197,15 @@ export const ProviderOnboardingStep3OTPVerify: React.FC = () => {
                   disabled={otp.length !== 6 || loading}
                   loading={loading}
                 >
-                  {loading ? 'Verifying...' : 'Verify'}
+                  {loading ? t('providerOnboarding.verifying') : t('providerOnboarding.verify_btn')}
                 </Button>
                 {seconds > 0 ? (
                   <Text size="xs" color="dimmed">
-                    Resend in {seconds}s
+                    {t('providerOnboarding.resend_in', { seconds })}
                   </Text>
                 ) : (
                   <Button variant="subtle" size="xs" onClick={handleResend}>
-                    Resend Code
+                    {t('providerOnboarding.resend_code')}
                   </Button>
                 )}
               </Stack>

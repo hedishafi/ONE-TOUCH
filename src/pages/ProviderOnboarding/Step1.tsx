@@ -12,6 +12,7 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle, IconCamera, IconRefresh } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import * as providerService from '../../services/providerOnboardingService';
 import * as authService from '../../services/authService';
@@ -52,14 +53,9 @@ const getErrorMessage = (err: unknown, fallback: string): string => {
   return fallback;
 };
 
-const TARGET_LABELS: Record<CaptureTarget, string> = {
-  id_front_image: 'ID Front',
-  id_back_image: 'ID Back',
-  selfie_image: 'Selfie',
-};
-
 export const ProviderOnboardingStep1: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const [loading, setLoading] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(false);
@@ -112,41 +108,17 @@ export const ProviderOnboardingStep1: React.FC = () => {
       stopCamera();
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError('Camera is not supported in this browser. Please use a modern browser like Chrome or Safari.');
+        setError(t('providerOnboarding.err_camera_unsupported'));
         setCameraLoading(false);
         return;
       }
 
       const prefersSelfie = target === 'selfie_image';
       const constraintAttempts: MediaStreamConstraints[] = [
-        {
-          video: {
-            facingMode: { exact: prefersSelfie ? 'user' : 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        },
-        {
-          video: {
-            facingMode: prefersSelfie ? 'user' : 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        },
-        {
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        },
-        // Fallback to basic video constraints
-        {
-          video: true,
-          audio: false,
-        },
+        { video: { facingMode: { exact: prefersSelfie ? 'user' : 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: prefersSelfie ? 'user' : 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: true, audio: false },
       ];
 
       let stream: MediaStream | null = null;
@@ -178,7 +150,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
             setTimeout(() => attachStreamToVideo(attempt + 1), 50);
           } else {
             setCameraLoading(false);
-            setError('Camera preview failed to initialize. Please tap Restart Camera.');
+            setError(t('providerOnboarding.err_camera_preview'));
           }
           return;
         }
@@ -199,7 +171,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
             })
             .catch((playErr) => {
               console.error('Video play failed:', playErr);
-              setError('Failed to start video playback. Please try again.');
+              setError(t('providerOnboarding.err_video_playback'));
               setCameraLoading(false);
             });
         };
@@ -213,7 +185,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
               setCameraLoading(false);
             })
             .catch(() => {
-              setError('Camera initialization timed out. Please try again.');
+              setError(t('providerOnboarding.err_camera_timeout'));
               setCameraLoading(false);
             });
         }, 5000);
@@ -222,36 +194,35 @@ export const ProviderOnboardingStep1: React.FC = () => {
       attachStreamToVideo();
     } catch (err: unknown) {
       console.error('Camera start error:', err);
-      
-      // User-friendly error messages without technical jargon
+
       let friendlyMessage = '';
-      
+
       if (typeof err === 'object' && err !== null && 'name' in err) {
         const errorName = (err as { name: string }).name;
-        
+
         if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-          friendlyMessage = 'Camera access was denied. Please enable camera permission in your browser settings and try again.';
+          friendlyMessage = t('providerOnboarding.err_camera_denied');
         } else if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
-          friendlyMessage = 'No camera found on your device. Please connect a camera and try again.';
+          friendlyMessage = t('providerOnboarding.err_camera_not_found');
         } else if (errorName === 'NotReadableError' || errorName === 'TrackStartError') {
-          friendlyMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+          friendlyMessage = t('providerOnboarding.err_camera_in_use');
         } else if (errorName === 'OverconstrainedError' || errorName === 'ConstraintNotSatisfiedError') {
-          friendlyMessage = 'Camera does not meet the required specifications. Please try with a different camera.';
+          friendlyMessage = t('providerOnboarding.err_camera_constraints');
         } else if (errorName === 'TypeError') {
-          friendlyMessage = 'Camera access is not supported in this browser. Please use Chrome, Safari, or Firefox.';
+          friendlyMessage = t('providerOnboarding.err_camera_browser');
         } else if (errorName === 'AbortError') {
-          friendlyMessage = 'Camera initialization was interrupted. Please try again.';
+          friendlyMessage = t('providerOnboarding.err_camera_aborted');
         } else {
-          friendlyMessage = `Unable to access camera (${errorName}). Please check your browser settings and ensure camera permission is granted.`;
+          friendlyMessage = t('providerOnboarding.err_camera_generic', { name: errorName });
         }
       } else {
-        friendlyMessage = 'Unable to access camera. Please check your browser settings and ensure camera permission is granted.';
+        friendlyMessage = t('providerOnboarding.err_camera_fallback');
       }
-      
+
       setError(friendlyMessage);
       setCameraLoading(false);
     }
-  }, [stopCamera]);
+  }, [stopCamera, t]);
 
   useEffect(() => {
     if (!streamRef.current || !videoRef.current) return;
@@ -278,14 +249,9 @@ export const ProviderOnboardingStep1: React.FC = () => {
       }
     };
 
-    video.play().catch(() => {
-      // Some browsers may require metadata/frames before play resolves.
-    });
-
+    video.play().catch(() => {});
     video.onloadedmetadata = () => {
-      video.play().catch(() => {
-        // Keep checking frame readiness below.
-      });
+      video.play().catch(() => {});
       markReadyIfFrames();
     };
 
@@ -293,25 +259,18 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
     return () => {
       cancelled = true;
-      if (frameCheckTimer) {
-        clearInterval(frameCheckTimer);
-      }
+      if (frameCheckTimer) clearInterval(frameCheckTimer);
     };
   }, [cameraLoading, activeTarget]);
 
   useEffect(() => {
-    // Auto-start camera when component mounts for better UX
     const timer = setTimeout(() => {
       startCamera(activeTarget);
-    }, 500); // Small delay to ensure DOM is ready
-
-    return () => {
-      clearTimeout(timer);
-    };
+    }, 500);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, []);
 
-  // Restart camera when switching between capture targets
   useEffect(() => {
     if (streamRef.current) {
       startCamera(activeTarget);
@@ -343,15 +302,12 @@ export const ProviderOnboardingStep1: React.FC = () => {
     };
 
     loadOnboardingStatus();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
   const validateCapturedFile = (selectedFile: File): boolean => {
     if (selectedFile.size > 10 * 1024 * 1024) {
-      setError('Captured image size must be less than 10MB. Please capture again.');
+      setError(t('providerOnboarding.err_image_size'));
       return false;
     }
     return true;
@@ -359,7 +315,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
   const captureCurrentFrame = async () => {
     if (!videoRef.current || !canvasRef.current) {
-      setError('Camera is not ready yet.');
+      setError(t('providerOnboarding.err_camera_not_ready'));
       return;
     }
 
@@ -367,7 +323,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
     const canvas = canvasRef.current;
 
     if (!video.videoWidth || !video.videoHeight) {
-      setError('Camera stream is not ready yet.');
+      setError(t('providerOnboarding.err_stream_not_ready'));
       return;
     }
 
@@ -376,7 +332,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
     const context = canvas.getContext('2d');
     if (!context) {
-      setError('Unable to capture image. Please try again.');
+      setError(t('providerOnboarding.err_capture_failed'));
       return;
     }
 
@@ -387,7 +343,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
     });
 
     if (!blob) {
-      setError('Capture failed. Please retake the photo.');
+      setError(t('providerOnboarding.err_capture_blob'));
       return;
     }
 
@@ -409,13 +365,10 @@ export const ProviderOnboardingStep1: React.FC = () => {
       if (latest.role !== 'provider') return;
 
       const verificationStatus: User['verificationStatus'] =
-        latest.verification_status === 'verified'
-          ? 'verified'
-          : latest.verification_status === 'rejected'
-            ? 'rejected'
-            : latest.verification_status === 're-verification-requested'
-              ? 're-verification-requested'
-              : 'pending';
+        latest.verification_status === 'verified' ? 'verified'
+        : latest.verification_status === 'rejected' ? 'rejected'
+        : latest.verification_status === 're-verification-requested' ? 're-verification-requested'
+        : 'pending';
 
       const user: User = {
         id: String(latest.id),
@@ -429,24 +382,16 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
       localStorage.setItem('user', JSON.stringify(latest));
       storage.set(STORAGE_KEYS.currentUser, user);
-      useAuthStore.setState({
-        currentUser: user,
-        isAuthenticated: true,
-        clientProfile: null,
-        providerProfile: null,
-      });
+      useAuthStore.setState({ currentUser: user, isAuthenticated: true, clientProfile: null, providerProfile: null });
     } catch {
       const stored = authService.getStoredUser();
       if (!stored || stored.role !== 'provider') return;
 
       const verificationStatus: User['verificationStatus'] =
-        stored.verification_status === 'verified'
-          ? 'verified'
-          : stored.verification_status === 'rejected'
-            ? 'rejected'
-            : stored.verification_status === 're-verification-requested'
-              ? 're-verification-requested'
-              : 'pending';
+        stored.verification_status === 'verified' ? 'verified'
+        : stored.verification_status === 'rejected' ? 'rejected'
+        : stored.verification_status === 're-verification-requested' ? 're-verification-requested'
+        : 'pending';
 
       const user: User = {
         id: String(stored.id),
@@ -459,18 +404,13 @@ export const ProviderOnboardingStep1: React.FC = () => {
       };
 
       storage.set(STORAGE_KEYS.currentUser, user);
-      useAuthStore.setState({
-        currentUser: user,
-        isAuthenticated: true,
-        clientProfile: null,
-        providerProfile: null,
-      });
+      useAuthStore.setState({ currentUser: user, isAuthenticated: true, clientProfile: null, providerProfile: null });
     }
   };
 
   const handleSubmit = async () => {
     if (!frontImage || !backImage || !selfieImage) {
-      setError('Please capture ID front, ID back, and selfie images.');
+      setError(t('providerOnboarding.err_missing_images'));
       return;
     }
 
@@ -485,8 +425,8 @@ export const ProviderOnboardingStep1: React.FC = () => {
       });
 
       notifications.show({
-        title: 'Verification Submitted',
-        message: 'Your account is under review.',
+        title: t('providerOnboarding.submitted_title'),
+        message: t('providerOnboarding.submitted_msg'),
         color: 'green',
       });
 
@@ -497,10 +437,10 @@ export const ProviderOnboardingStep1: React.FC = () => {
       await syncProviderSession();
       navigate(ROUTES.providerDashboard);
     } catch (err: unknown) {
-      const message = getErrorMessage(err, 'Failed to submit verification images.');
+      const message = getErrorMessage(err, t('providerOnboarding.err_submit_fallback'));
       setError(message);
       notifications.show({
-        title: 'Submission Failed',
+        title: t('providerOnboarding.submit_failed_title'),
         message,
         color: 'red',
       });
@@ -509,16 +449,28 @@ export const ProviderOnboardingStep1: React.FC = () => {
     }
   };
 
+  const TARGET_LABELS: Record<CaptureTarget, string> = {
+    id_front_image: t('providerOnboarding.tab_id_front'),
+    id_back_image: t('providerOnboarding.tab_id_back'),
+    selfie_image: t('providerOnboarding.tab_selfie'),
+  };
+
+  const previewItems = [
+    { key: 'id_front_image' as CaptureTarget, label: TARGET_LABELS.id_front_image, src: previewFront, captured: !!frontImage },
+    { key: 'id_back_image' as CaptureTarget, label: TARGET_LABELS.id_back_image, src: previewBack, captured: !!backImage },
+    { key: 'selfie_image' as CaptureTarget, label: TARGET_LABELS.selfie_image, src: previewSelfie, captured: !!selfieImage },
+  ];
+
   return (
     <Container size="md" py="xl">
       <Paper p="xl" radius="md" withBorder>
         <Stack gap="lg">
-          <Title order={2}>Identity Capture</Title>
-          <Text c="dimmed">Capture ID front, ID back, and selfie using live camera only.</Text>
+          <Title order={2}>{t('providerOnboarding.step1_title')}</Title>
+          <Text c="dimmed">{t('providerOnboarding.step1_sub')}</Text>
 
           {rejectionReason && (
             <Alert icon={<IconAlertCircle size={16} />} color="orange">
-              Admin feedback: {rejectionReason}
+              {t('providerOnboarding.admin_feedback', { reason: rejectionReason })}
             </Alert>
           )}
 
@@ -543,12 +495,12 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
           <Paper withBorder p="md" radius="md">
             <Stack gap="sm">
-              <Text fw={600}>Live Camera — {TARGET_LABELS[activeTarget]}</Text>
+              <Text fw={600}>{t('providerOnboarding.live_camera_label', { target: TARGET_LABELS[activeTarget] })}</Text>
               {cameraLoading && (
                 <Center style={{ minHeight: 280, background: '#f8f9fa', borderRadius: 8 }}>
                   <Stack align="center" gap="sm">
                     <IconCamera size={48} color="#868e96" />
-                    <Text size="sm" c="dimmed">Starting camera...</Text>
+                    <Text size="sm" c="dimmed">{t('providerOnboarding.camera_starting')}</Text>
                   </Stack>
                 </Center>
               )}
@@ -556,17 +508,17 @@ export const ProviderOnboardingStep1: React.FC = () => {
                 <Center style={{ minHeight: 280, background: '#f8f9fa', borderRadius: 8, border: '2px dashed #dee2e6' }}>
                   <Stack align="center" gap="sm">
                     <IconCamera size={48} color="#868e96" />
-                    <Text size="sm" c="dimmed">Camera not started</Text>
+                    <Text size="sm" c="dimmed">{t('providerOnboarding.camera_not_started')}</Text>
                     <Text size="xs" c="dimmed" ta="center" maw={300}>
-                      Click the button below to start your camera. You'll need to allow camera access when prompted.
+                      {t('providerOnboarding.camera_not_started_hint')}
                     </Text>
-                    <Button 
-                      leftSection={<IconCamera size={16} />} 
+                    <Button
+                      leftSection={<IconCamera size={16} />}
                       onClick={() => startCamera(activeTarget)}
                       loading={cameraLoading}
                       size="lg"
                     >
-                      Start Camera
+                      {t('providerOnboarding.start_camera')}
                     </Button>
                   </Stack>
                 </Center>
@@ -577,31 +529,35 @@ export const ProviderOnboardingStep1: React.FC = () => {
                     autoPlay
                     playsInline
                     muted
-                    style={{ 
-                      width: '100%', 
-                      minHeight: 280, 
+                    style={{
+                      width: '100%',
+                      minHeight: 280,
                       maxHeight: 480,
-                      background: '#000', 
+                      background: '#000',
                       borderRadius: 8,
                       objectFit: 'cover',
-                      display: 'block'
+                      display: 'block',
                     }}
                     onError={(e) => {
                       console.error('Video element error:', e);
-                      setError('Video playback error. Please restart the camera.');
+                      setError(t('providerOnboarding.err_video_element'));
                     }}
                   />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   {!cameraReady && (
                     <Center style={{ marginTop: -140, position: 'relative', zIndex: 10 }}>
                       <Text size="sm" c="white" style={{ background: 'rgba(0,0,0,0.7)', padding: '8px 16px', borderRadius: 4 }}>
-                        Initializing camera...
+                        {t('providerOnboarding.initializing_camera')}
                       </Text>
                     </Center>
                   )}
                   <Group>
-                    <Button leftSection={<IconCamera size={16} />} onClick={captureCurrentFrame} disabled={loading || cameraLoading || !cameraReady}>
-                      Capture
+                    <Button
+                      leftSection={<IconCamera size={16} />}
+                      onClick={captureCurrentFrame}
+                      disabled={loading || cameraLoading || !cameraReady}
+                    >
+                      {t('providerOnboarding.capture_btn')}
                     </Button>
                     <Button
                       variant="default"
@@ -609,7 +565,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
                       onClick={() => startCamera(activeTarget)}
                       disabled={loading || cameraLoading}
                     >
-                      Restart Camera
+                      {t('providerOnboarding.restart_camera')}
                     </Button>
                   </Group>
                 </>
@@ -618,11 +574,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
           </Paper>
 
           <Group grow align="flex-start">
-            {[
-              { key: 'id_front_image' as CaptureTarget, label: TARGET_LABELS.id_front_image, src: previewFront, captured: !!frontImage },
-              { key: 'id_back_image' as CaptureTarget, label: TARGET_LABELS.id_back_image, src: previewBack, captured: !!backImage },
-              { key: 'selfie_image' as CaptureTarget, label: TARGET_LABELS.selfie_image, src: previewSelfie, captured: !!selfieImage },
-            ].map((item) => (
+            {previewItems.map((item) => (
               <Paper key={item.key} withBorder p="sm" radius="md">
                 <Stack gap="xs">
                   <Text fw={600} size="sm">{item.label}</Text>
@@ -630,7 +582,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
                     <img src={item.src} alt={item.label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
                   ) : (
                     <Center style={{ height: 120, borderRadius: 8, border: '1px dashed #ccc' }}>
-                      <Text size="xs" c="dimmed">Not captured</Text>
+                      <Text size="xs" c="dimmed">{t('providerOnboarding.not_captured')}</Text>
                     </Center>
                   )}
                   <Button
@@ -643,7 +595,7 @@ export const ProviderOnboardingStep1: React.FC = () => {
                       if (item.key === 'selfie_image') setSelfieImage(null);
                     }}
                   >
-                    {item.captured ? 'Retake' : 'Capture'}
+                    {item.captured ? t('providerOnboarding.retake') : t('providerOnboarding.capture_btn')}
                   </Button>
                 </Stack>
               </Paper>
@@ -652,10 +604,14 @@ export const ProviderOnboardingStep1: React.FC = () => {
 
           <Group justify="flex-end">
             <Button variant="default" onClick={() => navigate(-1)} disabled={loading}>
-              Back
+              {t('providerOnboarding.back_btn')}
             </Button>
-            <Button onClick={handleSubmit} loading={loading} disabled={!frontImage || !backImage || !selfieImage || cameraLoading}>
-              Continue
+            <Button
+              onClick={handleSubmit}
+              loading={loading}
+              disabled={!frontImage || !backImage || !selfieImage || cameraLoading}
+            >
+              {t('providerOnboarding.continue_btn')}
             </Button>
           </Group>
         </Stack>

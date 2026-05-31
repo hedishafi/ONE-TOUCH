@@ -25,20 +25,35 @@ import type {
 } from '../types';
 import type { NavItem } from '../types/nav';
 
-const ADMIN_NAV: NavItem[] = [
-  { path: ROUTES.adminDashboard, label: 'Analytics', icon: <IconChartBar size={18} /> },
-  { path: ROUTES.adminUsers, label: 'User Verification', icon: <IconUsers size={18} /> },
-  { path: ROUTES.adminCommission, label: 'Commission Settings', icon: <IconCurrencyDollar size={18} /> },
-  { path: ROUTES.adminCategories, label: 'Categories', icon: <IconCategory size={18} /> },
-  { path: ROUTES.adminFraud, label: 'Fraud Monitoring', icon: <IconShield size={18} /> },
-  { path: ROUTES.adminDisputes, label: 'Dispute Resolution', icon: <IconScale size={18} /> },
-  { path: ROUTES.adminTransactions, label: 'Transactions', icon: <IconReceipt size={18} /> },
-  { path: ROUTES.adminContent, label: 'Content Manager', icon: <IconLanguage size={18} /> },
-];
+const ADMIN_NAV_PATHS = {
+  analytics:    ROUTES.adminDashboard,
+  users:        ROUTES.adminUsers,
+  commission:   ROUTES.adminCommission,
+  categories:   ROUTES.adminCategories,
+  fraud:        ROUTES.adminFraud,
+  disputes:     ROUTES.adminDisputes,
+  transactions: ROUTES.adminTransactions,
+  content:      ROUTES.adminContent,
+};
+
+function useAdminNav(): NavItem[] {
+  const { t } = useTranslation();
+  return [
+    { path: ADMIN_NAV_PATHS.analytics,    label: t('adminDashboard.nav_analytics'),         icon: <IconChartBar size={18} /> },
+    { path: ADMIN_NAV_PATHS.users,        label: t('adminDashboard.nav_user_verification'),  icon: <IconUsers size={18} /> },
+    { path: ADMIN_NAV_PATHS.commission,   label: t('adminDashboard.nav_commission'),         icon: <IconCurrencyDollar size={18} /> },
+    { path: ADMIN_NAV_PATHS.categories,   label: t('adminDashboard.nav_categories'),         icon: <IconCategory size={18} /> },
+    { path: ADMIN_NAV_PATHS.fraud,        label: t('adminDashboard.nav_fraud'),              icon: <IconShield size={18} /> },
+    { path: ADMIN_NAV_PATHS.disputes,     label: t('adminDashboard.nav_disputes'),           icon: <IconScale size={18} /> },
+    { path: ADMIN_NAV_PATHS.transactions, label: t('adminDashboard.nav_transactions'),       icon: <IconReceipt size={18} /> },
+    { path: ADMIN_NAV_PATHS.content,      label: t('adminDashboard.nav_content'),            icon: <IconLanguage size={18} /> },
+  ];
+}
 
 // ─── ANALYTICS ────────────────────────────────────────────────────────────────
 export function AdminAnalytics() {
   const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const users = storage.get<User[]>(STORAGE_KEYS.users, []);
   const jobs = storage.get<Job[]>(STORAGE_KEYS.jobs, []);
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, []);
@@ -54,14 +69,14 @@ export function AdminAnalytics() {
   ];
 
   const kpis = [
-    { label: 'Total Users', value: users.length, icon: <IconUsers size={20} />, color: COLORS.navyBlue },
-    { label: 'Active Jobs', value: jobs.filter(j => j.status === 'in_progress').length, icon: <IconBolt size={20} />, color: COLORS.tealBlue },
-    { label: 'Platform Revenue', value: formatCurrency(totalRevenue), icon: <IconCurrencyDollar size={20} />, color: '#2A9D8F' },
-    { label: 'Completed Jobs', value: jobs.filter(j => j.status === 'completed').length, icon: <IconCheck size={20} />, color: '#3A86FF' },
+    { label: t('adminDashboard.kpi_total_users'),    value: users.length,                                          icon: <IconUsers size={20} />,         color: COLORS.navyBlue },
+    { label: t('adminDashboard.kpi_active_jobs'),    value: jobs.filter(j => j.status === 'in_progress').length,  icon: <IconBolt size={20} />,           color: COLORS.tealBlue },
+    { label: t('adminDashboard.kpi_revenue'),        value: formatCurrency(totalRevenue),                          icon: <IconCurrencyDollar size={20} />, color: '#2A9D8F' },
+    { label: t('adminDashboard.kpi_completed_jobs'), value: jobs.filter(j => j.status === 'completed').length,    icon: <IconCheck size={20} />,          color: '#3A86FF' },
   ];
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title={t('admin.analytics')}>
+    <DashboardLayout navItems={adminNav} title={t('admin.analytics')}>
       <Stack gap="lg">
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
           {kpis.map(k => (
@@ -77,14 +92,14 @@ export function AdminAnalytics() {
           ))}
         </SimpleGrid>
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Platform Revenue (Monthly)</Text>
+          <Text fw={700} mb="md">{t('adminDashboard.chart_revenue_title')}</Text>
           <BarChart
             h={280}
             data={revenueData}
             dataKey="month"
             series={[
-              { name: 'revenue', color: COLORS.tealBlue, label: 'Revenue ($)' },
-              { name: 'jobs', color: COLORS.navyBlue, label: 'Jobs Count' },
+              { name: 'revenue', color: COLORS.tealBlue, label: t('adminDashboard.chart_revenue_label') },
+              { name: 'jobs',    color: COLORS.navyBlue, label: t('adminDashboard.chart_jobs_label') },
             ]}
             barProps={{ radius: [4, 4, 0, 0] }}
           />
@@ -97,6 +112,7 @@ export function AdminAnalytics() {
 // ─── USER VERIFICATION ────────────────────────────────────────────────────────
 export function UserVerification() {
   const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const [users, setUsers] = useState<User[]>(storage.get<User[]>(STORAGE_KEYS.users, []));
   const pending = users.filter(u => u.role === 'provider' && u.verificationStatus === 'pending');
 
@@ -104,25 +120,27 @@ export function UserVerification() {
     const updated = users.map(u => u.id === id ? { ...u, verificationStatus: 'verified' as const } : u);
     storage.set(STORAGE_KEYS.users, updated);
     setUsers(updated);
-    notifications.show({ title: 'Provider Approved ✅', message: 'Provider is now verified and visible on the platform.', color: 'teal' });
+    notifications.show({ title: t('adminDashboard.approved_title'), message: t('adminDashboard.approved_msg'), color: 'teal' });
   };
 
   const reject = (id: string) => {
     const updated = users.filter(u => u.id !== id);
     storage.set(STORAGE_KEYS.users, updated);
     setUsers(updated);
-    notifications.show({ title: 'Provider Rejected', message: 'Account has been removed from the queue.', color: 'red' });
+    notifications.show({ title: t('adminDashboard.rejected_title'), message: t('adminDashboard.rejected_msg'), color: 'red' });
   };
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title={t('admin.user_verification')}>
+    <DashboardLayout navItems={adminNav} title={t('admin.user_verification')}>
       <Stack gap="md">
         <Group justify="space-between">
           <Badge color={pending.length > 0 ? 'red' : 'teal'} size="lg">
-            {pending.length} pending verification{pending.length !== 1 ? 's' : ''}
+            {pending.length !== 1
+              ? t('adminDashboard.pending_count_plural', { count: pending.length })
+              : t('adminDashboard.pending_count', { count: pending.length })}
           </Badge>
           <Button variant="light" color="teal" size="sm" leftSection={<IconRefresh size={14} />}>
-            Refresh
+            {t('adminDashboard.refresh_btn')}
           </Button>
         </Group>
         {pending.length === 0 ? (
@@ -131,18 +149,18 @@ export function UserVerification() {
               <ThemeIcon size={56} radius="xl" color="teal" variant="light">
                 <IconCheck size={28} />
               </ThemeIcon>
-              <Text fw={600}>All providers verified!</Text>
-              <Text c="dimmed" size="sm">No pending verification requests.</Text>
+              <Text fw={600}>{t('adminDashboard.all_verified')}</Text>
+              <Text c="dimmed" size="sm">{t('adminDashboard.no_pending')}</Text>
             </Stack>
           </Center>
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Provider</Table.Th>
-                <Table.Th>Email</Table.Th>
-                <Table.Th>Joined</Table.Th>
-                <Table.Th>Actions</Table.Th>
+                <Table.Th>{t('adminDashboard.col_provider')}</Table.Th>
+                <Table.Th>{t('adminDashboard.col_email')}</Table.Th>
+                <Table.Th>{t('adminDashboard.col_joined')}</Table.Th>
+                <Table.Th>{t('adminDashboard.col_actions')}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -159,10 +177,10 @@ export function UserVerification() {
                   <Table.Td>
                     <Group gap="xs">
                       <Button size="xs" color="teal" onClick={() => approve(u.id)} leftSection={<IconCheck size={12} />}>
-                        Approve
+                        {t('adminDashboard.approve_btn')}
                       </Button>
                       <Button size="xs" color="red" variant="light" onClick={() => reject(u.id)} leftSection={<IconX size={12} />}>
-                        Reject
+                        {t('adminDashboard.reject_btn')}
                       </Button>
                     </Group>
                   </Table.Td>
@@ -178,21 +196,23 @@ export function UserVerification() {
 
 // ─── COMMISSION SETTINGS ──────────────────────────────────────────────────────
 export function CommissionSettings() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const saved = storage.get<CommissionConfig>(STORAGE_KEYS.commissionConfig, { baseRate: 10, loyaltyDiscounts: { rising_pro: 0, trusted_pro: 2, elite_pro: 4 }, repeatBookingCashback: 5 });
   const [baseRate, setBaseRate] = useState(saved.baseRate);
   const [tierDiscounts, setTierDiscounts] = useState<Record<string, number>>(saved.loyaltyDiscounts);
 
   const save = () => {
     storage.set(STORAGE_KEYS.commissionConfig, { baseRate, loyaltyDiscounts: tierDiscounts, repeatBookingCashback: 5 });
-    notifications.show({ title: 'Settings Saved ✅', message: 'Commission rates updated.', color: 'teal' });
+    notifications.show({ title: t('adminDashboard.settings_saved_title'), message: t('adminDashboard.settings_saved_msg'), color: 'teal' });
   };
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Commission Settings">
+    <DashboardLayout navItems={adminNav} title={t('admin.commissions')}>
       <Stack gap="xl" maw={600}>
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Base Commission Rate</Text>
-          <Text size="sm" c="dimmed" mb="lg">This rate applies to all jobs before loyalty discounts.</Text>
+          <Text fw={700} mb="md">{t('adminDashboard.commission_base_title')}</Text>
+          <Text size="sm" c="dimmed" mb="lg">{t('adminDashboard.commission_base_sub')}</Text>
           <Group gap="md" align="center">
             <Slider flex={1} value={baseRate} onChange={setBaseRate} min={5} max={20} step={0.5}
               marks={[{ value: 5, label: '5%' }, { value: 10, label: '10%' }, { value: 15, label: '15%' }, { value: 20, label: '20%' }]}
@@ -202,12 +222,12 @@ export function CommissionSettings() {
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Provider Tier Discounts</Text>
+          <Text fw={700} mb="md">{t('adminDashboard.commission_tier_title')}</Text>
           {Object.entries(tierDiscounts).map(([tier, discount]) => (
             <Group key={tier} mb="md" justify="space-between">
               <Stack gap={0}>
                 <Text size="sm" fw={600} tt="capitalize">{tier.replace(/_/g, ' ')}</Text>
-                <Text size="xs" c="dimmed">Applied on top of base rate</Text>
+                <Text size="xs" c="dimmed">{t('adminDashboard.commission_tier_sub')}</Text>
               </Stack>
               <NumberInput
                 size="sm"
@@ -221,12 +241,12 @@ export function CommissionSettings() {
             </Group>
           ))}
           <Alert color="blue" icon={<IconTrendingUp size={14} />} mt="md">
-            Elite Pro providers pay {baseRate - (tierDiscounts.elite_pro ?? 4)}% effective commission rate.
+            {t('adminDashboard.commission_elite_note', { rate: baseRate - (tierDiscounts.elite_pro ?? 4) })}
           </Alert>
         </Card>
 
         <Button size="md" onClick={save} style={{ background: COLORS.navyBlue }}>
-          Save Commission Settings
+          {t('adminDashboard.save_commission')}
         </Button>
       </Stack>
     </DashboardLayout>
@@ -235,6 +255,8 @@ export function CommissionSettings() {
 
 // ─── CATEGORY MANAGER ─────────────────────────────────────────────────────────
 export function CategoryManager() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const { categories } = useServiceCatalog();
   const [cats, setCats] = useState(categories);
   const [addModal, setAddModal] = useState(false);
@@ -248,7 +270,7 @@ export function CategoryManager() {
 
   const deletecat = (id: string) => {
     setCats(prev => prev.filter(c => c.id !== id));
-    notifications.show({ title: 'Category Deleted', message: '', color: 'red' });
+    notifications.show({ title: t('adminDashboard.cat_deleted_title'), message: '', color: 'red' });
   };
 
   const addCat = () => {
@@ -256,25 +278,25 @@ export function CategoryManager() {
     setCats(prev => [...prev, { id: Date.now().toString(), name: newName, icon: 'bolt', color: '#777', subcategories: [] }]);
     setNewName('');
     setAddModal(false);
-    notifications.show({ title: 'Category Added ✅', message: newName, color: 'teal' });
+    notifications.show({ title: t('adminDashboard.cat_added_title'), message: newName, color: 'teal' });
   };
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Category Management">
+    <DashboardLayout navItems={adminNav} title={t('admin.categories')}>
       <Stack gap="md">
         <Group justify="space-between">
-          <Badge size="lg" color="navy">{cats.length} categories</Badge>
+          <Badge size="lg" color="navy">{t('adminDashboard.cat_count', { count: cats.length })}</Badge>
           <Button size="sm" color="teal" leftSection={<IconPlus size={14} />} onClick={() => setAddModal(true)}>
-            Add Category
+            {t('adminDashboard.add_category_btn')}
           </Button>
         </Group>
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Icon</Table.Th>
-              <Table.Th>Category</Table.Th>
-              <Table.Th>Subcategories</Table.Th>
-              <Table.Th>Actions</Table.Th>
+              <Table.Th>{t('adminDashboard.col_icon')}</Table.Th>
+              <Table.Th>{t('adminDashboard.col_category')}</Table.Th>
+              <Table.Th>{t('adminDashboard.col_subcategories')}</Table.Th>
+              <Table.Th>{t('adminDashboard.col_actions')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -294,10 +316,15 @@ export function CategoryManager() {
           </Table.Tbody>
         </Table>
       </Stack>
-      <Modal opened={addModal} onClose={() => setAddModal(false)} title="Add New Category" radius="lg">
+      <Modal opened={addModal} onClose={() => setAddModal(false)} title={t('adminDashboard.add_category_modal_title')} radius="lg">
         <Stack gap="md">
-          <TextInput label="Category Name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Healthcare" />
-          <Button onClick={addCat} color="teal">Add Category</Button>
+          <TextInput
+            label={t('adminDashboard.cat_name_label')}
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            placeholder={t('adminDashboard.cat_name_placeholder')}
+          />
+          <Button onClick={addCat} color="teal">{t('adminDashboard.add_btn')}</Button>
         </Stack>
       </Modal>
     </DashboardLayout>
@@ -306,36 +333,40 @@ export function CategoryManager() {
 
 // ─── FRAUD MONITORING ─────────────────────────────────────────────────────────
 export function FraudMonitoring() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const [flags, setFlags] = useState<FraudFlag[]>(storage.get<FraudFlag[]>(STORAGE_KEYS.fraudFlags, []));
 
   const dismiss = (id: string) => {
     const updated = flags.filter(f => f.id !== id);
     storage.set(STORAGE_KEYS.fraudFlags, updated);
     setFlags(updated);
-    notifications.show({ title: 'Flag Dismissed', message: '', color: 'gray' });
+    notifications.show({ title: t('adminDashboard.flag_dismissed_title'), message: '', color: 'gray' });
   };
 
   const ban = (id: string) => {
     const updated = flags.filter(f => f.id !== id);
     storage.set(STORAGE_KEYS.fraudFlags, updated);
     setFlags(updated);
-    notifications.show({ title: 'User Suspended ⛔', message: 'Account has been suspended.', color: 'red' });
+    notifications.show({ title: t('adminDashboard.user_suspended_title'), message: t('adminDashboard.user_suspended_msg'), color: 'red' });
   };
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Fraud Monitoring">
+    <DashboardLayout navItems={adminNav} title={t('admin.fraud')}>
       <Stack gap="md">
         <Group justify="space-between">
           <Group gap="xs">
             {flags.length > 0 && <ThemeIcon size={24} radius="xl" color="red" variant="filled"><IconAlertTriangle size={14} /></ThemeIcon>}
-            <Badge color={flags.length > 0 ? 'red' : 'teal'} size="lg">{flags.length} active flags</Badge>
+            <Badge color={flags.length > 0 ? 'red' : 'teal'} size="lg">
+              {t('adminDashboard.active_flags', { count: flags.length })}
+            </Badge>
           </Group>
         </Group>
         {flags.length === 0 ? (
           <Center py={60}>
             <Stack align="center" gap="xs">
               <ThemeIcon size={56} radius="xl" color="teal" variant="light"><IconShield size={28} /></ThemeIcon>
-              <Text fw={600}>No active fraud flags</Text>
+              <Text fw={600}>{t('adminDashboard.no_fraud_flags')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -353,8 +384,12 @@ export function FraudMonitoring() {
                   <Text size="xs" c="dimmed">User: {f.userId} · {formatTimeAgo(f.createdAt)}</Text>
                 </Stack>
                 <Group gap="xs">
-                  <Button size="xs" variant="light" color="gray" onClick={() => dismiss(f.id)}>Dismiss</Button>
-                  <Button size="xs" color="red" onClick={() => ban(f.userId)}>Suspend</Button>
+                  <Button size="xs" variant="light" color="gray" onClick={() => dismiss(f.id)}>
+                    {t('adminDashboard.dismiss_btn')}
+                  </Button>
+                  <Button size="xs" color="red" onClick={() => ban(f.userId)}>
+                    {t('adminDashboard.suspend_btn')}
+                  </Button>
                 </Group>
               </Group>
             </Card>
@@ -367,6 +402,8 @@ export function FraudMonitoring() {
 
 // ─── DISPUTE RESOLUTION ───────────────────────────────────────────────────────
 export function DisputeResolution() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const [disputes, setDisputes] = useState<Dispute[]>(storage.get<Dispute[]>(STORAGE_KEYS.disputes, []));
   const [resolveModal, setResolveModal] = useState<Dispute | null>(null);
   const [resolution, setResolution] = useState('');
@@ -380,11 +417,11 @@ export function DisputeResolution() {
     setDisputes(updated);
     setResolveModal(null);
     setResolution('');
-    notifications.show({ title: 'Dispute Resolved ✅', message: '', color: 'teal' });
+    notifications.show({ title: t('adminDashboard.dispute_resolved_title'), message: '', color: 'teal' });
   };
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Dispute Resolution">
+    <DashboardLayout navItems={adminNav} title={t('admin.disputes')}>
       <Stack gap="md">
         {disputes.map(d => (
           <Card key={d.id} radius="lg" withBorder p="lg"
@@ -395,36 +432,44 @@ export function DisputeResolution() {
                   <Badge color={d.status === 'open' ? 'yellow' : (d.status === 'resolved_client' || d.status === 'resolved_provider') ? 'teal' : 'blue'}>
                     {d.status}
                   </Badge>
-                  <Text size="sm" fw={600}>Job: {d.jobId}</Text>
+                  <Text size="sm" fw={600}>{t('adminDashboard.job_label')} {d.jobId}</Text>
                 </Group>
                 <Text size="sm">{d.reason}</Text>
                 {d.resolution && <Alert color="teal" icon={<IconCheck size={12} />} p="xs" radius="md">{d.resolution}</Alert>}
-                <Text size="xs" c="dimmed">Raised by {d.raisedBy} · {formatTimeAgo(d.createdAt)}</Text>
+                <Text size="xs" c="dimmed">{t('adminDashboard.raised_by', { user: d.raisedBy })} · {formatTimeAgo(d.createdAt)}</Text>
               </Stack>
               {d.status === 'open' && (
                 <Button size="sm" color="teal" onClick={() => setResolveModal(d)}>
-                  Resolve
+                  {t('adminDashboard.resolve_btn')}
                 </Button>
               )}
             </Group>
           </Card>
         ))}
       </Stack>
-      <Modal opened={!!resolveModal} onClose={() => setResolveModal(null)} title="Resolve Dispute" radius="lg">
+      <Modal opened={!!resolveModal} onClose={() => setResolveModal(null)} title={t('adminDashboard.resolve_modal_title')} radius="lg">
         <Stack gap="md">
           <Alert color="yellow" icon={<IconScale size={14} />}>
-            Dispute: {resolveModal?.reason}
+            {t('adminDashboard.dispute_label')} {resolveModal?.reason}
           </Alert>
           <Select
-            label="Decision"
+            label={t('adminDashboard.decision_label')}
             data={[
-              { value: 'refund_client', label: 'Refund client — job incomplete' },
-              { value: 'release_provider', label: 'Release to provider — work completed' },
-              { value: 'partial_split', label: 'Split 50/50 — partial completion' },
+              { value: 'refund_client',    label: t('adminDashboard.decision_refund') },
+              { value: 'release_provider', label: t('adminDashboard.decision_release') },
+              { value: 'partial_split',    label: t('adminDashboard.decision_split') },
             ]}
           />
-          <Textarea label="Resolution Notes" value={resolution} onChange={e => setResolution(e.target.value)} placeholder="Document your decision..." rows={3} />
-          <Button onClick={resolve} color="teal" disabled={!resolution}>Confirm Resolution</Button>
+          <Textarea
+            label={t('adminDashboard.resolution_notes_label')}
+            value={resolution}
+            onChange={e => setResolution(e.target.value)}
+            placeholder={t('adminDashboard.resolution_placeholder')}
+            rows={3}
+          />
+          <Button onClick={resolve} color="teal" disabled={!resolution}>
+            {t('adminDashboard.confirm_resolution')}
+          </Button>
         </Stack>
       </Modal>
     </DashboardLayout>
@@ -433,25 +478,27 @@ export function DisputeResolution() {
 
 // ─── TRANSACTION MONITORING ───────────────────────────────────────────────────
 export function TransactionMonitoring() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, []);
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Transaction Monitoring">
+    <DashboardLayout navItems={adminNav} title={t('admin.transactions')}>
       <Stack gap="md">
         <Group justify="space-between">
-          <Badge size="lg" color="navy">{txns.length} total transactions</Badge>
+          <Badge size="lg" color="navy">{t('adminDashboard.tx_count', { count: txns.length })}</Badge>
         </Group>
         <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
           <ScrollArea h={520}>
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>ID</Table.Th>
-                  <Table.Th>User</Table.Th>
-                  <Table.Th>Type</Table.Th>
-                  <Table.Th>Amount</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Date</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_id')}</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_user')}</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_type')}</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_amount')}</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_status')}</Table.Th>
+                  <Table.Th>{t('adminDashboard.col_date')}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -480,6 +527,8 @@ export function TransactionMonitoring() {
 
 // ─── CONTENT MANAGER ──────────────────────────────────────────────────────────
 export function ContentManager() {
+  const { t } = useTranslation();
+  const adminNav = useAdminNav();
   const [lang, setLang] = useState('en');
   const [filter, setFilter] = useState('');
   const sampleKeys = [
@@ -498,14 +547,14 @@ export function ContentManager() {
   const displayed = filter ? sampleKeys.filter(([k]) => k.includes(filter)) : sampleKeys;
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} title="Content Manager">
+    <DashboardLayout navItems={adminNav} title={t('admin.content')}>
       <Stack gap="md">
         <Group gap="sm">
           <Select
             data={[
-              { value: 'en', label: '🇺🇸 English' },
-              { value: 'am', label: '🇪🇹 Amharic' },
-              { value: 'ar', label: '🇸🇦 Arabic' },
+              { value: 'en', label: t('adminDashboard.content_lang_en') },
+              { value: 'am', label: t('adminDashboard.content_lang_am') },
+              { value: 'ar', label: t('adminDashboard.content_lang_ar') },
             ]}
             value={lang}
             onChange={v => setLang(v ?? 'en')}
@@ -513,7 +562,7 @@ export function ContentManager() {
           />
           <TextInput
             flex={1}
-            placeholder="Filter by key..."
+            placeholder={t('adminDashboard.content_filter_placeholder')}
             value={filter}
             onChange={e => setFilter(e.target.value)}
           />
@@ -521,9 +570,9 @@ export function ContentManager() {
         <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Key</Table.Th>
-              <Table.Th>Value ({lang.toUpperCase()})</Table.Th>
-              <Table.Th>Action</Table.Th>
+              <Table.Th>{t('adminDashboard.col_key')}</Table.Th>
+              <Table.Th>{t('adminDashboard.col_value', { lang: lang.toUpperCase() })}</Table.Th>
+              <Table.Th>{t('adminDashboard.col_action')}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -532,7 +581,7 @@ export function ContentManager() {
                 <Table.Td><Text size="xs" ff="monospace" c="dimmed">{k}</Text></Table.Td>
                 <Table.Td><TextInput size="xs" defaultValue={v} styles={{ input: { border: 'none', background: 'transparent' } }} /></Table.Td>
                 <Table.Td>
-                  <Button size="xs" variant="subtle" color="teal">Save</Button>
+                  <Button size="xs" variant="subtle" color="teal">{t('adminDashboard.save_btn')}</Button>
                 </Table.Td>
               </Table.Tr>
             ))}

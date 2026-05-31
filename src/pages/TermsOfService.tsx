@@ -4,6 +4,7 @@ import {
 import { IconArrowLeft, IconFileText, IconCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -30,62 +31,18 @@ const ANIMATIONS = `
 }
 `;
 
-const TERMS_SECTIONS = [
-  {
-    num: '1',
-    title: 'Acceptance of Terms',
-    content: 'By accessing and using ONE TOUCH, you accept and agree to be bound by all terms, conditions, and notices contained herein. If you do not accept these terms, please do not use this platform. ONE TOUCH reserves the right to modify these terms at any time without notice. Your continued use of ONE TOUCH following changes constitutes your acceptance of those changes.'
-  },
-  {
-    num: '2',
-    title: 'User Registration & Account',
-    content: 'You agree to provide accurate, complete, and current information during registration. You are responsible for maintaining the confidentiality of your password and account. You agree to accept responsibility for all activities that occur under your account. You must notify ONE TOUCH immediately of any unauthorized use.'
-  },
-  {
-    num: '3',
-    title: 'User Conduct Obligations',
-    content: 'You agree not to engage in any conduct that restricts or inhibits anyone\'s use of the platform. Prohibited behaviors include harassment, threats, unlawful conduct, transmission of viruses, or any illegal activity. Users must respect all laws and regulations governing their jurisdiction.'
-  },
-  {
-    num: '4',
-    title: 'Payment Terms & Pricing',
-    content: 'All prices are in Ethiopian Birr (ETB). ONE TOUCH charges a platform fee (percentage varies by service) in addition to provider rates. Payments are processed securely through our escrow system. Users authorize ONE TOUCH to charge the agreed amount for confirmed bookings.'
-  },
-  {
-    num: '5',
-    title: 'Escrow & Dispute Resolution',
-    content: 'Payment is held in escrow until the user confirms job completion. If a dispute arises, both parties can file a claim. ONE TOUCH will investigate and make a final determination. Disputes must be reported within 7 days of service completion.'
-  },
-  {
-    num: '6',
-    title: 'Intellectual Property Rights',
-    content: 'All content on ONE TOUCH (design, text, graphics, logos) is the property of ONE TOUCH and protected by copyright. You may not reproduce, modify, or distribute any content without explicit permission. Your use is limited to personal, non-commercial purposes.'
-  },
-  {
-    num: '7',
-    title: 'Limitation of Liability',
-    content: 'ONE TOUCH is provided on an "AS-IS" basis. We do not guarantee uninterrupted service or accuracy of information. ONE TOUCH is not liable for indirect, incidental, or consequential damages. Our total liability is limited to the amount you paid for the service.'
-  },
-  {
-    num: '8',
-    title: 'Termination of Service',
-    content: 'ONE TOUCH reserves the right to terminate or suspend your account at any time for violation of these terms, illegal activity, or abuse. Users may terminate their account anytime by contacting support. Outstanding balances must be paid before termination.'
-  },
-  {
-    num: '9',
-    title: 'Governing Law & Jurisdiction',
-    content: 'These terms are governed by the laws of Ethiopia. Any disputes shall be resolved in the courts of Addis Ababa, Ethiopia. You agree to jurisdiction and venue in these courts and waive any objection to such venue.'
-  },
-  {
-    num: '10',
-    title: 'Contact & Amendments',
-    content: 'For questions about these terms, contact us at legal@onetouch.et. ONE TOUCH may update these terms periodically. We will notify users of significant changes via email. Continued use after notification constitutes acceptance of amendments.'
-  },
-];
+const SECTION_NUMS = ['1','2','3','4','5','6','7','8','9','10'];
 
 export function TermsOfService() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState('1');
+
+  const TERMS_SECTIONS = SECTION_NUMS.map(num => ({
+    num,
+    title: t(`termsOfService.s${num}_title`),
+    content: t(`termsOfService.s${num}_content`),
+  }));
 
   return (
     <>
@@ -144,10 +101,10 @@ export function TermsOfService() {
                 </ThemeIcon>
               </Group>
               <Text fw={900} size="4xl" c="white" style={{ letterSpacing: '-1px' }}>
-                Terms of Service
+                {t('termsOfService.page_title')}
               </Text>
               <Text c="rgba(255,255,255,0.80)" size="lg" maw={600} style={{ lineHeight: 1.8 }}>
-                Please read these terms carefully before using ONE TOUCH. Last updated: February 2026.
+                {t('termsOfService.page_sub')}
               </Text>
             </Stack>
           </Container>
@@ -168,7 +125,7 @@ export function TermsOfService() {
                 <Text fw={700} size="sm" c={COLORS.navyBlue} mb="md" style={{
                   textTransform: 'uppercase', letterSpacing: '0.5px'
                 }}>
-                  Contents
+                  {t('termsOfService.toc_heading')}
                 </Text>
                 <Stack gap="xs">
                   {TERMS_SECTIONS.map(section => (
@@ -225,10 +182,10 @@ export function TermsOfService() {
                     <IconCheck color={COLORS.tealBlue} />
                     <Stack gap="4px">
                       <Text fw={700} size="sm" c={COLORS.tealBlue}>
-                        Acceptance Required
+                        {t('termsOfService.acceptance_title')}
                       </Text>
                       <Text size="sm" c={COLORS.navyBlue}>
-                        By using ONE TOUCH, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
+                        {t('termsOfService.acceptance_body')}
                       </Text>
                     </Stack>
                   </Group>

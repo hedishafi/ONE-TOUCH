@@ -844,6 +844,17 @@ class ProviderProfileSetupView(APIView):
         provider_service.save()
         provider_service.subservices.set(sub_service_objects)
 
+        # Save price range as ProviderCategoryPricing so it shows on order provider cards
+        price_min = vd.get('price_min')
+        price_max = vd.get('price_max')
+        if price_min is not None and price_max is not None:
+            from services.models import ProviderCategoryPricing
+            ProviderCategoryPricing.objects.update_or_create(
+                provider=provider_profile,
+                category=service_category,
+                defaults={'min_price': price_min, 'max_price': price_max},
+            )
+
         profile_picture_url = ''
         if provider_profile.profile_picture:
             try:

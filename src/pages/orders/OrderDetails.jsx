@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  Container,
-  Stack,
-  Button,
-  Loader,
-  Alert,
-  Text,
-  Group,
-  Badge,
-  Paper,
-  Timeline,
-  Divider,
+  Container, Stack, Button, Loader, Alert, Text, Group,
+  Badge, Paper, Timeline, Divider,
 } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -20,9 +11,8 @@ import { OrderStatusBadge } from '../../components/orders/OrderStatusBadge';
 
 export const OrderDetails = () => {
   const { id } = useParams();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const isAmharic = i18n.language === 'am';
 
   const [order, setOrder] = useState(null);
   const [statusLogs, setStatusLogs] = useState([]);
@@ -31,22 +21,17 @@ export const OrderDetails = () => {
   const [completeLoading, setCompleteLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  useEffect(() => {
-    fetchOrderDetails();
-  }, [id]);
+  useEffect(() => { fetchOrderDetails(); }, [id]);
 
   const fetchOrderDetails = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [orderData, logsData] = await Promise.all([
-        getOrder(id),
-        getStatusLog(id),
-      ]);
+      const [orderData, logsData] = await Promise.all([getOrder(id), getStatusLog(id)]);
       setOrder(orderData);
       setStatusLogs(logsData);
     } catch (err) {
-      setError(typeof err === 'string' ? err : err.detail || (isAmharic ? 'ቅደም ቁጥር ማውጣት ወደ ውጤት አልመጣም' : 'Failed to fetch order'));
+      setError(typeof err === 'string' ? err : err.detail || t('orders.fetch_order_failed'));
     } finally {
       setLoading(false);
     }
@@ -58,7 +43,7 @@ export const OrderDetails = () => {
       await completeOrder(id);
       fetchOrderDetails();
     } catch (err) {
-      setError(typeof err === 'string' ? err : err.detail || (isAmharic ? 'ስህተት' : 'Error'));
+      setError(typeof err === 'string' ? err : err.detail || t('common.error'));
     } finally {
       setCompleteLoading(false);
     }
@@ -70,7 +55,7 @@ export const OrderDetails = () => {
       await cancelOrder(id);
       fetchOrderDetails();
     } catch (err) {
-      setError(typeof err === 'string' ? err : err.detail || (isAmharic ? 'ትዕዛዝ ሰርዝ ወደ ውጤት አልመጣም' : 'Failed to cancel order'));
+      setError(typeof err === 'string' ? err : err.detail || t('orders.cancel_failed'));
     } finally {
       setCancelLoading(false);
     }
@@ -79,9 +64,7 @@ export const OrderDetails = () => {
   if (loading) {
     return (
       <Container size="md" py="xl">
-        <Group justify="center">
-          <Loader />
-        </Group>
+        <Group justify="center"><Loader /></Group>
       </Container>
     );
   }
@@ -90,25 +73,26 @@ export const OrderDetails = () => {
     return (
       <Container size="md" py="xl">
         <Alert icon={<IconAlertCircle size={16} />} color="red">
-          {isAmharic ? 'ቅደም ቁጥር አልተገኘም' : 'Order not found'}
+          {t('orders.not_found')}
         </Alert>
       </Container>
     );
   }
 
-  const formattedDate = new Date(order.created_at).toLocaleDateString(
-    isAmharic ? 'am-ET' : 'en-US',
-    { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-  );
+  const locale = i18n.language === 'am' ? 'am-ET' : 'en-US';
+  const formattedDate = new Date(order.created_at).toLocaleDateString(locale, {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 
-  const statusLabels = {
-    pending: isAmharic ? 'ጥብቅ ያልሆነ' : 'Pending',
-    matching: isAmharic ? 'ማዛመድ' : 'Matching',
-    accepted: isAmharic ? 'ተቀብሏል' : 'Accepted',
-    in_progress: isAmharic ? 'በዚህ ላይ ነው' : 'In Progress',
-    completed: isAmharic ? 'ተጠናቅቆ' : 'Completed',
-    cancelled: isAmharic ? 'ተሰርዞ' : 'Cancelled',
-    expired: isAmharic ? 'ጊዜው ያለፈ' : 'Expired',
+  const statusKey = {
+    pending: 'orders.status_pending',
+    matching: 'orders.status_matching',
+    accepted: 'orders.status_accepted',
+    in_progress: 'orders.status_in_progress',
+    completed: 'orders.status_completed',
+    cancelled: 'orders.status_cancelled',
+    expired: 'orders.status_expired',
   };
 
   return (
@@ -117,92 +101,74 @@ export const OrderDetails = () => {
         {/* Header */}
         <Group justify="space-between">
           <Text fw={700} size="xl">
-            {isAmharic ? 'ቅደም ቁጥር' : 'Order'} #{order.id}
+            {t('orders.order_prefix')} #{order.id}
           </Text>
           <OrderStatusBadge status={order.status} />
         </Group>
 
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} color="red">
-            {error}
-          </Alert>
+          <Alert icon={<IconAlertCircle size={16} />} color="red">{error}</Alert>
         )}
 
         {/* Order Info */}
         <Paper p="md" withBorder>
           <Stack gap="md">
             <div>
-              <Text fw={600} size="sm" c="dimmed">
-                {isAmharic ? 'ዋና መግለጫ' : 'Description'}
-              </Text>
+              <Text fw={600} size="sm" c="dimmed">{t('orders.description_label')}</Text>
               <Text>{order.description}</Text>
             </div>
 
             <Group grow>
               <div>
-                <Text fw={600} size="sm" c="dimmed">
-                  {isAmharic ? 'ምድብ' : 'Category'}
-                </Text>
-                <Badge>{order.category_name || (isAmharic ? 'አልተወሰነም' : 'Unassigned')}</Badge>
+                <Text fw={600} size="sm" c="dimmed">{t('orders.category_label')}</Text>
+                <Badge>{order.category_name || t('orders.unassigned')}</Badge>
               </div>
               <div>
-                <Text fw={600} size="sm" c="dimmed">
-                  {isAmharic ? 'ንዑስ አገልግሎት' : 'Sub Service'}
-                </Text>
-                <Badge>{order.sub_service_name || (isAmharic ? 'አልተወሰነም' : 'Unassigned')}</Badge>
+                <Text fw={600} size="sm" c="dimmed">{t('orders.sub_service_label')}</Text>
+                <Badge>{order.sub_service_name || t('orders.unassigned')}</Badge>
               </div>
             </Group>
 
             <div>
-              <Text fw={600} size="sm" c="dimmed">
-                {isAmharic ? 'የተፈጠረ' : 'Created'}
-              </Text>
+              <Text fw={600} size="sm" c="dimmed">{t('orders.created_label')}</Text>
               <Text>{formattedDate}</Text>
             </div>
 
             {order.input_type === 'voice' && (
               <div>
-                <Text fw={600} size="sm" c="dimmed">
-                  {isAmharic ? 'ስህተተኛ ጽሑፍ' : 'Transcription'}
-                </Text>
+                <Text fw={600} size="sm" c="dimmed">{t('orders.transcription_label')}</Text>
                 <Text size="sm">{order.transcription}</Text>
               </div>
             )}
           </Stack>
         </Paper>
 
-        {/* Assignment info if accepted */}
+        {/* Assignment info */}
         {order.assignment && (
           <Paper p="md" withBorder>
             <Stack gap="md">
-              <Text fw={600}>{isAmharic ? 'አስተካካቂ አገልግሎት' : 'Service Provider'}</Text>
+              <Text fw={600}>{t('orders.assignment_info')}</Text>
               <Group>
                 <div>
-                  <Text fw={600} size="sm" c="dimmed">
-                    {isAmharic ? 'አገልግሎት አሰጣጥ' : 'Assignment ID'}
-                  </Text>
+                  <Text fw={600} size="sm" c="dimmed">{t('orders.assignment_id')}</Text>
                   <Text>#{order.assignment.id}</Text>
                 </div>
                 <div>
-                  <Text fw={600} size="sm" c="dimmed">
-                    {isAmharic ? 'ኪሳራ' : 'Commission Fee'}
-                  </Text>
+                  <Text fw={600} size="sm" c="dimmed">{t('orders.commission_fee')}</Text>
                   <Text>{order.assignment.commission_fee} ETB</Text>
                 </div>
               </Group>
 
               {order.assignment.commission_paid && order.assignment.client_contact_released && (
                 <div>
-                  <Text fw={600} size="sm" c="dimmed">
-                    {isAmharic ? 'ስልክ ቁጥር' : 'Provider Contact'}
-                  </Text>
+                  <Text fw={600} size="sm" c="dimmed">{t('orders.client_phone')}</Text>
                   <Text>{order.assignment.provider_phone || 'N/A'}</Text>
                 </div>
               )}
 
               {!order.assignment.commission_paid && (
                 <Alert icon={<IconAlertCircle size={16} />} color="yellow">
-                  {isAmharic ? 'ኪሳራ ይክፈሉ' : 'Commission not paid yet'}
+                  {t('orders.commission_not_paid')}
                 </Alert>
               )}
             </Stack>
@@ -212,39 +178,30 @@ export const OrderDetails = () => {
         {/* Actions */}
         <Group gap="md">
           {order.status === 'pending' && (
-            <Button 
-              onClick={handleCancelOrder} 
-              loading={cancelLoading} 
-              color="red"
-              fullWidth
-            >
-              {isAmharic ? 'ትዕዛዝ ሰርዝ' : 'Cancel Order'}
+            <Button onClick={handleCancelOrder} loading={cancelLoading} color="red" fullWidth>
+              {t('orders.cancel_order')}
             </Button>
           )}
           {order.status === 'in_progress' && (
             <Button onClick={handleCompleteOrder} loading={completeLoading} fullWidth>
-              {isAmharic ? 'የሚጠናቀቅ' : 'Mark as Complete'}
+              {t('orders.complete_order')}
             </Button>
           )}
         </Group>
 
-        {/* Status Log Timeline */}
+        {/* Status Timeline */}
         {statusLogs.length > 0 && (
           <Paper p="md" withBorder>
-            <Text fw={600} mb="md">
-              {isAmharic ? 'ግዜ መዝገብ' : 'Status Timeline'}
-            </Text>
+            <Text fw={600} mb="md">{t('orders.timeline')}</Text>
             <Timeline active={statusLogs.length} bulletSize={24} lineWidth={2}>
               {statusLogs.map((log) => (
                 <Timeline.Item key={log.id} bullet={log.id % 2 === 0 ? '✓' : '●'}>
                   <Group justify="space-between" mb="xs">
                     <Text fw={600} size="sm">
-                      {statusLabels[log.new_status] || log.new_status}
+                      {t(statusKey[log.new_status] || log.new_status)}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      {new Date(log.created_at).toLocaleString(
-                        isAmharic ? 'am-ET' : 'en-US'
-                      )}
+                      {new Date(log.created_at).toLocaleString(locale)}
                     </Text>
                   </Group>
                   {log.note && <Text size="sm">{log.note}</Text>}
@@ -254,9 +211,8 @@ export const OrderDetails = () => {
           </Paper>
         )}
 
-        {/* Back button */}
         <Button onClick={() => navigate('/orders')} variant="light">
-          {isAmharic ? 'ወደ ተመለስ' : 'Back to Orders'}
+          {t('orders.back_to_orders')}
         </Button>
       </Stack>
     </Container>

@@ -89,6 +89,7 @@ export const ROUTES = {
   clientSettings: '/client/settings',
   providerDashboard: '/provider/dashboard',
   providerJobs: '/provider/jobs',
+  providerOrders: '/provider/orders',
   providerEarnings: '/provider/earnings',
   providerProfile: '/provider/profile',
   providerWallet: '/provider/wallet',

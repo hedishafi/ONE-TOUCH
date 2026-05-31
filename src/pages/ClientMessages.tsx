@@ -1,11 +1,14 @@
 import { Box, Group, Paper, Stack, Text } from '@mantine/core';
 import { IconMessage } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { COLORS } from '../utils/constants';
 
 export function ClientMessages() {
+  const { t } = useTranslation();
+
   return (
-    <DashboardLayout title="Messages">
+    <DashboardLayout title={t('messages.title')}>
       <Paper p="xl" radius="lg" withBorder style={{ background: 'var(--ot-bg-card)' }}>
         <Stack gap="md">
           <Group gap="sm">
@@ -23,12 +26,12 @@ export function ClientMessages() {
               <IconMessage size={20} color={COLORS.tealBlue} />
             </Box>
             <Box>
-              <Text fw={800} size="lg" c={COLORS.navyBlue}>Messages</Text>
-              <Text size="sm" c="dimmed">All service conversations will show up here.</Text>
+              <Text fw={800} size="lg" c={COLORS.navyBlue}>{t('messages.title')}</Text>
+              <Text size="sm" c="dimmed">{t('messages.subtitle')}</Text>
             </Box>
           </Group>
           <Text size="sm" c="dimmed">
-            You do not have any messages yet.
+            {t('messages.empty')}
           </Text>
         </Stack>
       </Paper>

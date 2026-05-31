@@ -12,9 +12,10 @@ import {
   IconBell, IconBellFilled, IconMenu2, IconX, IconLogout,
   IconCheck, IconClock, IconMapPin, IconCircleFilled, IconGift,
   IconShieldCheck, IconCurrencyDollar, IconPhoneCall, IconRadar, IconStar,
-  IconStarFilled, IconAlertCircle, IconWifiOff,
+  IconAlertCircle, IconWifiOff,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
@@ -22,10 +23,11 @@ import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
 import { RoleSwitcher } from '../components/RoleSwitcher';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { OnlineOfflineToggle } from '../components/OnlineOfflineToggle';
 import { OSMProviderMap } from '../components/OSMProviderMap';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
-import { getAvailableOrders, acceptOrder, declineOrder } from '../api/ordersApi';
+import { getAvailableOrders, acceptOrder, declineOrder, getProviderMe } from '../api/ordersApi';
 // import { ChapaModal } from '../components/ChapaModal';
 import type { ProviderProfile, User } from '../types';
 
@@ -44,9 +46,6 @@ function saveTrials(uid: string, n: number) {
   storage.set(TRIAL_KEY, m);
 }
 
-const jitter = (): [number, number] =>
-  [MAP_CTR[0] + (Math.random() - 0.5) * 0.04, MAP_CTR[1] + (Math.random() - 0.5) * 0.04];
-
 interface Req {
   id: string; clientName: string; clientId: string; clientRating: number; clientJobsDone: number;
   catId: string; desc: string; addr: string;
@@ -62,31 +61,6 @@ const CANCEL_REASONS = [
   'Other',
 ];
 
-const DEMO: Req[] = [
-  {
-    id: 'r1', clientName: 'Alex J.', clientRating: 4.7, clientJobsDone: 12, clientId: 'client-001', catId: 'cat-003',
-    desc: 'Water leaking from pipe under kitchen sink.',
-    addr: 'Bole Road, Addis Ababa', price: 0, dist: 1.4, coords: jitter(),
-    at: new Date(Date.now() - 3 * 60000).toISOString()
-  },
-  {
-    id: 'r2', clientName: 'Sara M.', clientRating: 4.9, clientJobsDone: 7, clientId: 'client-002', catId: 'cat-003',
-    desc: 'Bathroom faucet won’t shut off completely.',
-    addr: 'Kazanchis, Addis Ababa', price: 0, dist: 2.1, coords: jitter(),
-    at: new Date(Date.now() - 8 * 60000).toISOString()
-  },
-  {
-    id: 'r3', clientName: 'Yared T.', clientRating: 4.5, clientJobsDone: 31, clientId: 'client-003', catId: 'cat-003',
-    desc: 'Low water pressure in shower, possible clog.',
-    addr: 'Piazza, Addis Ababa', price: 0, dist: 3.2, coords: jitter(),
-    at: new Date(Date.now() - 14 * 60000).toISOString()
-  },
-];
-
-const ago = (iso: string) => {
-  const m = Math.floor((Date.now()-new Date(iso).getTime())/60000);
-  return m<1?'Just now':m<60?`${m}m ago`:`${Math.floor(m/60)}h ago`;
-};
 
 // Memoized map component — prevents Leaflet from re-mounting when sidebar opens/closes
 interface ProviderMapProps {
@@ -112,15 +86,17 @@ const ProviderMap = memo(function ProviderMap({ online }: ProviderMapProps) {
 });
 
 const NAV = [
-  {label:'Dashboard',                    icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
-  {label:'Profile Setup',                icon:<IconUser         size={16}/>, r:'/provider/profile-setup'},
-  {label:'Services & Subservices',       icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
-  {label:'Wallet / Commission Overview', icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
-  {label:'Earnings',                     icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
+  {labelKey:'providerHome.nav_dashboard',          icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
+  {labelKey:'providerHome.nav_my_orders',          icon:<IconBriefcase    size={16}/>, r:ROUTES.providerOrders},
+  {labelKey:'providerHome.nav_profile_setup',      icon:<IconUser         size={16}/>, r:'/provider/profile-setup'},
+  {labelKey:'providerHome.nav_services',           icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
+  {labelKey:'providerHome.nav_wallet',             icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
+  {labelKey:'providerHome.nav_earnings',           icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
 ];
 
 export function ProviderHome() {
   const nav = useNavigate();
+  const { t } = useTranslation();
   const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
@@ -134,8 +110,8 @@ export function ProviderHome() {
   const [sidebar,   setSidebar]   = useState(false);
   const [realOrders, setRealOrders] = useState<any[]>([]);
 
-  const [trials,    setTrials]    = useState(FREE_TRIAL_TOTAL);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  // Real free jobs remaining — fetched from backend, decremented on each accept
+  const [trials, setTrials] = useState(FREE_TRIAL_TOTAL);
   // const [chapaOpen, setChapaOpen] = useState(false);
   const [pending,   setPending]   = useState<Req|null>(null);
   const [payOpen,   setPayOpen]   = useState(false);
@@ -169,7 +145,16 @@ export function ProviderHome() {
     const profiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
     const p = profiles.find(x=>x.userId===currentUser.id);
     if (p) { setProfile(p); setOnline(p.isOnline); }
-    setTrials(getTrials(currentUser.id));
+    // Fetch real free_jobs_remaining from backend (source of truth)
+    getProviderMe().then((data: any) => {
+      const backendTrials = data?.free_jobs_remaining ?? FREE_TRIAL_TOTAL;
+      setTrials(backendTrials);
+      // Keep localStorage in sync
+      if (currentUser) saveTrials(currentUser.id, backendTrials);
+    }).catch(() => {
+      // Fallback to localStorage if backend unavailable
+      setTrials(getTrials(currentUser.id));
+    });
     fetchNotifications(currentUser.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[currentUser?.id]);
@@ -185,7 +170,7 @@ export function ProviderHome() {
     if (!online) return;
     const fetchOrders = async () => {
       try {
-        const data = await getAvailableOrders();
+        const data = await getAvailableOrders() as any;
         setRealOrders(Array.isArray(data) ? data : data.results ?? []);
       } catch (err) {
         console.error('Failed to fetch orders:', err);
@@ -253,47 +238,20 @@ export function ProviderHome() {
   const toggle = useCallback((v:boolean) => {
     if (isRestricted) {
       notifications.show({
-        title: isUnderReview ? 'Account Under Review' : 'Account Not Verified',
+        title: isUnderReview ? t('providerHome.account_under_review') : t('providerHome.account_not_verified'),
         message: isUnderReview
-          ? 'You cannot go online until your account is approved.'
-          : 'You cannot go online until your account is verified.',
+          ? t('providerHome.cannot_go_online_review')
+          : t('providerHome.cannot_go_online_unverified'),
         color: 'yellow',
       });
       return;
     }
     setOnline(v); updateProviderOnlineStatus(v);
-    notifications.show({title:v?'You are Online':'You are Offline',
-      message:v?'Receiving job requests.':'Not receiving requests.',color:v?'teal':'gray'});
-  },[isRestricted, isUnderReview, updateProviderOnlineStatus]);
-
-  const accept = useCallback((req:Req) => {
-    if (isRestricted) {
-      notifications.show({
-        title: isUnderReview ? 'Account Under Review' : 'Account Not Verified',
-        message: isUnderReview
-          ? 'Job acceptance is disabled while your account is under review.'
-          : 'Job acceptance is disabled until your account is verified.',
-        color: 'yellow',
-      });
-      return;
-    }
-    setTrials(prev => {
-      if (prev>0) {
-        const n = prev - 1;
-        if (currentUser) saveTrials(currentUser.id, n);
-        finalize(req);
-        return n;
-      } else {
-        setPending(req);
-        setPayOpen(true);
-        return prev;
-      }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[currentUser?.id, isRestricted, isUnderReview]);
+    notifications.show({title: v ? t('providerHome.now_online') : t('provider.now_offline'),
+      message: v ? t('providerHome.now_online_msg') : t('provider.now_offline_msg'), color:v?'teal':'gray'});
+  },[isRestricted, isUnderReview, updateProviderOnlineStatus, t]);
 
   function finalize(req:Req) {
-    setDismissed(s=>new Set([...s,req.id]));
     const all = storage.get<User[]>(STORAGE_KEYS.users,[]);
     const cl  = all.find(u=>u.id===req.clientId)??all.find(u=>u.role==='client');
     const ph  = cl?.phone??'+251-912-345-678';
@@ -303,17 +261,10 @@ export function ProviderHome() {
       isRead:false,createdAt:new Date().toISOString()});
   }
 
-  function decline(id:string) {
-    const req = DEMO.find(r=>r.id===id) ?? null;
-    setCancelTarget(req);
-    setCancelReason('');
-    setCancelDone(false);
-  }
   function submitCancel() {
     if (!cancelReason || !cancelTarget) return;
     setCancelDone(true);
     setTimeout(() => {
-      setDismissed(s=>new Set([...s, cancelTarget.id]));
       notifications.show({title:'Request declined', message:'Passed to next available provider.', color:'gray'});
       setCancelTarget(null);
       setCancelDone(false);
@@ -353,10 +304,10 @@ export function ProviderHome() {
               <Text size="sm" fw={700} lineClamp={1}>{profile?.fullName??currentUser?.email??'Provider'}</Text>
               <Group gap={6}>
                 <Badge size="xs" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
-                  {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
+                  {isVerified ? t('providerHome.verified') : isUnderReview ? t('providerHome.under_review') : t('providerHome.not_verified')}
                 </Badge>
                 <Box w={7} h={7} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa'}}/>
-                <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online?'Online':'Offline'}</Text>
+                <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online ? t('provider.online') : t('provider.offline')}</Text>
               </Group>
               <Text size="10px" c="dimmed">UID: {currentUser?.providerUid ?? '—'}</Text>
               <Text size="10px" c="dimmed">{localizedDate}</Text>
@@ -366,28 +317,29 @@ export function ProviderHome() {
         <Divider/>
         <Stack gap={2} p="sm" style={{flex:1}}>
           {currentUser?.role === 'provider' && NAV.map(n=>(
-            <Box key={n.label} p={10}
+            <Box key={n.labelKey} p={10}
               onClick={()=>{setSidebar(false);nav(n.r);}}
               style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
                 fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
                 cursor:'pointer'}}>
-              {n.icon} {n.label}
+              {n.icon} {t(n.labelKey)}
             </Box>
           ))}
           <Paper p="xs" radius="md" mt="xs" style={{border:'1px solid var(--ot-border)'}}>
-            <Text size="xs" fw={700} c={N}>Identity Verification Status</Text>
+            <Text size="xs" fw={700} c={N}>{t('providerHome.id_verification_status')}</Text>
             <Badge mt={6} size="sm" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
-              {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
+              {isVerified ? t('providerHome.verified') : isUnderReview ? t('providerHome.under_review') : t('providerHome.not_verified')}
             </Badge>
           </Paper>
         </Stack>
         <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+          <LanguageSwitcher />
           <RoleSwitcher />
           <Box p={10}
             onClick={()=>{logout();nav(ROUTES.landing);}}
             style={{borderRadius:10,display:'flex',alignItems:'center',
               gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
+            <IconLogout size={18}/> {t('nav.logout')}
           </Box>
         </Box>
       </Box>
@@ -403,7 +355,7 @@ export function ProviderHome() {
                 <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <Text fw={900} size="11px" c="white">OT</Text>
                 </Box>
-                <Text fw={800} size="sm" c={N} visibleFrom="sm">Provider Dashboard</Text>
+                <Text fw={800} size="sm" c={N} visibleFrom="sm">{t('providerHome.header_title')}</Text>
               </Group>
             </Group>
             <Group gap={12}>
@@ -415,6 +367,8 @@ export function ProviderHome() {
                   updateProviderOnlineStatus(isOnline);
                 }}
               />
+              {/* Language Switcher */}
+              <LanguageSwitcher />
               <ActionIcon variant="subtle" size="lg" style={{position:'relative'}}>
                 {unreadCount>0?<IconBellFilled size={22} color={T}/>:<IconBell size={22}/>}
                 {unreadCount>0&&<Box style={{position:'absolute',top:2,right:2,width:14,height:14,
@@ -434,8 +388,8 @@ export function ProviderHome() {
 
         {isUnderReview && (
           <Paper mb={20} p="md" radius="xl" style={{background:'#FFFBEA', border:'1px solid #FCD34D'}}>
-            <Text fw={700} size="sm" c={N}>Your account is under review</Text>
-            <Text size="xs" c="dimmed">You can access the dashboard, but going online and accepting jobs are disabled until approval.</Text>
+            <Text fw={700} size="sm" c={N}>{t('providerHome.under_review_title')}</Text>
+            <Text size="xs" c="dimmed">{t('providerHome.under_review_hint')}</Text>
           </Paper>
         )}
 
@@ -443,11 +397,11 @@ export function ProviderHome() {
           <Paper mb={20} p="md" radius="xl" style={{background:'#ECFDF5', border:'1px solid #6EE7B7'}}>
             <Group justify="space-between" align="flex-start" gap={12}>
               <Box>
-                <Text fw={700} size="sm" c={N}>Verification re-submitted successfully</Text>
-                <Text size="xs" c="dimmed">Your updated identity package is pending admin review.</Text>
+                <Text fw={700} size="sm" c={N}>{t('providerHome.resubmitted_title')}</Text>
+                <Text size="xs" c="dimmed">{t('providerHome.resubmitted_hint')}</Text>
               </Box>
               <Button size="xs" variant="subtle" color="teal" onClick={() => setShowResubmittedNotice(false)}>
-                Dismiss
+                {t('providerHome.dismiss')}
               </Button>
             </Group>
           </Paper>
@@ -458,8 +412,8 @@ export function ProviderHome() {
             <Group gap={8} align="flex-start">
               <IconAlertCircle size={18} color={COLORS.error} />
               <Box>
-                <Text fw={700} size="sm" c={N}>Your verification was rejected</Text>
-                <Text size="xs" c="dimmed">Admin feedback: {rejectionReason}</Text>
+                <Text fw={700} size="sm" c={N}>{t('providerHome.rejected_title')}</Text>
+                <Text size="xs" c="dimmed">{t('providerHome.rejected_hint', { reason: rejectionReason })}</Text>
               </Box>
             </Group>
           </Paper>
@@ -475,17 +429,17 @@ export function ProviderHome() {
                 <Box w={12} h={12} style={{borderRadius:'50%',background:online?'#2ECC71':'#888',
                   boxShadow:online?'0 0 0 4px rgba(46,204,113,.35)':'none',transition:'all .35s'}}/>
                 <Text fw={800} size="md" c={online?'white':'var(--ot-text-navy)'}>
-                  {online?'You are Online':'You are Offline'}
+                  {online ? t('provider.online') : t('provider.offline')}
                 </Text>
               </Group>
               <Text size="sm" c={online?'rgba(255,255,255,.75)':'var(--ot-text-sub)'} mb={online?12:0}>
-                {online?'Receiving job requests near you.':'Toggle to start receiving requests.'}
+                {online ? t('providerHome.online_hint') : t('providerHome.offline_hint')}
               </Text>
               {online&&(
                 <Group gap={8}>
-                  <Badge variant="light" color="yellow" size="sm" leftSection={<IconRadar size={10}/>}>Scanning</Badge>
+                  <Badge variant="light" color="yellow" size="sm" leftSection={<IconRadar size={10}/>}>{t('providerHome.scanning')}</Badge>
                   {visible.length>0&&<Badge variant="filled" color="red" size="sm">
-                    {visible.length} new{visible.length!==1?'s':''}
+                    {visible.length} {t('providerHome.new_requests', { count: visible.length })}
                   </Badge>}
                 </Group>
               )}
@@ -504,8 +458,8 @@ export function ProviderHome() {
         {/* Stats */}
         <SimpleGrid cols={{base:2,sm:2}} spacing={12} mb={20}>
           {[
-            {label:'Rating',        value:`${(profile?.rating??0).toFixed(1)} \u2605`, icon:<IconStar size={18}/>, c:COLORS.warning},
-            {label:'Jobs Accepted', value:`${profile?.totalJobsCompleted??done.length}`, icon:<IconCheck size={18}/>,   c:T},
+            {label: t('providerHome.stat_rating'),        value:`${(profile?.rating??0).toFixed(1)} \u2605`, icon:<IconStar size={18}/>, c:COLORS.warning},
+            {label: t('providerHome.stat_jobs_accepted'), value:`${profile?.totalJobsCompleted??done.length}`, icon:<IconCheck size={18}/>,   c:T},
           ].map(s=>(
             <Paper key={s.label} p="md" radius="xl"
               style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
@@ -525,9 +479,9 @@ export function ProviderHome() {
                 <IconGift size={18}/>
               </ThemeIcon>
               <Box>
-                <Text fw={700} size="sm">Free Trial Accepts</Text>
+                <Text fw={700} size="sm">{t('providerHome.free_trial_title')}</Text>
                 <Text size="xs" c="var(--ot-text-sub)">
-                  {trials>0?`${trials} zero-commission accept${trials!==1?'s':''} left`:`${commPct}% Chapa commission per accept`}
+                  {trials>0 ? t('providerHome.free_trial_remaining', { count: trials }) : t('providerHome.free_trial_commission', { pct: commPct })}
                 </Text>
               </Box>
             </Group>
@@ -552,23 +506,23 @@ export function ProviderHome() {
           {/* Request list */}
           <Box>
             <Group justify="space-between" mb={14}>
-              <Text fw={800} size="sm" c={N}>Incoming Requests</Text>
-              {visible.length>0&&<Badge color="red" variant="filled" size="xs">{visible.length} new</Badge>}
+              <Text fw={800} size="sm" c={N}>{t('providerHome.incoming_requests')}</Text>
+              {visible.length>0&&<Badge color="red" variant="filled" size="xs">{visible.length} {t('providerHome.new_badge')}</Badge>}
             </Group>
 
             {!online?(
               <Paper p="xl" radius="xl" style={{background:'var(--ot-bg-card)',border:'2px dashed var(--ot-border)',textAlign:'center'}}>
                 <Stack align="center" gap={10}>
                   <Text style={{fontSize:44}}>📡</Text>
-                  <Text size="sm" c="var(--ot-text-sub)">{isUnderReview ? 'Your account is under review' : isVerified ? 'Go online to see requests' : 'Your account is not yet verified'}</Text>
-                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)} disabled={isRestricted}>Go Online</Button>
+                  <Text size="sm" c="var(--ot-text-sub)">{isUnderReview ? t('providerHome.offline_under_review') : isVerified ? t('providerHome.offline_go_online') : t('providerHome.offline_not_verified')}</Text>
+                  <Button size="xs" variant="light" color="teal" onClick={()=>toggle(true)} disabled={isRestricted}>{t('provider.online')}</Button>
                 </Stack>
               </Paper>
             ):visible.length===0?(
               <Paper p="xl" radius="xl" style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)',textAlign:'center'}}>
                 <Stack align="center" gap={10}>
                   <Text style={{fontSize:44}}>🔍</Text>
-                  <Text size="sm" c="var(--ot-text-sub)">Scanning for new requests…</Text>
+                  <Text size="sm" c="var(--ot-text-sub)">{t('providerHome.scanning_requests')}</Text>
                 </Stack>
               </Paper>
             ):(
@@ -592,19 +546,19 @@ export function ProviderHome() {
                           <Group gap={4}>
                             <IconClock size={11}/>
                             <Text size="xs" c="var(--ot-text-muted)">
-                              {order.expires_at ? Math.max(0, Math.floor((new Date(order.expires_at).getTime() - new Date().getTime()) / 60000)) + ' min left' : 'N/A'}
+                              {order.expires_at ? Math.max(0, Math.floor((new Date(order.expires_at).getTime() - new Date().getTime()) / 60000)) + ` ${t('providerHome.min_left')}` : 'N/A'}
                             </Text>
                           </Group>
                         </Group>
                         <Group gap={4} py={8} px={12} style={{background:'var(--ot-bg-row)',borderRadius:10}}>
                           <Box style={{flex:1,textAlign:'center'}}>
                             <Text size="10px" c="var(--ot-text-muted)">
-                              {trials > 0 ? 'Free Trial' : 'Commission Fee'}
+                              {trials > 0 ? t('providerHome.free_trial_label') : t('providerHome.commission_fee_label')}
                             </Text>
                             {trials > 0 ? (
-                              <Badge size="xs" color="teal" variant="light">FREE (Trial {FREE_TRIAL_TOTAL - trials + 1}/{FREE_TRIAL_TOTAL})</Badge>
+                              <Badge size="xs" color="teal" variant="light">{t('providerHome.free_badge', { current: FREE_TRIAL_TOTAL - trials + 1, total: FREE_TRIAL_TOTAL })}</Badge>
                             ) : (
-                              <Text size="xs" fw={700} c={COLORS.error}>{order.estimated_commission ?? 'Calculated on accept'} ETB</Text>
+                              <Text size="xs" fw={700} c={COLORS.error}>{order.estimated_commission ?? t('providerHome.calc_on_accept')} ETB</Text>
                             )}
                           </Box>
                         </Group>
@@ -616,12 +570,12 @@ export function ProviderHome() {
                               try {
                                 await acceptOrder(order.id);
                                 setRealOrders(prev => prev.filter(o => o.id !== order.id));
-                                notifications.show({title:'Order Accepted!', message:'Check your active orders.', color:'teal'});
+                                notifications.show({title: t('providerHome.order_accepted_title'), message: t('providerHome.order_accepted_msg'), color:'teal'});
                               } catch(err: any) {
-                                notifications.show({title:'Error', message: err?.detail || 'Failed to accept', color:'red'});
+                                notifications.show({title: t('providerHome.error'), message: err?.detail || t('providerHome.failed_accept'), color:'red'});
                               }
                             }}>
-                            Accept
+                            {t('provider.accept')}
                           </Button>
                           <Button flex={1} size="xs" radius="xl" variant="light" color="red"
                             onClick={async () => {
@@ -629,10 +583,10 @@ export function ProviderHome() {
                                 await declineOrder(order.id);
                                 setRealOrders(prev => prev.filter(o => o.id !== order.id));
                               } catch(err: any) {
-                                notifications.show({title:'Error', message: err?.detail || 'Failed to decline', color:'red'});
+                                notifications.show({title: t('providerHome.error'), message: err?.detail || t('providerHome.failed_decline'), color:'red'});
                               }
                             }}>
-                            Decline
+                            {t('provider.decline')}
                           </Button>
                         </Group>
                       </Stack>
@@ -653,7 +607,7 @@ export function ProviderHome() {
           {!cancelDone ? (
             <>
               <Group justify="space-between">
-                <Text fw={800} size="md" c={N}>Why are you declining?</Text>
+                <Text fw={800} size="md" c={N}>{t('providerHome.decline_why')}</Text>
                 <ActionIcon variant="subtle" onClick={()=>setCancelTarget(null)}><IconX size={18}/></ActionIcon>
               </Group>
               {cancelTarget&&(
@@ -666,14 +620,14 @@ export function ProviderHome() {
                   </Box>
                 </Group>
               )}
-              <Text size="xs" c="dimmed">Select a reason — this helps us improve job matching.</Text>
+              <Text size="xs" c="dimmed">{t('providerHome.decline_reason_hint')}</Text>
               <Stack gap={8}>
-                {CANCEL_REASONS.map(r=>(
+                {CANCEL_REASONS.map((r, i)=>(
                   <Button key={r} size="sm" radius="xl" fullWidth
                     variant={cancelReason===r?'filled':'light'}
                     color={cancelReason===r?'red':'gray'}
                     styles={{root:{justifyContent:'flex-start',paddingLeft:20,fontWeight:600}}}
-                    onClick={()=>setCancelReason(r)}>{r}</Button>
+                    onClick={()=>setCancelReason(r)}>{t(`providerHome.decline_reason_${i}`)}</Button>
                 ))}
               </Stack>
               {/* Offline nudge */}
@@ -682,20 +636,20 @@ export function ProviderHome() {
                 <Group gap={8}>
                   <IconAlertCircle size={16} color={COLORS.warning}/>
                   <Text size="xs" c="dimmed" style={{flex:1}}>
-                    Not available? Switch to
-                    <Text span fw={700} c={N}> Offline</Text> so clients won’t send requests.
+                    {t('providerHome.offline_nudge_pre')}
+                    <Text span fw={700} c={N}> {t('provider.offline')}</Text> {t('providerHome.offline_nudge_post')}
                   </Text>
                 </Group>
                 <Group gap={8} mt={10} align="center">
                   <IconWifiOff size={14} color={COLORS.warning}/>
-                  <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
+                  <Text size="xs" fw={600} c={COLORS.warning}>{t('provider.go_offline')}</Text>
                   <Switch size="xs" color="orange"
                     disabled={isRestricted}
-                    onChange={e=>{if(e.currentTarget.checked){toggle(false);notifications.show({title:'You are now Offline',message:'No new requests will reach you.',color:'orange'});}}} />
+                    onChange={e=>{if(e.currentTarget.checked){toggle(false);notifications.show({title: t('provider.now_offline'), message: t('provider.now_offline_msg'), color:'orange'});}}} />
                 </Group>
               </Paper>
               <Button size="md" radius="xl" color="red" disabled={!cancelReason} onClick={submitCancel}>
-                Submit &amp; Decline
+                {t('providerHome.decline_submit')}
               </Button>
             </>
           ):(
@@ -705,10 +659,8 @@ export function ProviderHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconCheck size={32} color="white"/>
               </Box>
-              <Text fw={800} size="lg" c={N}>Decline recorded</Text>
-              <Text size="sm" c="dimmed" ta="center">
-                We’ve noted your reason. Consider going Offline if you’re unavailable.
-              </Text>
+              <Text fw={800} size="lg" c={N}>{t('providerHome.decline_done_title')}</Text>
+              <Text size="sm" c="dimmed" ta="center">{t('providerHome.decline_done_hint')}</Text>
             </Stack>
           )}
         </Stack>
@@ -722,15 +674,15 @@ export function ProviderHome() {
             <Box w={64} h={64} style={{borderRadius:'50%',background:`linear-gradient(135deg,${COLORS.warning},${T})`,display:'flex',alignItems:'center',justifyContent:'center'}}>
               <IconCurrencyDollar size={32} color="white"/>
             </Box>
-            <Text fw={800} size="lg" c={N}>TeleBirr Payment</Text>
-            <Text size="sm" c="dimmed" ta="center">Confirm you have received TeleBirr payment from the client, or that the client will pay on arrival.</Text>
+            <Text fw={800} size="lg" c={N}>{t('providerHome.telebirr_title')}</Text>
+            <Text size="sm" c="dimmed" ta="center">{t('providerHome.telebirr_hint')}</Text>
             <Box style={{width:'100%'}}>
-              <PasswordInput placeholder="TeleBirr password" value={payPassword} onChange={(e)=>{setPayPassword(e.currentTarget.value); setPayError('');}} required />
+              <PasswordInput placeholder={t('providerDashboard.telebirr_password_placeholder')} value={payPassword} onChange={(e)=>{setPayPassword(e.currentTarget.value); setPayError('');}} required />
               {payError && <Text size="xs" c="red" mt={6}>{payError}</Text>}
               <Group w="100%" mt="md">
                 <Button flex={1} size="md" radius="xl" color="teal" loading={payLoading} onClick={async ()=>{
-                  if (!pending) { notifications.show({title:'Error',message:'No pending request.',color:'red'}); return; }
-                  if (!payPassword || payPassword.trim().length < 4) { setPayError('Enter your TeleBirr password (min 4 chars)'); return; }
+                  if (!pending) { notifications.show({title: t('providerHome.error'), message: t('providerHome.no_pending'), color:'red'}); return; }
+                  if (!payPassword || payPassword.trim().length < 4) { setPayError(t('providerDashboard.telebirr_err_short')); return; }
                   try {
                     setPayLoading(true);
                     // simulate TeleBirr verification delay
@@ -739,14 +691,14 @@ export function ProviderHome() {
                     setPayOpen(false);
                     setPending(null);
                     setPayPassword('');
-                    notifications.show({title:'Payment confirmed',message:'Client phone revealed.',color:'teal'});
+                    notifications.show({title: t('providerHome.payment_confirmed'), message: t('providerHome.phone_revealed'), color:'teal'});
                   } catch(err) {
                     console.error(err);
-                    setPayError('Unable to verify TeleBirr password.');
-                    notifications.show({title:'Payment error',message:'Unable to verify payment.',color:'red'});
+                    setPayError(t('providerHome.telebirr_verify_fail'));
+                    notifications.show({title: t('providerHome.payment_error'), message: t('providerHome.payment_error_msg'), color:'red'});
                   } finally { setPayLoading(false); }
-                }}>Confirm & Reveal</Button>
-                <Button flex={1} size="md" radius="xl" variant="light" color="gray" onClick={()=>{ setPayOpen(false); setPending(null); setPayPassword(''); setPayError(''); }}>Cancel</Button>
+                }}>{t('providerHome.confirm_reveal')}</Button>
+                <Button flex={1} size="md" radius="xl" variant="light" color="gray" onClick={()=>{ setPayOpen(false); setPending(null); setPayPassword(''); setPayError(''); }}>{t('providerHome.cancel')}</Button>
               </Group>
             </Box>
           </Stack>
@@ -761,12 +713,12 @@ export function ProviderHome() {
             display:'flex',alignItems:'center',justifyContent:'center'}}>
             <IconPhoneCall size={38} color="white"/>
           </Box>
-          <Text fw={900} size="xl" c={N} ta="center">Job Confirmed!</Text>
-          <Text size="sm" c="dimmed" ta="center">Call the client to confirm details and arrival time.</Text>
+          <Text fw={900} size="xl" c={N} ta="center">{t('providerHome.job_confirmed')}</Text>
+          <Text size="sm" c="dimmed" ta="center">{t('providerHome.job_confirmed_hint')}</Text>
           <Paper p="lg" radius="lg" w="100%"
             style={{background:'#F0FFF8',border:`1px solid ${COLORS.success}55`}}>
             <Stack gap={4} align="center">
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">Client Phone</Text>
+              <Text size="xs" c="dimmed" fw={600} tt="uppercase">{t('providerHome.client_phone_label')}</Text>
               <Text fw={900} size="xl" c={N} style={{letterSpacing:2}}>{revealed?.phone}</Text>
               <Text size="xs" c={COLORS.success}>
                 {revealed?.req.clientName} · {revealed?getCategoryName(revealed.req.catId):''}
@@ -778,16 +730,16 @@ export function ProviderHome() {
               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
               leftSection={<IconPhoneCall size={16}/>}
               component="a" href={`tel:${revealed?.phone}`}>
-              Call Now
+              {t('providerHome.call_now')}
             </Button>
             <Button flex={1} size="md" radius="xl" variant="light" color="gray"
               onClick={()=>setRevOpen(false)}>
-              Close
+              {t('providerHome.close')}
             </Button>
           </Group>
           <Group gap={5}>
             <IconShieldCheck size={12} color={T}/>
-            <Text size="xs" c="dimmed">Client has been notified you accepted.</Text>
+            <Text size="xs" c="dimmed">{t('providerHome.client_notified')}</Text>
           </Group>
         </Stack>
       </Modal>

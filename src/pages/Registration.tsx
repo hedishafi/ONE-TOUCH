@@ -27,20 +27,20 @@ export function ClientTypeSelect() {
   const navigate = useNavigate();
 
   return (
-    <RegisterShell title="What type of client?" subtitle="Select how you'll be using ONE TOUCH">
+    <RegisterShell title={t('registration.client_type_title')} subtitle={t('registration.client_type_subtitle')}>
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl">
         {[
           {
             icon: <IconUser size={36} />,
             label: t('register.individual'),
-            desc: 'Personal services for everyday needs. Upload a government ID to verify your identity.',
+            desc: t('registration.individual_desc'),
             path: ROUTES.individualRegister,
             color: 'navy',
           },
           {
             icon: <IconBuilding size={36} />,
             label: t('register.business'),
-            desc: 'Business account for companies or organizations. Upload business registration documents.',
+            desc: t('registration.business_desc'),
             path: ROUTES.businessRegister,
             color: 'teal',
           },
@@ -78,7 +78,7 @@ export function ClientTypeSelect() {
                 rightSection={<IconArrowRight size={14} />}
                 size="sm"
               >
-                Select
+                {t('registration.select_btn')}
               </Button>
             </Stack>
           </Box>
@@ -147,24 +147,24 @@ export function IndividualClientRegister() {
       storage.set(STORAGE_KEYS.clientProfiles, profiles);
       const { login } = useAuthStore.getState();
       login(newUser.email, '');
-      notifications.show({ title: '🎉 Registration Complete!', message: 'Welcome to ONE TOUCH!', color: 'teal' });
+      notifications.show({ title: t('registration.reg_complete_title'), message: t('registration.reg_complete_msg'), color: 'teal' });
       navigate(ROUTES.clientDashboard);
     } else {
-      notifications.show({ title: 'Invalid OTP', message: `Use ${MOCK_OTP} for demo`, color: 'red' });
+      notifications.show({ title: t('registration.invalid_otp_title'), message: t('registration.demo_otp_use', { otp: MOCK_OTP }), color: 'red' });
     }
   };
 
   return (
-    <RegisterShell title="Individual Client Registration" subtitle="Step-by-step verification">
+    <RegisterShell title={t('registration.individual_title')} subtitle={t('registration.individual_subtitle')}>
       <Stepper active={active} color="teal" size="sm" mb="xl" onStepClick={setActive}>
-        <Stepper.Step icon={<IconScan size={16} />} label="ID Upload" />
-        <Stepper.Step icon={<IconPhoneCall size={16} />} label="Phone OTP" />
+        <Stepper.Step icon={<IconScan size={16} />} label={t('registration.step_id_upload')} />
+        <Stepper.Step icon={<IconPhoneCall size={16} />} label={t('registration.step_phone_otp')} />
       </Stepper>
 
       {active === 0 && (
         <Stack gap="lg">
           <Alert color="blue" radius="md" icon={<IconShieldCheck size={14} />}>
-            Your ID is used only for identity verification and is stored securely. We never share it.
+            {t('registration.id_privacy_notice')}
           </Alert>
 
           <Group gap="md" align="flex-start" wrap="wrap">
@@ -188,9 +188,9 @@ export function IndividualClientRegister() {
                       {idFile ? <IconCheck size={24} /> : <IconUpload size={24} />}
                     </ThemeIcon>
                     <Text size="sm" fw={600} c={idFile ? 'teal' : 'dimmed'}>
-                      {idFile ? idFile.name : 'Click to upload ID'}
+                      {idFile ? idFile.name : t('registration.click_upload_id')}
                     </Text>
-                    <Text size="xs" c="dimmed">JPG, PNG or PDF</Text>
+                    <Text size="xs" c="dimmed">{t('registration.id_file_types')}</Text>
                   </Box>
                 )}
               </FileButton>
@@ -216,9 +216,9 @@ export function IndividualClientRegister() {
                       {selfieFile ? <IconCheck size={24} /> : <IconCamera size={24} />}
                     </ThemeIcon>
                     <Text size="sm" fw={600} c={selfieFile ? COLORS.navyBlue : 'dimmed'}>
-                      {selfieFile ? selfieFile.name : 'Click to take selfie'}
+                      {selfieFile ? selfieFile.name : t('registration.click_take_selfie')}
                     </Text>
-                    <Text size="xs" c="dimmed">Live liveness check</Text>
+                    <Text size="xs" c="dimmed">{t('registration.liveness_check')}</Text>
                   </Box>
                 )}
               </FileButton>
@@ -238,12 +238,12 @@ export function IndividualClientRegister() {
             <Box p="md" style={{ background: `${COLORS.tealBlue}08`, borderRadius: 12, border: `1px solid ${COLORS.tealBlue}30` }}>
               <Group gap="xs" mb="sm">
                 <IconScan size={16} color={COLORS.tealBlue} />
-                <Text size="sm" fw={600} c={COLORS.tealBlue}>Data Extracted Successfully</Text>
-                <Badge size="xs" color="teal">Auto-filled</Badge>
+                <Text size="sm" fw={600} c={COLORS.tealBlue}>{t('registration.data_extracted')}</Text>
+                <Badge size="xs" color="teal">{t('registration.auto_filled')}</Badge>
               </Group>
               <SimpleGrid cols={2}>
-                <TextInput label="Full Name" value={extractedData.fullName} onChange={e => setExtractedData(d => ({ ...d, fullName: e.target.value }))} />
-                <TextInput label="ID Number" value={extractedData.idNumber} onChange={e => setExtractedData(d => ({ ...d, idNumber: e.target.value }))} />
+                <TextInput label={t('registration.full_name_label')} value={extractedData.fullName} onChange={e => setExtractedData(d => ({ ...d, fullName: e.target.value }))} />
+                <TextInput label={t('registration.id_number_label')} value={extractedData.idNumber} onChange={e => setExtractedData(d => ({ ...d, idNumber: e.target.value }))} />
               </SimpleGrid>
             </Box>
           )}
@@ -255,7 +255,7 @@ export function IndividualClientRegister() {
             onClick={() => setActive(1)}
             style={{ background: COLORS.navyBlue }}
           >
-            Continue to Phone Verification
+            {t('registration.continue_phone_verify')}
           </Button>
         </Stack>
       )}
@@ -265,7 +265,7 @@ export function IndividualClientRegister() {
           <Alert color="teal" icon={<IconPhoneCall size={14} />}>
             {t('register.otp_sent')} <strong>+251 9XX XXX XXX</strong>. {t('register.otp_enter')}.
           </Alert>
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
+          <Text size="sm" c="dimmed">{t('registration.demo_otp_hint')} <strong>123456</strong></Text>
           <PinInput
             length={6}
             value={phoneOtp}
@@ -286,6 +286,7 @@ export function IndividualClientRegister() {
 // ─── BUSINESS CLIENT REGISTRATION ─────────────────────────────────────────────
 export function BusinessClientRegister() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [active, setActive] = useState(0);
   const [docFile, setDocFile] = useState<File | null>(null);
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -336,15 +337,15 @@ export function BusinessClientRegister() {
       storage.set(STORAGE_KEYS.clientProfiles, profiles);
       const { login } = useAuthStore.getState();
       login(newUser.email, '');
-      notifications.show({ title: '🎉 Business Account Ready!', message: 'Welcome to ONE TOUCH Business.', color: 'teal' });
+      notifications.show({ title: t('registration.business_ready_title'), message: t('registration.business_ready_msg'), color: 'teal' });
       navigate(ROUTES.clientDashboard);
   };
 
   return (
-    <RegisterShell title="Business Client Registration" subtitle="Verify your business identity">
+    <RegisterShell title={t('registration.business_title')} subtitle={t('registration.business_subtitle')}>
       <Stepper active={active} color="teal" size="sm" mb="xl">
-        <Stepper.Step icon={<IconBuilding size={16} />} label="Documents" />
-        <Stepper.Step icon={<IconPhoneCall size={16} />} label="Phone OTP" />
+        <Stepper.Step icon={<IconBuilding size={16} />} label={t('registration.step_documents')} />
+        <Stepper.Step icon={<IconPhoneCall size={16} />} label={t('registration.step_phone_otp')} />
       </Stepper>
 
       {active === 0 && (
@@ -365,38 +366,38 @@ export function BusinessClientRegister() {
                 <ThemeIcon size={56} radius="xl" color={docFile ? 'teal' : 'gray'} variant="light" mx="auto" mb="sm">
                   {docFile ? <IconCheck size={28} /> : <IconUpload size={28} />}
                 </ThemeIcon>
-                <Text fw={600} c={docFile ? 'teal' : 'dimmed'}>{docFile ? docFile.name : 'Upload Business Registration Documents'}</Text>
-                <Text size="xs" c="dimmed">Certificate of Incorporation, Tax Registration, etc.</Text>
+                <Text fw={600} c={docFile ? 'teal' : 'dimmed'}>{docFile ? docFile.name : t('registration.upload_biz_docs')}</Text>
+                <Text size="xs" c="dimmed">{t('registration.biz_doc_types')}</Text>
               </Box>
             )}
           </FileButton>
 
           {docFile && !ocrDone && (
             <Box>
-              <Text size="sm" c="dimmed" mb="xs">Extracting business data...</Text>
+              <Text size="sm" c="dimmed" mb="xs">{t('registration.extracting_biz_data')}</Text>
               <Progress value={ocrProgress} color="teal" animated radius="xl" />
             </Box>
           )}
           {ocrDone && (
             <Stack gap="sm">
-              <Badge color="teal" size="sm" w="fit-content">OCR Extracted Data</Badge>
-              <TextInput label="Business Name" value={extracted.businessName} onChange={e => setExtracted(d => ({ ...d, businessName: e.target.value }))} />
-              <TextInput label="Tax ID" value={extracted.taxId} onChange={e => setExtracted(d => ({ ...d, taxId: e.target.value }))} />
-              <TextInput label="Business Address" value={extracted.address} onChange={e => setExtracted(d => ({ ...d, address: e.target.value }))} />
+              <Badge color="teal" size="sm" w="fit-content">{t('registration.ocr_extracted')}</Badge>
+              <TextInput label={t('registration.business_name_label')} value={extracted.businessName} onChange={e => setExtracted(d => ({ ...d, businessName: e.target.value }))} />
+              <TextInput label={t('registration.tax_id_label')} value={extracted.taxId} onChange={e => setExtracted(d => ({ ...d, taxId: e.target.value }))} />
+              <TextInput label={t('registration.biz_address_label')} value={extracted.address} onChange={e => setExtracted(d => ({ ...d, address: e.target.value }))} />
             </Stack>
           )}
           <Button fullWidth size="md" disabled={!ocrDone} onClick={() => setActive(1)} style={{ background: COLORS.navyBlue }}>
-            Continue
+            {t('registration.continue_btn')}
           </Button>
         </Stack>
       )}
 
       {active === 1 && (
         <Stack gap="lg" align="center">
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
+          <Text size="sm" c="dimmed">{t('registration.demo_otp_hint')} <strong>123456</strong></Text>
           <PinInput length={6} value={phoneOtp} onChange={setPhoneOtp} size="lg" type="number" />
-          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) finish(); else notifications.show({ title: 'Wrong OTP', message: 'Use 123456', color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
-            Verify Phone & Complete
+          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) finish(); else notifications.show({ title: t('registration.wrong_otp_title'), message: t('registration.wrong_otp_msg'), color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
+            {t('registration.verify_phone_complete')}
           </Button>
         </Stack>
       )}
@@ -407,6 +408,7 @@ export function BusinessClientRegister() {
 // ─── PROVIDER REGISTRATION ─────────────────────────────────────────────────────
 export function ProviderRegister() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { categories } = useServiceCatalog();
   const [active, setActive] = useState(0);
   const [idFile, setIdFile] = useState<File | null>(null);
@@ -491,24 +493,24 @@ export function ProviderRegister() {
       const { login } = useAuthStore.getState();
       login(newUser.email, '');
       
-      notifications.show({ title: '🎉 Provider Profile Created!', message: 'You can now receive jobs on ONE TOUCH.', color: 'teal' });
+      notifications.show({ title: t('registration.provider_ready_title'), message: t('registration.provider_ready_msg'), color: 'teal' });
       navigate(ROUTES.providerDashboard);
   };
 
   return (
-    <RegisterShell title="Service Provider Registration" subtitle="Get verified and start earning">
+    <RegisterShell title={t('registration.provider_title')} subtitle={t('registration.provider_subtitle')}>
       <Stepper active={active} color="teal" size="sm" mb="xl" onStepClick={(s) => s < active && setActive(s)}>
-        <Stepper.Step icon={<IconScan size={14} />} label="ID Verify" />
-        <Stepper.Step icon={<IconPhoneCall size={14} />} label="Phone" />
-        <Stepper.Step icon={<IconBriefcase size={14} />} label="Service" />
-        <Stepper.Step icon={<IconMapPin size={14} />} label="Location" />
-        <Stepper.Step icon={<IconCheck size={14} />} label="Done" />
+        <Stepper.Step icon={<IconScan size={14} />} label={t('registration.step_id_verify')} />
+        <Stepper.Step icon={<IconPhoneCall size={14} />} label={t('registration.step_phone')} />
+        <Stepper.Step icon={<IconBriefcase size={14} />} label={t('registration.step_service')} />
+        <Stepper.Step icon={<IconMapPin size={14} />} label={t('registration.step_location')} />
+        <Stepper.Step icon={<IconCheck size={14} />} label={t('registration.step_done')} />
       </Stepper>
 
       {active === 0 && (
         <Stack gap="lg">
           <Alert color="blue" icon={<IconShieldCheck size={14} />}>
-            Upload your government ID + selfie for identity verification.
+            {t('registration.provider_id_notice')}
           </Alert>
           <Group gap="md" align="flex-start" wrap="wrap">
             <Box flex={1} miw={200}>
@@ -518,7 +520,7 @@ export function ProviderRegister() {
                     <ThemeIcon size={48} radius="xl" color={idFile ? 'teal' : 'gray'} variant="light" mx="auto" mb="sm">
                       {idFile ? <IconCheck size={24} /> : <IconUpload size={24} />}
                     </ThemeIcon>
-                    <Text size="sm" fw={600} c={idFile ? 'teal' : 'dimmed'}>{idFile ? 'ID Uploaded' : 'Upload Government ID'}</Text>
+                    <Text size="sm" fw={600} c={idFile ? 'teal' : 'dimmed'}>{idFile ? t('registration.id_uploaded') : t('registration.upload_gov_id')}</Text>
                   </Box>
                 )}
               </FileButton>
@@ -528,59 +530,59 @@ export function ProviderRegister() {
                 <ThemeIcon size={48} radius="xl" color="gray" variant="light" mx="auto" mb="sm">
                   <IconCamera size={24} />
                 </ThemeIcon>
-                <Text size="sm" c="dimmed">Take Selfie</Text>
-                <Text size="xs" c="dimmed">Live liveness check</Text>
+                <Text size="sm" c="dimmed">{t('registration.take_selfie')}</Text>
+                <Text size="xs" c="dimmed">{t('registration.liveness_check')}</Text>
               </Box>
             </Box>
           </Group>
           {idFile && !ocrDone && (
             <Box>
-              <Text size="sm" c="dimmed" mb="xs">Verifying identity...</Text>
+              <Text size="sm" c="dimmed" mb="xs">{t('registration.verifying_identity')}</Text>
               <Progress value={ocrProgress} color="teal" animated radius="xl" />
             </Box>
           )}
-          {ocrDone && <Alert color="teal" icon={<IconCheck size={14} />}>Identity verified successfully!</Alert>}
+          {ocrDone && <Alert color="teal" icon={<IconCheck size={14} />}>{t('registration.identity_verified')}</Alert>}
           <Button fullWidth size="md" disabled={!ocrDone} onClick={() => setActive(1)} style={{ background: COLORS.navyBlue }}>
-            Continue to Phone Verification
+            {t('registration.continue_phone_verify')}
           </Button>
         </Stack>
       )}
 
       {active === 1 && (
         <Stack gap="lg" align="center">
-          <Text size="sm" c="dimmed">Demo OTP: <strong>123456</strong></Text>
+          <Text size="sm" c="dimmed">{t('registration.demo_otp_hint')} <strong>123456</strong></Text>
           <PinInput length={6} value={phoneOtp} onChange={setPhoneOtp} size="lg" type="number" />
-          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) setActive(2); else notifications.show({ title: 'Wrong OTP', message: 'Use 123456', color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
-            Verify Phone & Continue
+          <Button fullWidth size="md" onClick={() => { if (phoneOtp === MOCK_OTP) setActive(2); else notifications.show({ title: t('registration.wrong_otp_title'), message: t('registration.wrong_otp_msg'), color: 'red' }); }} style={{ background: COLORS.tealBlue }}>
+            {t('registration.verify_phone_continue')}
           </Button>
         </Stack>
       )}
 
       {active === 2 && (
         <Stack gap="lg">
-          <Select label="Primary Service Category" data={catOptions} value={selectedCategory} onChange={setSelectedCategory} placeholder="Select category" />
+          <Select label={t('registration.primary_category_label')} data={catOptions} value={selectedCategory} onChange={setSelectedCategory} placeholder={t('registration.select_category_placeholder')} />
           {selectedCat && (
-            <Select label="Subcategory" data={subcatOptions} placeholder="Select subcategory" />
+            <Select label={t('registration.subcategory_label')} data={subcatOptions} placeholder={t('registration.select_subcategory_placeholder')} />
           )}
           <Select
-            label="Pricing Model"
+            label={t('registration.pricing_model_label')}
             data={[
-              { value: 'hourly', label: '⏱ Hourly Rate' },
-              { value: 'fixed', label: '💰 Fixed Price' },
-              { value: 'custom', label: '🤝 Custom Estimate' },
+              { value: 'hourly', label: t('registration.pricing_hourly') },
+              { value: 'fixed', label: t('registration.pricing_fixed') },
+              { value: 'custom', label: t('registration.pricing_custom') },
             ]}
             value={pricingModel}
             onChange={setPricingModel}
           />
           {pricingModel === 'hourly' && (
-            <NumberInput label="Hourly Rate (USD)" value={hourlyRate} onChange={(v) => setHourlyRate(Number(v))} prefix="$" min={10} />
+            <NumberInput label={t('registration.hourly_rate_label')} value={hourlyRate} onChange={(v) => setHourlyRate(Number(v))} prefix="$" min={10} />
           )}
           {pricingModel === 'fixed' && (
-            <NumberInput label="Fixed Price (USD)" prefix="$" min={10} />
+            <NumberInput label={t('registration.fixed_price_label')} prefix="$" min={10} />
           )}
-          <Textarea label="Bio / Description" placeholder="Tell clients about your experience and expertise..." value={bio} onChange={e => setBio(e.target.value)} rows={3} />
+          <Textarea label={t('registration.bio_label')} placeholder={t('registration.bio_placeholder')} value={bio} onChange={e => setBio(e.target.value)} rows={3} />
           <Button fullWidth size="md" disabled={!selectedCategory || !pricingModel} onClick={() => setActive(3)} style={{ background: COLORS.navyBlue }}>
-            Continue to Location & Availability
+            {t('registration.continue_location')}
           </Button>
         </Stack>
       )}
@@ -588,15 +590,15 @@ export function ProviderRegister() {
       {active === 3 && (
         <Stack gap="lg">
           <Alert color="teal" icon={<IconMapPin size={14} />}>
-            Your location is used to match you with nearby clients. Only approximate location is shared with clients.
+            {t('registration.location_notice')}
           </Alert>
           <Box p="md" style={{ background: `${COLORS.tealBlue}10`, borderRadius: 12, border: `1px solid ${COLORS.tealBlue}30`, textAlign: 'center' }}>
             <IconMapPin size={32} color={COLORS.tealBlue} />
-            <Text size="sm" fw={600} mt="xs">Detecting your location...</Text>
+            <Text size="sm" fw={600} mt="xs">{t('registration.detecting_location')}</Text>
             <Badge color="teal" mt="xs">Addis Ababa, ET · 9.0320°N, 38.7469°E</Badge>
           </Box>
           <Box>
-            <Text size="sm" fw={600} mb="xs">Service Coverage Radius: {coverageRadius} km</Text>
+            <Text size="sm" fw={600} mb="xs">{t('registration.coverage_radius_label', { radius: coverageRadius })}</Text>
             <Slider
               value={coverageRadius}
               onChange={setCoverageRadius}
@@ -608,13 +610,13 @@ export function ProviderRegister() {
             />
           </Box>
           <Checkbox
-            label="Set status to Online immediately after registration"
+            label={t('registration.set_online_label')}
             checked={isOnline}
             onChange={e => setIsOnline(e.currentTarget.checked)}
             color="teal"
           />
           <Button fullWidth size="md" onClick={() => setActive(4)} style={{ background: COLORS.navyBlue }}>
-            Continue to Final Step
+            {t('registration.continue_final')}
           </Button>
         </Stack>
       )}
@@ -622,11 +624,11 @@ export function ProviderRegister() {
       {active === 4 && (
         <Stack gap="lg" align="center">
           <Alert color="teal" icon={<IconCheck size={14} />}>
-            All verified! Click below to activate your provider account.
+            {t('registration.all_verified')}
           </Alert>
           <Button fullWidth size="md" onClick={finish}
             style={{ background: `linear-gradient(135deg, ${COLORS.navyBlue} 0%, ${COLORS.tealBlue} 100%)` }}>
-            Complete Registration
+            {t('register.complete')}
           </Button>
         </Stack>
       )}

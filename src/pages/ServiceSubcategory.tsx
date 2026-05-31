@@ -10,6 +10,7 @@ import {
   IconClock, IconEngine, IconTool, IconWand, IconWifi,
   IconBrush, IconMusic, IconMath, IconLanguage,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LandingNavbar } from '../components/LandingNavbar';
@@ -144,17 +145,18 @@ const SUB_DESCRIPTIONS: Record<string, string> = {
 };
 
 /* ── Page badges ─────────────────────────────────────────── */
-const TRUST_BADGES = [
-  { icon: <IconShieldCheck size={14} />, label: 'Verified Providers' },
-  { icon: <IconClock size={14} />,       label: 'Fast Response' },
-  { icon: <IconStar size={14} />,        label: '4.8★ Avg Rating' },
-  { icon: <IconMapPin size={14} />,      label: 'Addis Ababa' },
+const TRUST_BADGE_KEYS = [
+  { icon: <IconShieldCheck size={14} />, key: 'verified_providers' },
+  { icon: <IconClock size={14} />,       key: 'fast_response' },
+  { icon: <IconStar size={14} />,        key: 'avg_rating' },
+  { icon: <IconMapPin size={14} />,      key: 'location' },
 ];
 
 /* ── Component ───────────────────────────────────────────── */
 export function ServiceSubcategory() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { categories, loading } = useServiceCatalog();
 
   const category = categories.find(c => c.id === categoryId);
@@ -162,7 +164,7 @@ export function ServiceSubcategory() {
   if (loading && categories.length === 0) {
     return (
       <Box style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Text fw={700} size="lg" c={COLORS.navyBlue}>Loading services…</Text>
+        <Text fw={700} size="lg" c={COLORS.navyBlue}>{t('serviceSubcategory.loading')}</Text>
       </Box>
     );
   }
@@ -171,9 +173,9 @@ export function ServiceSubcategory() {
   if (!category) {
     return (
       <Box style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <Text fw={800} size="2xl" c={COLORS.navyBlue}>Service not found</Text>
+        <Text fw={800} size="2xl" c={COLORS.navyBlue}>{t('serviceSubcategory.not_found')}</Text>
         <Button className="btn-teal" style={{ color: 'white' }} onClick={() => navigate(ROUTES.landing)}>
-          Back to Home
+          {t('serviceSubcategory.back_to_home')}
         </Button>
       </Box>
     );
@@ -208,8 +210,8 @@ export function ServiceSubcategory() {
               style={{ animation: 'slideRight 0.5s ease both' }}
               separator={<Text size="xs" c="dimmed">/</Text>}
             >
-              <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>Home</Anchor>
-              <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.services)} style={{ cursor: 'pointer' }}>Services</Anchor>
+              <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>{t('serviceSubcategory.breadcrumb_home')}</Anchor>
+              <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.services)} style={{ cursor: 'pointer' }}>{t('serviceSubcategory.breadcrumb_services')}</Anchor>
               <Text size="sm" c="dimmed" fw={500}>{category.name}</Text>
             </Breadcrumbs>
 
@@ -239,27 +241,27 @@ export function ServiceSubcategory() {
                     size="sm"
                     style={{ background: `${category.color}15`, color: category.color, border: `1px solid ${category.color}30`, fontWeight: 700 }}
                   >
-                    {category.subcategories.length} Available Services
+                    {t('serviceSubcategory.available_services', { count: category.subcategories.length })}
                   </Badge>
                 </Group>
                 <Text fw={900} size="3xl" c={COLORS.navyBlue} style={{ letterSpacing: '-0.5px', lineHeight: 1.1 }}>
                   {category.name}
                 </Text>
                 <Text size="md" c="dimmed" maw={540}>
-                  Choose a service below. All providers are verified and rated by real customers in Addis Ababa.
+                  {t('serviceSubcategory.category_sub')}
                 </Text>
               </Stack>
             </Group>
 
             {/* Trust badges row */}
             <Group mt="xl" gap="sm" wrap="wrap" style={{ animation: 'fadeUp 0.6s 0.15s ease both' }}>
-              {TRUST_BADGES.map((b, i) => (
+              {TRUST_BADGE_KEYS.map((b, i) => (
                 <Group
                   key={i} gap={6} px={12} py={6}
                   style={{ background: 'white', borderRadius: 20, border: `1px solid #E9ECEF`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
                 >
                   <Box c={COLORS.tealBlue}>{b.icon}</Box>
-                  <Text size="xs" fw={600} c={COLORS.navyBlue}>{b.label}</Text>
+                  <Text size="xs" fw={600} c={COLORS.navyBlue}>{t(`serviceSubcategory.badge_${b.key}`)}</Text>
                 </Group>
               ))}
             </Group>
@@ -307,7 +309,7 @@ export function ServiceSubcategory() {
                     {sub.name}
                   </Text>
                   <Text size="sm" c="dimmed" lh={1.6} mb="lg" style={{ flexGrow: 1 }}>
-                    {SUB_DESCRIPTIONS[sub.id] ?? `Professional ${sub.name.toLowerCase()} services by verified experts near you.`}
+                    {SUB_DESCRIPTIONS[sub.id] ?? t('serviceSubcategory.default_sub_desc', { name: sub.name.toLowerCase() })}
                   </Text>
 
                   <Button
@@ -326,7 +328,7 @@ export function ServiceSubcategory() {
                       navigate(ROUTES.signup);
                     }}
                   >
-                    Book Now
+                    {t('serviceSubcategory.book_now')}
                   </Button>
                 </Stack>
               </Paper>
@@ -342,7 +344,7 @@ export function ServiceSubcategory() {
               style={{ cursor: 'pointer' }}
             >
               <IconArrowLeft size={16} color={COLORS.tealBlue} />
-              <Text size="sm" fw={600} c={COLORS.tealBlue}>Back to Home</Text>
+              <Text size="sm" fw={600} c={COLORS.tealBlue}>{t('serviceSubcategory.back_to_home')}</Text>
             </Group>
             <Text size="sm" c="dimmed">·</Text>
             <Text
@@ -352,7 +354,7 @@ export function ServiceSubcategory() {
               onMouseEnter={e => ((e.currentTarget as HTMLElement).style.opacity = '0.7')}
               onMouseLeave={e => ((e.currentTarget as HTMLElement).style.opacity = '1')}
             >
-              Browse All Services
+              {t('serviceSubcategory.browse_all')}
             </Text>
           </Group>
         </Container>
@@ -375,10 +377,10 @@ export function ServiceSubcategory() {
             >
               <Box style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
               <Text fw={800} size="xl" c="white" mb={8} style={{ position: 'relative' }}>
-                Ready to book a {category.name} professional?
+                {t('serviceSubcategory.cta_title', { name: category.name })}
               </Text>
               <Text c="rgba(255,255,255,0.75)" size="sm" mb="xl" style={{ position: 'relative' }}>
-                Create a free account to connect with verified providers near you.
+                {t('serviceSubcategory.cta_sub')}
               </Text>
               <Group justify="center" gap="md" wrap="wrap" style={{ position: 'relative' }}>
                 <Button
@@ -393,7 +395,7 @@ export function ServiceSubcategory() {
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
                   onClick={() => navigate(ROUTES.signup)}
                 >
-                  Sign Up Free
+                  {t('serviceSubcategory.cta_signup')}
                 </Button>
                 <Button
                   size="md"
@@ -403,7 +405,7 @@ export function ServiceSubcategory() {
                   onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = '')}
                   onClick={() => navigate(ROUTES.login)}
                 >
-                  I Already Have an Account
+                  {t('serviceSubcategory.cta_login')}
                 </Button>
               </Group>
             </Box>

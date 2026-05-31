@@ -15,6 +15,7 @@ import {
   IconChevronLeft, IconAlertCircle, IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { signupVerify } from '../services/authService';
 import { COLORS, ROUTES, MOCK_OTP } from '../utils/constants';
 import type { IdentityResult } from './signup/shared';
@@ -60,6 +61,7 @@ function StepPhoneOTP({
   onBack: () => void;
   onSuccess: () => void;
 }) {
+  const { t } = useTranslation();
   const [otp, setOtp]           = useState('');
   const [error, setError]       = useState('');
   const [attempts, setAttempts] = useState(0);
@@ -69,7 +71,7 @@ function StepPhoneOTP({
   const MAX_ATTEMPTS = 5;
   const phone = idResult.selectedPhone;
 
-  useEffect(() => { begin(); }, [begin]); // start countdown on mount
+  useEffect(() => { begin(); }, [begin]);
 
   const handleOtpChange = (val: string) => {
     setOtp(val);
@@ -79,35 +81,35 @@ function StepPhoneOTP({
 
   const verify = async (code: string) => {
     if (attempts >= MAX_ATTEMPTS) {
-      setError('Too many attempts. Please request a new code.');
+      setError(t('clientSignup.too_many_attempts'));
       return;
     }
     if (code !== MOCK_OTP) {
       const remaining = MAX_ATTEMPTS - attempts - 1;
       setAttempts(a => a + 1);
-      setError(`Incorrect code.${remaining > 0 ? ` ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.` : ' Please resend.'}`);
+      const remainingMsg = remaining > 0
+        ? ` ${remaining !== 1
+            ? t('clientSignup.attempts_remaining_plural', { remaining })
+            : t('clientSignup.attempts_remaining', { remaining })}`
+        : ` ${t('clientSignup.please_resend')}`;
+      setError(`${t('clientSignup.incorrect_code')}${remainingMsg}`);
       return;
     }
 
     setVerifying(true);
     try {
-      // Call backend API to verify OTP and create account
-      const response = await signupVerify({
-        phone,
-        otp_code: code,
-      });
-      
+      const response = await signupVerify({ phone, otp_code: code });
+
       if (response && response.user) {
         setVerifying(false);
         onSuccess();
       } else {
         setVerifying(false);
-        setError('Failed to create account. Please try again.');
+        setError(t('clientSignup.failed_create'));
       }
     } catch (err: unknown) {
       setVerifying(false);
-      const errorMessage = getErrorMessage(err, 'Failed to verify OTP. Please try again.');
-      setError(errorMessage);
+      setError(getErrorMessage(err, t('clientSignup.failed_verify_otp')));
     }
   };
 
@@ -125,8 +127,8 @@ function StepPhoneOTP({
     <Card>
       <CardHeader
         icon={<IconMessageCircle size={22} color={COLORS.tealBlue} />}
-        title="Verify Your Phone"
-        sub={`We sent a 6-digit code to ${phone}`}
+        title={t('clientSignup.otp_card_title')}
+        sub={t('clientSignup.otp_card_sub', { phone })}
       />
 
       {/* Demo hint */}
@@ -137,7 +139,7 @@ function StepPhoneOTP({
         radius="md"
         mb="lg"
       >
-        Demo verification code: <strong>{MOCK_OTP}</strong>
+        {t('clientSignup.demo_code')} <strong>{MOCK_OTP}</strong>
       </Alert>
 
       {error && (
@@ -150,7 +152,7 @@ function StepPhoneOTP({
         {/* OTP input */}
         <Box>
           <Text size="sm" fw={600} c="var(--ot-text-navy)" mb={12} ta="center">
-            Enter 6-digit code
+            {t('clientSignup.enter_6digit')}
           </Text>
           <Center>
             <PinInput
@@ -167,7 +169,7 @@ function StepPhoneOTP({
 
         {verifying && (
           <Box ta="center">
-            <Text size="sm" c="var(--ot-text-sub)">Verifying…</Text>
+            <Text size="sm" c="var(--ot-text-sub)">{t('clientSignup.verifying_label')}</Text>
           </Box>
         )}
 
@@ -178,7 +180,7 @@ function StepPhoneOTP({
             onClick={onBack}
             style={{ color: COLORS.tealBlue, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
           >
-            <IconChevronLeft size={14} /> Change number
+            <IconChevronLeft size={14} /> {t('clientSignup.change_number')}
           </Anchor>
           <Anchor
             size="sm"
@@ -188,7 +190,11 @@ function StepPhoneOTP({
               cursor: seconds > 0 || locked ? 'default' : 'pointer',
             }}
           >
-            {seconds > 0 ? `Resend in ${seconds}s` : locked ? 'Max attempts reached' : 'Resend code'}
+            {seconds > 0
+              ? t('clientSignup.resend_in_short', { seconds })
+              : locked
+              ? t('clientSignup.max_attempts')
+              : t('clientSignup.resend_code')}
           </Anchor>
         </Group>
 
@@ -200,7 +206,7 @@ function StepPhoneOTP({
           <Group gap={8} wrap="nowrap">
             <IconCheck size={14} color={COLORS.tealBlue} style={{ flexShrink: 0 }} />
             <Text size="xs" c="var(--ot-text-muted)">
-              Your identity was verified from the scanned document. No additional steps required after this.
+              {t('clientSignup.identity_note')}
             </Text>
           </Group>
         </Box>
@@ -211,11 +217,20 @@ function StepPhoneOTP({
 
 // ─── Done Screen ──────────────────────────────────────────────────────────────
 function StepDone({ name }: { name: string }) {
+  const { t } = useTranslation();
   const [pct, setPct] = useState(0);
+
   useEffect(() => {
     const iv = setInterval(() => setPct(p => { if (p >= 100) { clearInterval(iv); return 100; } return p + 5; }), 110);
     return () => clearInterval(iv);
   }, []);
+
+  const checks = [
+    t('clientSignup.done_check_1'),
+    t('clientSignup.done_check_2'),
+    t('clientSignup.done_check_3'),
+  ];
+
   return (
     <Card>
       <Stack align="center" gap={24} py={12}>
@@ -231,17 +246,15 @@ function StepDone({ name }: { name: string }) {
           <IconShieldCheck size={40} color={COLORS.tealBlue} />
         </Box>
         <Stack gap={6} align="center">
-          <Text fw={900} size="xl" c={COLORS.navyBlue}>Welcome, {name.split(' ')[0]}!</Text>
+          <Text fw={900} size="xl" c={COLORS.navyBlue}>
+            {t('clientSignup.done_welcome', { name: name.split(' ')[0] })}
+          </Text>
           <Text size="sm" c="var(--ot-text-sub)" ta="center">
-            Your account is ready. Taking you to your dashboard…
+            {t('clientSignup.done_sub')}
           </Text>
         </Stack>
         <Stack gap={10} w="100%">
-          {[
-            'Identity document verified',
-            'Phone number confirmed',
-            'Profile created from your ID',
-          ].map(label => (
+          {checks.map(label => (
             <Group key={label} gap={8}>
               <Box
                 w={20} h={20}
@@ -268,6 +281,7 @@ function StepDone({ name }: { name: string }) {
 // ─── ClientSignup Orchestrator ────────────────────────────────────────────────
 export function ClientSignup() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [step, setStep]             = useState(1);
   const [idResult, setIdResult]     = useState<IdentityResult | null>(null);
   const [profileName, setProfileName] = useState('');
@@ -289,8 +303,14 @@ export function ClientSignup() {
     setTimeout(() => navigate(ROUTES.clientDashboard, { replace: true }), 2200);
   };
 
+  const stepLabels = [
+    t('clientSignup.step_identity'),
+    t('clientSignup.step_phone_verify'),
+    t('clientSignup.step_complete'),
+  ];
+
   return (
-    <Shell step={done ? 3 : step} labels={['Identity', 'Phone Verify', 'Complete']}>
+    <Shell step={done ? 3 : step} labels={stepLabels}>
       {done ? (
         <StepDone name={profileName} />
       ) : step === 1 ? (

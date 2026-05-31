@@ -5,6 +5,7 @@ import {
 import { IconSend, IconArrowLeft, IconRobot } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 
 const ANIMATIONS = `
@@ -29,11 +30,13 @@ interface Message {
 
 export function AIHelpBot() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       sender: 'bot',
-      text: 'Hello! 👋 Welcome to ONE TOUCH AI Assistant. How can I help you today?',
+      text: t('aiBot.greeting'),
       timestamp: new Date(),
     },
   ]);
@@ -43,7 +46,6 @@ export function AIHelpBot() {
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: 'user',
@@ -51,21 +53,28 @@ export function AIHelpBot() {
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
+    const sentInput = inputValue;
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate bot response
     setTimeout(() => {
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'bot',
-        text: `I understand you're asking about: "${inputValue}". Let me help you with that. Feel free to ask me anything about our services, booking process, payments, or how to register as a provider!`,
+        text: t('aiBot.bot_response', { input: sentInput }),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, botResponse]);
       setIsLoading(false);
     }, 800);
   };
+
+  const FAQ_QUESTIONS = [
+    t('aiBot.faq_register'),
+    t('aiBot.faq_fees'),
+    t('aiBot.faq_booking'),
+    t('aiBot.faq_provider'),
+  ];
 
   return (
     <>
@@ -96,16 +105,16 @@ export function AIHelpBot() {
                   <Group gap="xs" align="center">
                     <IconRobot size={24} stroke={2} />
                     <Text fw={800} size="lg">
-                      ONE TOUCH AI Assistant
+                      {t('aiBot.title')}
                     </Text>
                   </Group>
                   <Text size="xs" c="rgba(255,255,255,0.7)">
-                    Available 24/7
+                    {t('aiBot.available')}
                   </Text>
                 </Stack>
               </Group>
               <Badge size="lg" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>
-                Always Online
+                {t('aiBot.always_online')}
               </Badge>
             </Group>
           </Container>
@@ -209,7 +218,7 @@ export function AIHelpBot() {
             {/* Input Area */}
             <Group gap="sm" wrap="nowrap">
               <TextInput
-                placeholder="Ask me anything..."
+                placeholder={t('aiBot.placeholder')}
                 style={{ flex: 1 }}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.currentTarget.value)}
@@ -251,15 +260,10 @@ export function AIHelpBot() {
           {/* Quick Actions */}
           <Stack gap="md" mt="xl" align="center">
             <Text size="sm" c="dimmed" ta="center">
-              Frequently asked questions
+              {t('aiBot.faq_label')}
             </Text>
             <Group gap="sm" wrap="wrap" justify="center">
-              {[
-                'How do I register?',
-                'What are service fees?',
-                'How does booking work?',
-                'Provider benefits?',
-              ].map((q) => (
+              {FAQ_QUESTIONS.map((q) => (
                 <Paper
                   key={q}
                   p="sm"
