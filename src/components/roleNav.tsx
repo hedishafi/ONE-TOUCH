@@ -1,9 +1,6 @@
 import {
 	IconBuildingStore,
 	IconHistory,
-	IconHeart,
-	IconWallet,
-	IconStar,
 	IconSettings,
 	IconBriefcase,
 	IconTrendingUp,
@@ -16,27 +13,25 @@ import {
 	IconScale,
 	IconReceipt,
 	IconLanguage,
-	IconMessage,
+	IconLayoutDashboard,
+	IconLifebuoy,
 } from '@tabler/icons-react';
 import { ROUTES } from '../utils/constants';
 import type { NavItem } from '../types/nav';
 import type { UserRole } from '../types';
 
 const CLIENT_NAV: NavItem[] = [
-	{ path: ROUTES.clientBrowse, label: 'Explore Services', icon: <IconBuildingStore size={20} /> },
-	{ path: ROUTES.clientHistory, label: 'My Requests', icon: <IconHistory size={20} /> },
-	{ path: ROUTES.clientMessages, label: 'Messages', icon: <IconMessage size={20} /> },
-	{ path: ROUTES.clientWallet, label: 'Payments', icon: <IconWallet size={20} /> },
-	{ path: ROUTES.clientSaved, label: 'Favorites', icon: <IconHeart size={20} /> },
-	{ path: ROUTES.clientSettings, label: 'Settings', icon: <IconSettings size={20} /> },
+	{ path: ROUTES.clientDashboard, label: 'Dashboard',       icon: <IconLayoutDashboard size={20} /> },
+	{ path: ROUTES.clientBrowse,    label: 'Explore Services', icon: <IconBuildingStore size={20} /> },
+	{ path: ROUTES.clientHistory,   label: 'My Requests',     icon: <IconHistory size={20} /> },
+	{ path: ROUTES.clientHelp,      label: 'Help & Support',  icon: <IconLifebuoy size={20} /> },
+	{ path: ROUTES.clientSettings,  label: 'Settings',        icon: <IconSettings size={20} /> },
 ];
 
 const PROVIDER_NAV: NavItem[] = [
-	{ path: ROUTES.providerDashboard, label: 'Jobs', icon: <IconBriefcase size={20} /> },
-	{ path: ROUTES.providerEarnings, label: 'Earnings', icon: <IconTrendingUp size={20} /> },
-	{ path: ROUTES.providerWallet, label: 'Wallet', icon: <IconWallet size={20} /> },
+	{ path: ROUTES.providerDashboard, label: 'Dashboard', icon: <IconLayoutDashboard size={20} /> },
 	{ path: ROUTES.providerProfile, label: 'Profile', icon: <IconUser size={20} /> },
-	{ path: ROUTES.providerLoyalty, label: 'Rewards', icon: <IconStar size={20} /> },
+	{ path: ROUTES.providerEarnings, label: 'Earnings', icon: <IconTrendingUp size={20} /> },
 	{ path: ROUTES.providerSettings, label: 'Settings', icon: <IconSettings size={20} /> },
 ];
 

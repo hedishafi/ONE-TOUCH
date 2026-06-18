@@ -3,9 +3,10 @@
  * Request Service · Chat in app (AI voice assistant with 7 stages)
  */
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput, NavLink,
 } from '@mantine/core';
 import {
   IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet,
@@ -13,15 +14,17 @@ import {
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
-  IconMessage,
+  IconMessage, IconUser, IconLifebuoy,
 } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
+import { useMantineColorScheme } from '@mantine/core';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { RoleSwitcher } from '../components/RoleSwitcher';
 import { OSMClientMap } from '../components/OSMClientMap';
+import { DarkModeToggle } from '../components/DarkModeToggle';
 import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const N = COLORS.navyBlue;
@@ -99,16 +102,19 @@ const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
 const NAV=[
-  {label:'Explore Services', icon:<IconSearch  size={16}/>,r:ROUTES.clientBrowse},
-  {label:'My Requests',      icon:<IconHistory size={16}/>,r:ROUTES.clientHistory},
-  {label:'Messages',         icon:<IconMessage size={16}/>,r:ROUTES.clientMessages},
-  {label:'Payments',         icon:<IconWallet  size={16}/>,r:ROUTES.clientWallet},
-  {label:'Favorites',        icon:<IconHeart   size={16}/>,r:ROUTES.clientSaved},
+  {label:'Dashboard',        icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
+  {label:'Explore Services', icon:<IconSearch   size={16}/>,r:ROUTES.clientBrowse},
+  {label:'My Requests',      icon:<IconHistory  size={16}/>,r:ROUTES.clientHistory},
+  {label:'Messages',         icon:<IconMessage  size={16}/>,r:ROUTES.clientMessages},
   {label:'Settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
+  {label:'Help & Support',   icon:<IconLifebuoy size={16}/>,r:ROUTES.clientHelp},
 ];
 
 export function ClientHome() {
   const nav=useNavigate();
+  const location=useLocation();
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
@@ -285,66 +291,118 @@ export function ClientHome() {
   return (
     <Box style={{minHeight:'100vh',background:'var(--ot-bg-page)'}}>
 
-      {/* Sidebar backdrop */}
-      {sidebar&&<Box onClick={()=>setSidebar(false)}
-        style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:399}}/>}
+      {/* ── Backdrop + Sidebar rendered into document.body via portal ──
+          This escapes ALL stacking contexts in the component tree so
+          z-index values are always respected absolutely.               */}
+      {createPortal(
+        <>
+          {/* Backdrop — zIndex 1000, covers page, below sidebar */}
+          {sidebar && (
+            <div
+              onClick={()=>setSidebar(false)}
+              style={{
+                position:'fixed', inset:0,
+                background:'rgba(0,0,0,0.45)',
+                zIndex:1000,
+                cursor:'pointer',
+              }}
+            />
+          )}
 
-      {/* Sidebar */}
-      <Box style={{position:'fixed',top:0,left:0,bottom:0,width:260,zIndex:400,
-        background:'var(--ot-bg-card)',borderRight:'1px solid var(--ot-border)',
-        transform:sidebar?'translateX(0)':'translateX(-260px)',
-        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
-        display:'flex',flexDirection:'column'}}>
-        <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
-          <Group justify="space-between">
-            <Group gap={8}>
-              <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
+          {/* Sidebar — zIndex 1100, always above backdrop */}
+          <div style={{
+            position:'fixed', top:0, left:0, bottom:0, width:260,
+            zIndex:1100,
+            background:'var(--ot-bg-card)',
+            borderRight:'1px solid var(--ot-border)',
+            display:'flex', flexDirection:'column',
+            transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+            transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+            boxShadow: sidebar ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
+            overflowY:'auto',
+          }}>
+            <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
+              <Group justify="space-between">
+                <Group gap={8}>
+                  <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Text fw={900} size="11px" c="white">OT</Text>
+                  </Box>
+                  <Text fw={800} size="sm" c={N}>OneTouch</Text>
+                </Group>
+                <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
+              </Group>
+            </Box>
+            <Box p="md">
+              <Group gap={10} style={{cursor:'pointer'}} onClick={()=>{setSidebar(false);nav(ROUTES.clientProfile);}}>
+                <Box style={{position:'relative'}}>
+                  <Avatar radius="xl" size={48} color="teal">{clientProfile?.fullName?.charAt(0) ?? 'C'}</Avatar>
+                  <Box style={{position:'absolute',bottom:-1,right:-1,width:14,height:14,borderRadius:'50%',background:COLORS.success,border:'2px solid var(--ot-bg-card)'}}/>
+                </Box>
+                <Box style={{flex:1,minWidth:0}}>
+                  <Text size="sm" fw={700} c={N} style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {clientProfile?.fullName ?? 'Client'}
+                  </Text>
+                  <Text size="xs" c="var(--ot-text-muted)" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {currentUser?.email ?? currentUser?.phone}
+                  </Text>
+                  <Text size="10px" c={T} fw={600} mt={2}>View Profile →</Text>
+                </Box>
+              </Group>
+            </Box>
+            <Divider/>
+            <Stack gap={2} p="sm" style={{flex:1}}>
+              {NAV.map(n=>{
+                const isActive = location.pathname === n.r;
+                return (
+                  <NavLink
+                    key={n.label}
+                    label={n.label}
+                    leftSection={<Box style={{color: isActive ? T : '#ADB5BD'}}>{n.icon}</Box>}
+                    active={isActive}
+                    onClick={()=>{setSidebar(false);nav(n.r);}}
+                    styles={{
+                      root:{
+                        borderRadius:10,
+                        borderLeft:`3px solid ${isActive ? T : 'transparent'}`,
+                        paddingLeft:13,
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize:14,
+                        color: isActive ? N : '#6C757D',
+                        backgroundColor: isActive ? `${T}13` : 'transparent',
+                      },
+                      label:{fontSize:14},
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+            <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+              <RoleSwitcher />
+              <Box p={10}
+                onClick={()=>{logout();nav(ROUTES.landing);}}
+                style={{borderRadius:10,display:'flex',alignItems:'center',
+                  gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
+                <IconLogout size={18}/> Sign out
               </Box>
-              <Text fw={800} size="sm" c={N}>OneTouch</Text>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-        </Box>
-        <Box p="md">
-          <Group gap={10}>
-            <Avatar radius="xl" size="md" color="teal">{clientProfile?.fullName?.charAt(0)?.charAt(0) ?? 'C'}</Avatar>
-            <Box>
-              <Text size="sm" fw={700}>{clientProfile?.fullName??'Client'}</Text>
-              <Text size="xs" c="var(--ot-text-muted)">{currentUser?.phone}</Text>
             </Box>
-          </Group>
-        </Box>
-        <Divider/>
-        <Stack gap={2} p="sm" style={{flex:1}}>
-          {NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
-        </Stack>
-        <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <RoleSwitcher />
-          <Box p={10}
-            onClick={()=>{logout();nav(ROUTES.landing);}}
-            style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
-          </Box>
-        </Box>
-      </Box>
+          </div>
+        </>,
+        document.body
+      )}
 
-      {/* Header */}
-      <Box style={{position:'sticky',top:0,zIndex:200,background:'var(--ot-bg-card)',
-        borderBottom:'1px solid var(--ot-border)'}}>
+      {/* ── Header ── */}
+      <Box style={{
+        position:'sticky', top:0,
+        zIndex:400,  /* same as sidebar so header stays above backdrop */
+        background:'var(--ot-bg-card)',
+        borderBottom:'1px solid var(--ot-border)',
+      }}>
         <Box px={20} py={12} style={{maxWidth:960,margin:'0 auto'}}>
           <Group justify="space-between" wrap="nowrap">
             <Group gap={12}>
-              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(true)}><IconMenu2 size={22}/></ActionIcon>
+              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(v=>!v)}>
+                <IconMenu2 size={22}/>
+              </ActionIcon>
               <Group gap={8}>
                 <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <Text fw={900} size="11px" c="white">OT</Text>
@@ -382,7 +440,8 @@ export function ClientHome() {
                   borderRadius:'50%',background:COLORS.error,display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <Text size="8px" c="white" fw={700}>{unreadCount}</Text></Box>}
               </ActionIcon>
-              <Avatar radius="xl" size="sm" color="teal" style={{cursor:'pointer'}} onClick={()=>setSidebar(true)}>
+              <DarkModeToggle size="sm" />
+              <Avatar radius="xl" size="sm" color="teal" style={{cursor:'pointer'}} onClick={()=>setSidebar(v=>!v)}>
                 {clientProfile?.fullName?.charAt(0)?.charAt(0) ?? 'C'}
               </Avatar>
             </Group>
@@ -553,7 +612,7 @@ export function ClientHome() {
 
       {/* ══ VOICE ASSISTANT MODAL ══════════════════════════════════════════════ */}
       <Modal opened={aOpen} onClose={closeAssist} centered radius="xl" size="sm"
-        withCloseButton={false} styles={{content:{background:'white'},header:{display:'none'}}}>
+        withCloseButton={false} styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
 
         {/* Dialing */}
         {aStage==='dialing'&&(
@@ -773,7 +832,7 @@ export function ClientHome() {
 
       {/* ══ CATEGORY CALL MODAL ════════════════════════════════════════════════ */}
       <Modal opened={cOpen} onClose={closeCall} centered radius="xl" size="sm"
-        withCloseButton={false} styles={{content:{background:'white'},header:{display:'none'}}}>
+        withCloseButton={false} styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
         <Stack gap="md" py={24} px={8}>
 
           {cStage==='dialing'&&(
@@ -1032,26 +1091,6 @@ export function ClientHome() {
 
       <style>{`
         @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:.55}}
-        .ot-prov-dot{
-          width:18px;height:18px;border-radius:50%;
-          background:var(--dc);border:3px solid white;
-          box-shadow:0 2px 8px rgba(0,0,0,.3);
-          animation:prov-blink 2.2s ease-in-out infinite;
-        }
-        .ot-prov-dot::after{
-          content:'';position:absolute;inset:-5px;border-radius:50%;
-          border:2px solid var(--dc);opacity:0;
-          animation:prov-ring 2.2s ease-out infinite;
-        }
-        @keyframes prov-blink{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
-        @keyframes prov-ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
-        .ot-user-dot{
-          width:24px;height:24px;border-radius:50%;
-          background:${N};border:4px solid white;
-          box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4);
-          animation:user-pulse 1.8s ease-in-out infinite;
-        }
-        @keyframes user-pulse{0%,100%{box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4)}50%{box-shadow:0 0 0 8px ${T}33,0 3px 12px rgba(0,0,0,.4)}}
       `}</style>
     </Box>
   );

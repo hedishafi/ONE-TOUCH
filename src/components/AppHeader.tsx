@@ -15,6 +15,7 @@ import { ROUTES, COLORS } from '../utils/constants';
 import { formatCurrency } from '../utils/formatting';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { NotificationCenter } from './NotificationCenter';
+import { DarkModeToggle } from './DarkModeToggle';
 import { useEffect } from 'react';
 
 export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?: () => void; mobileMenuOpened?: boolean }) {
@@ -126,6 +127,9 @@ export function AppHeader({ onBurgerClick, mobileMenuOpened }: { onBurgerClick?:
 
         {/* Language Switcher */}
         <LanguageSwitcher />
+
+        {/* Dark mode toggle */}
+        <DarkModeToggle />
 
         {/* Notifications */}
         <Indicator

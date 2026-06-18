@@ -159,7 +159,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 const FEATURES = [
   { icon: <IconShieldCheck size={24} />, color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Identity Verified', desc: 'Every provider is government-ID checked before being listed on the platform.' },
-  { icon: <IconBolt size={24} />,        color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Instant VoIP Call', desc: 'Connect in seconds with a free in-app call — no phone number sharing needed.' },
+  { icon: <IconBolt size={24} />, color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Instant Connect', desc: 'Choose a service, describe your problem, and connect directly with a service provider.' },
   { icon: <IconMapPin size={24} />,      color: '#000089', bg: 'rgba(0,0,137,0.08)', title: 'Location-Based',   desc: 'See only providers within your chosen radius on a live Addis Ababa map.' },
   { icon: <IconWallet size={24} />,      color: '#008080', bg: 'rgba(0,128,128,0.08)', title: 'Payment Process', desc: 'Payments are processed upfront to confirm the booking. This platform connects clients with service providers and does not hold funds in escrow.' },
 ];
@@ -174,7 +174,6 @@ const STATS = [
 const STEPS = [
   { n: '01', title: 'Browse & Discover', desc: 'Search by category and see verified providers near you on a live Addis Ababa map.', icon: <IconMapPin size={20} /> },
   { n: '02', title: 'Call Free & Agree', desc: 'Free in-app VoIP call. Agree on price with full transparency before any payment.', icon: <IconPhone size={20} /> },
-  { n: '03', title: 'Pay Secure & Review', desc: 'Escrow holds payment and releases it only after you confirm the job is done.', icon: <IconShieldCheck size={20} /> },
 ];
 
 export function Landing() {
@@ -210,7 +209,7 @@ export function Landing() {
   return (
     <>
       <style>{ANIMATIONS}</style>
-      <Box style={{ minHeight:'100vh', background:'#FFFFFF', position:'relative', overflow:'hidden' }}>
+      <Box style={{ minHeight:'100vh', background:'var(--ot-bg-page)', position:'relative', overflow:'hidden' }}>
 
         {/* ── Decorative blobs (light, on white) ── */}
         <Box style={{ position:'absolute',top:-200,right:-180,width:600,height:600,borderRadius:'50%',background:'radial-gradient(circle,rgba(0,0,137,0.05) 0%,transparent 70%)',pointerEvents:'none' }} />
@@ -301,7 +300,7 @@ export function Landing() {
             <Box flex={1} miw={280} maw={440} className="afr float" style={{ position:'relative' }}>
               {/* Main card */}
               <Paper p={28} radius={20} shadow="xl"
-                style={{ background:'white',border:`1px solid rgba(0,0,137,0.08)`,overflow:'hidden',position:'relative' }}>
+                style={{ background:'var(--ot-bg-card)',border:`1px solid rgba(0,0,137,0.08)`,overflow:'hidden',position:'relative' }}>
                 {/* Accent top bar */}
                 <Box style={{ position:'absolute',top:0,left:0,right:0,height:4,background:`linear-gradient(90deg,${COLORS.navyBlue},${COLORS.tealBlue},${COLORS.lemonYellow})` }} />
 
@@ -316,7 +315,7 @@ export function Landing() {
                       { name:'Meron Tesfaye',   service:'Home Cleaning',  rating:4.8, dist:'0.8 km', price:'ETB 700-900 ', color:'#3498DB' },
                       { name:'Tigist Mengesha', service:'Electrical Work', rating:4.7, dist:'2.1 km', price:'ETB 800-2000', color:'#F39C12' },
                   ].map((p,i) => (
-                    <Box key={i} p="sm" style={{ background:'#F8F9FA',borderRadius:12,border:'1px solid #E9ECEF' }}>
+                    <Box key={i} p="sm" style={{ background:'var(--ot-bg-row)',borderRadius:12,border:'1px solid var(--ot-border)' }}>
                       <Group justify="space-between" wrap="nowrap">
                         <Group gap="sm" wrap="nowrap">
                           <Box w={38} h={38} style={{ borderRadius:10,background:`linear-gradient(135deg,${p.color}30,${p.color}60)`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
@@ -356,7 +355,7 @@ export function Landing() {
               </Box>
 
               {/* Floating badge bottom-left */}
-              <Box style={{ position:'absolute',bottom:-16,left:-16,background:'white',borderRadius:14,padding:'10px 16px',boxShadow:'0 8px 24px rgba(0,0,137,0.12)',border:`1px solid rgba(0,0,137,0.08)` }}>
+              <Box style={{ position:'absolute',bottom:-16,left:-16,background:'var(--ot-bg-card)',borderRadius:14,padding:'10px 16px',boxShadow:'0 8px 24px rgba(0,0,137,0.12)',border:`1px solid rgba(0,0,137,0.08)` }}>
                 <Group gap={8}>
                   <Box style={{ width:28,height:28,borderRadius:'50%',background:`${COLORS.tealBlue}20`,display:'flex',alignItems:'center',justifyContent:'center' }}>
                     <IconShieldCheck size={14} color={COLORS.tealBlue} />
@@ -372,7 +371,7 @@ export function Landing() {
         </Container>
 
         {/* ── STATS BAR ── */}
-        <Box style={{ background: '#FBFCFF' }} py="xl">
+        <Box style={{ background: 'var(--ot-bg-page)' }} py="xl">
           <Container size="lg">
             <SimpleGrid cols={{ base:2,sm:4 }}>
               {STATS.map(s => {
@@ -433,7 +432,7 @@ export function Landing() {
           <SimpleGrid cols={{ base:2,xs:4 }} spacing="lg">
             {categories.map((cat,i) => (
               <Box key={cat.id} className="cat-card" p="xl" ta="center"
-                style={{ background:'white',border:'1.5px solid #E9ECEF',borderRadius:20,boxShadow:'0 2px 12px rgba(0,0,137,0.05)',animation:`fadeUp 0.6s ${0.06*i}s ease both` }}
+                style={{ background:'var(--ot-bg-card)',border:'1.5px solid var(--ot-border)',borderRadius:20,boxShadow:'0 2px 12px rgba(0,0,137,0.05)',animation:`fadeUp 0.6s ${0.06*i}s ease both` }}
                 onClick={() => navigate(`/services/${cat.id}`)}>
                 <ThemeIcon size={56} radius="xl" mb="md" mx="auto"
                   style={{ background:`${cat.color}14`,color:cat.color,transition:'transform 0.2s' }}
@@ -458,7 +457,7 @@ export function Landing() {
         </Container>
 
         {/* ── FEATURES ── */}
-        <Box py={80} px={{ base:'md',sm:'xl' }} style={{ background:'#F8F9FA' }}>
+        <Box py={80} px={{ base:'md',sm:'xl' }} style={{ background:'var(--ot-bg-row)' }}>
           <Container size="lg">
             <Stack align="center" mb={52} gap="sm">
               <Badge size="lg" style={{ background:`${COLORS.tealBlue}12`,color:COLORS.tealBlue,border:`1px solid ${COLORS.tealBlue}25`,fontWeight:700 }}>
@@ -472,7 +471,7 @@ export function Landing() {
             <SimpleGrid cols={{ base:1,sm:2 }} spacing="xl">
               {FEATURES.map((f,i) => (
                 <Paper key={i} className="feat-card" p="xl" radius={18} shadow="sm"
-                  style={{ background:'white',border:`1px solid rgba(0,0,137,0.06)`,animation:`fadeUp 0.6s ${0.08*i}s ease both`,overflow:'hidden',position:'relative' }}>
+                  style={{ background:'var(--ot-bg-card)',border:`1px solid rgba(0,0,137,0.06)`,animation:`fadeUp 0.6s ${0.08*i}s ease both`,overflow:'hidden',position:'relative' }}>
                   <Box style={{ position:'absolute',top:0,left:0,width:4,height:'100%',background:`linear-gradient(180deg,${f.color},${f.color}40)`,borderRadius:'4px 0 0 4px' }} />
                   <Box pl={8}>
                     <ThemeIcon size={50} radius="xl" mb="md" style={{ background:f.bg,color:f.color }}>
@@ -488,23 +487,20 @@ export function Landing() {
         </Box>
 
         {/* ── HOW IT WORKS ── */}
-        <Box style={{ background: '#ffffff', position: 'relative' }}>
+        <Box style={{ background: 'var(--ot-bg-page)', position: 'relative' }}>
         <Container size="lg" py={80} px={{ base:'md',sm:'xl' }}>
           <Stack align="center" mb={60} gap="sm">
             <Badge size="lg" style={{ background:`${COLORS.lemonYellow}30`,color:'#7A6B00',border:`1px solid ${COLORS.lemonYellow}`,fontWeight:700 }}>
               How It Works
             </Badge>
             <Text fw={900} size="3xl" ta="center" c={COLORS.navyBlue} style={{ letterSpacing:'-0.5px' }}>
-              3 steps to get help
+              2 steps to get help
             </Text>
             <Box style={{ width:64,height:4,borderRadius:2,background:`linear-gradient(90deg,${COLORS.lemonYellow},${COLORS.tealBlue})` }} />
           </Stack>
-          <SimpleGrid cols={{ base:1,sm:3 }} spacing={48}>
+          <SimpleGrid cols={{ base:1,sm:2 }} spacing={48} style={{ maxWidth: 720, margin: '0 auto' }}>
             {STEPS.map((item,i) => (
               <Stack key={item.n} align="center" ta="center" gap="lg" style={{ position:'relative',animation:`fadeUp 0.6s ${0.1*i}s ease both` }}>
-                {i < STEPS.length-1 && (
-                  <Box style={{ display:'none' }} />
-                )}
                 <Box className="step-circle" w={70} h={70}
                   style={{ borderRadius:'50%',background:`linear-gradient(135deg,${COLORS.navyBlue} 0%,${COLORS.tealBlue} 100%)`,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 8px 24px rgba(0,0,137,0.2)`,position:'relative' }}>
                   <Text fw={900} size="xl" c="white">{item.n}</Text>
@@ -527,7 +523,7 @@ export function Landing() {
           py={{ base: 72, sm: 96 }}
           px={{ base: 'md', sm: 'xl' }}
           style={{
-            background: '#ffffff',
+            background: 'var(--ot-bg-page)',
             position: 'relative',
             overflow: 'hidden',
             borderTop: 'none',
@@ -591,7 +587,7 @@ export function Landing() {
                 radius={20}
                 className="feat-card"
                 style={{
-                  background: 'white',
+                  background: 'var(--ot-bg-card)',
                   border: '1.5px solid rgba(0,0,0,0.06)',
                   boxShadow: '0 8px 40px rgba(0,0,128,0.08)',
                 }}
@@ -676,7 +672,7 @@ export function Landing() {
                 radius={20}
                 className="feat-card"
                 style={{
-                  background: 'white',
+                  background: 'var(--ot-bg-card)',
                   border: '1.5px solid rgba(0,0,0,0.06)',
                   boxShadow: '0 8px 40px rgba(0,0,128,0.08)',
                 }}
@@ -757,10 +753,10 @@ export function Landing() {
         </Box>
 
         {/* ── FOOTER ── */}
-        <Box style={{ background:'linear-gradient(180deg, #E8F6FB 0%, #D6EEF8 100%)', position:'relative', overflow:'hidden' }}>
+        <Box style={{ background:'var(--ot-bg-card)', position:'relative', overflow:'hidden' }}>
 
           {/* Seamless blend from content above */}
-          <Box style={{ position:'absolute', top:0, left:0, right:0, height:40, background:'linear-gradient(180deg, #ffffff 0%, transparent 100%)', pointerEvents:'none', zIndex:0 }} />
+          <Box style={{ position:'absolute', top:0, left:0, right:0, height:40, background:'linear-gradient(180deg, var(--ot-bg-page) 0%, transparent 100%)', pointerEvents:'none', zIndex:0 }} />
 
           {/* Subtle teal glow blobs */}
           <Box style={{ position:'absolute', top:0, left:-80, width:320, height:320, borderRadius:'50%', background:`radial-gradient(circle, rgba(6,182,212,0.10) 0%, transparent 70%)`, pointerEvents:'none' }} />
