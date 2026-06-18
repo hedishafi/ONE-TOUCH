@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 from datetime import timedelta
 
 from django.conf import settings
@@ -6,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.middleware.csrf import get_token
 from django.db import transaction
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiRequest, OpenApiResponse, OpenApiParameter, extend_schema, inline_serializer
 from rest_framework import permissions, serializers as rest_framework_serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -177,7 +178,13 @@ def _otp_response(code: str) -> dict:
     return payload
 
 
-def _error_response(detail: str, *, http_status: int = status.HTTP_400_BAD_REQUEST, errors=None, extra: dict | None = None) -> Response:
+def _error_response(
+    detail: str,
+    *,
+    http_status: int = status.HTTP_400_BAD_REQUEST,
+    errors=None,
+    extra: Optional[dict] = None,
+) -> Response:
     payload = {
         'error': detail,
         'detail': detail,
@@ -592,6 +599,160 @@ class UserProfileView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+class RoleSwitchView(APIView):
+    """
+    API endpoint for switching between client and provider roles.
+    
+    Validates:
+    - User has access to target role
+    - Provider onboarding is complete (for provider switch)
+    
+    Returns appropriate redirect URLs and error messages.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['Auth'],
+        request=inline_serializer(
+            'RoleSwitchRequest',
+            {
+                'role': rest_framework_serializers.ChoiceField(choices=['client', 'provider']),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                'RoleSwitchSuccess',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'role': rest_framework_serializers.CharField(),
+                    'redirect': rest_framework_serializers.CharField(),
+                },
+            ),
+            400: inline_serializer(
+                'RoleSwitchOnboardingRequired',
+                {
+                    'error': rest_framework_serializers.CharField(),
+                    'onboarding_required': rest_framework_serializers.BooleanField(),
+                    'onboarding_status': rest_framework_serializers.DictField(),
+                    'redirect': rest_framework_serializers.CharField(),
+                },
+            ),
+            403: OpenApiResponse(description='User does not have access to target role.'),
+        },
+        summary='Switch between client and provider roles',
+        description='Allows users with multiple roles to switch between client and provider modes. '
+                    'Validates onboarding completion for provider access.',
+    )
+    def post(self, request):
+        target_role = request.data.get('role')
+        
+        # Validate role
+        if target_role not in [User.ROLE_CLIENT, User.ROLE_PROVIDER]:
+            return Response(
+                {'error': 'Invalid role. Must be "client" or "provider".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if already in target role
+        if request.user.role == target_role:
+            return Response(
+                {
+                    'message': f'Already in {target_role} role.',
+                    'role': target_role,
+                    'redirect': f'/{target_role}/dashboard'
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        # ===== SWITCH TO CLIENT =====
+        if target_role == User.ROLE_CLIENT:
+            if not request.user.has_client_role:
+                return Response(
+                    {'error': 'You do not have access to client role.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Allow immediate switch to client (no onboarding checks)
+            request.user.role = User.ROLE_CLIENT
+            request.user.save(update_fields=['role'])
+            
+            return Response({
+                'message': 'Switched to client role successfully.',
+                'role': User.ROLE_CLIENT,
+                'redirect': '/client/dashboard'
+            }, status=status.HTTP_200_OK)
+        
+        # ===== SWITCH TO PROVIDER =====
+        elif target_role == User.ROLE_PROVIDER:
+            if not request.user.has_provider_role:
+                return Response(
+                    {'error': 'You do not have access to provider role.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get provider profile and verification status
+            try:
+                provider_profile = ProviderProfile.objects.get(user=request.user)
+                profile_completed = provider_profile.profile_completed
+            except ProviderProfile.DoesNotExist:
+                profile_completed = False
+            
+            verification_status = request.user.verification_status
+            
+            # Check if verification was submitted (pending or approved)
+            has_submitted_verification = ProviderManualVerification.objects.filter(
+                provider=request.user
+            ).exists()
+            
+            # Allow switch if:
+            # 1. Onboarding is fully completed (approved), OR
+            # 2. Profile is complete AND verification is pending/under review, OR
+            # 3. Profile is complete AND verification was submitted (any status except rejected)
+            can_switch = (
+                request.user.provider_onboarding_completed or
+                (profile_completed and verification_status == User.STATUS_PENDING) or
+                (profile_completed and has_submitted_verification and verification_status != User.STATUS_REJECTED)
+            )
+            
+            if not can_switch:
+                # Only redirect to onboarding if:
+                # 1. Profile not completed, OR
+                # 2. Verification was rejected
+                
+                if not profile_completed:
+                    next_step = 'profile-setup'
+                    redirect_url = '/provider/profile-setup'
+                elif verification_status == User.STATUS_REJECTED:
+                    # Rejected - need to re-submit verification
+                    next_step = 'identity-verification'
+                    redirect_url = '/provider/onboarding/step1'
+                else:
+                    # No verification submitted yet
+                    next_step = 'identity-verification'
+                    redirect_url = '/provider/onboarding/step1'
+                
+                return Response({
+                    'error': 'Provider onboarding not completed.',
+                    'onboarding_required': True,
+                    'onboarding_status': {
+                        'profile_completed': profile_completed,
+                        'verification_status': verification_status,
+                        'next_step': next_step
+                    },
+                    'redirect': redirect_url
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Switch to provider role
+            request.user.role = User.ROLE_PROVIDER
+            request.user.save(update_fields=['role'])
+            
+            return Response({
+                'message': 'Switched to provider role successfully.',
+                'role': User.ROLE_PROVIDER,
+                'redirect': '/provider/dashboard'
+            }, status=status.HTTP_200_OK)
+
+
 class ProviderManualVerificationUploadView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsProvider]
     parser_classes = [MultiPartParser, FormParser]
@@ -649,8 +810,6 @@ class ProviderProfileSetupView(APIView):
                     'full_name': rest_framework_serializers.CharField(),
                     'service_category': rest_framework_serializers.CharField(),
                     'sub_services': rest_framework_serializers.ListField(child=rest_framework_serializers.CharField()),
-                    'price_min': rest_framework_serializers.IntegerField(),
-                    'price_max': rest_framework_serializers.IntegerField(),
                     'bio': rest_framework_serializers.CharField(allow_blank=True),
                     'profile_picture': rest_framework_serializers.CharField(allow_blank=True, required=False),
                     'profile_completed': rest_framework_serializers.BooleanField(),
@@ -680,8 +839,6 @@ class ProviderProfileSetupView(APIView):
 
         provider_profile, _ = ProviderProfile.objects.get_or_create(user=request.user)
         provider_profile.bio = vd.get('bio', '')
-        provider_profile.price_min = vd['price_min']
-        provider_profile.price_max = vd['price_max']
         if vd.get('profile_picture') is not None:
             provider_profile.profile_picture = vd['profile_picture']
         provider_profile.profile_completed = True
@@ -707,8 +864,6 @@ class ProviderProfileSetupView(APIView):
                 'full_name': full_name,
                 'service_category': service_category.name,
                 'sub_services': [item.name for item in sub_service_objects],
-                'price_min': vd['price_min'],
-                'price_max': vd['price_max'],
                 'bio': provider_profile.bio,
                 'profile_picture': profile_picture_url,
                 'profile_completed': provider_profile.profile_completed,
@@ -802,3 +957,360 @@ class SubServiceListView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PROVIDER ONLINE/OFFLINE STATUS & LOCATION TRACKING
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ProviderGoOnlineView(APIView):
+    """
+    Provider goes online and starts accepting jobs.
+    Captures initial location when going online.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        request=inline_serializer(
+            'ProviderGoOnlineRequest',
+            {
+                'latitude': rest_framework_serializers.FloatField(),
+                'longitude': rest_framework_serializers.FloatField(),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                'ProviderGoOnlineResponse',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'is_online': rest_framework_serializers.BooleanField(),
+                    'latitude': rest_framework_serializers.FloatField(),
+                    'longitude': rest_framework_serializers.FloatField(),
+                    'last_location_update': rest_framework_serializers.DateTimeField(),
+                },
+            ),
+            400: OpenApiResponse(description='Invalid location data or profile not completed.'),
+        },
+        summary='Provider goes online',
+        description='Sets provider status to online and captures their current location.',
+    )
+    def post(self, request):
+        try:
+            provider_profile = request.user.provider_profile
+        except ProviderProfile.DoesNotExist:
+            return _error_response('Provider profile not found. Please complete your profile first.')
+
+        if not provider_profile.profile_completed:
+            return _error_response('Please complete your profile before going online.')
+
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+
+        if latitude is None or longitude is None:
+            return _error_response('Location (latitude and longitude) is required.')
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (ValueError, TypeError):
+            return _error_response('Invalid latitude or longitude format.')
+
+        # Validate coordinates are within reasonable bounds
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            return _error_response('Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.')
+
+        provider_profile.is_online = True
+        provider_profile.current_latitude = latitude
+        provider_profile.current_longitude = longitude
+        provider_profile.last_location_update = timezone.now()
+        provider_profile.save(update_fields=['is_online', 'current_latitude', 'current_longitude', 'last_location_update'])
+
+        return Response({
+            'message': 'You are now online and accepting jobs.',
+            'is_online': True,
+            'latitude': latitude,
+            'longitude': longitude,
+            'last_location_update': provider_profile.last_location_update,
+        }, status=status.HTTP_200_OK)
+
+
+class ProviderGoOfflineView(APIView):
+    """
+    Provider goes offline and stops accepting jobs.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        responses={
+            200: inline_serializer(
+                'ProviderGoOfflineResponse',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'is_online': rest_framework_serializers.BooleanField(),
+                },
+            ),
+        },
+        summary='Provider goes offline',
+        description='Sets provider status to offline. Location tracking stops.',
+    )
+    def post(self, request):
+        try:
+            provider_profile = request.user.provider_profile
+        except ProviderProfile.DoesNotExist:
+            return _error_response('Provider profile not found.')
+
+        provider_profile.is_online = False
+        provider_profile.save(update_fields=['is_online'])
+
+        return Response({
+            'message': 'You are now offline.',
+            'is_online': False,
+        }, status=status.HTTP_200_OK)
+
+
+class ProviderUpdateLocationView(APIView):
+    """
+    Update provider's current location while online.
+    Should be called periodically (every 30-60 seconds) while provider is online.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        request=inline_serializer(
+            'ProviderUpdateLocationRequest',
+            {
+                'latitude': rest_framework_serializers.FloatField(),
+                'longitude': rest_framework_serializers.FloatField(),
+            },
+        ),
+        responses={
+            200: inline_serializer(
+                'ProviderUpdateLocationResponse',
+                {
+                    'message': rest_framework_serializers.CharField(),
+                    'latitude': rest_framework_serializers.FloatField(),
+                    'longitude': rest_framework_serializers.FloatField(),
+                    'last_location_update': rest_framework_serializers.DateTimeField(),
+                },
+            ),
+            400: OpenApiResponse(description='Invalid location data or provider is offline.'),
+        },
+        summary='Update provider location',
+        description='Updates provider location while online. Call this every 30-60 seconds.',
+    )
+    def post(self, request):
+        try:
+            provider_profile = request.user.provider_profile
+        except ProviderProfile.DoesNotExist:
+            return _error_response('Provider profile not found.')
+
+        if not provider_profile.is_online:
+            return _error_response('You must be online to update location.', http_status=status.HTTP_400_BAD_REQUEST)
+
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+
+        if latitude is None or longitude is None:
+            return _error_response('Location (latitude and longitude) is required.')
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (ValueError, TypeError):
+            return _error_response('Invalid latitude or longitude format.')
+
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            return _error_response('Invalid coordinates.')
+
+        provider_profile.current_latitude = latitude
+        provider_profile.current_longitude = longitude
+        provider_profile.last_location_update = timezone.now()
+        provider_profile.save(update_fields=['current_latitude', 'current_longitude', 'last_location_update'])
+
+        return Response({
+            'message': 'Location updated successfully.',
+            'latitude': latitude,
+            'longitude': longitude,
+            'last_location_update': provider_profile.last_location_update,
+        }, status=status.HTTP_200_OK)
+
+
+class ProviderStatusView(APIView):
+    """
+    Get provider's current online/offline status and location.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+    @extend_schema(
+        tags=['Provider'],
+        responses={
+            200: inline_serializer(
+                'ProviderStatusResponse',
+                {
+                    'is_online': rest_framework_serializers.BooleanField(),
+                    'latitude': rest_framework_serializers.FloatField(allow_null=True),
+                    'longitude': rest_framework_serializers.FloatField(allow_null=True),
+                    'last_location_update': rest_framework_serializers.DateTimeField(allow_null=True),
+                },
+            ),
+        },
+        summary='Get provider status',
+        description='Returns provider online/offline status and current location.',
+    )
+    def get(self, request):
+        try:
+            provider_profile = request.user.provider_profile
+        except ProviderProfile.DoesNotExist:
+            return _error_response('Provider profile not found.', http_status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'is_online': provider_profile.is_online,
+            'latitude': provider_profile.current_latitude,
+            'longitude': provider_profile.current_longitude,
+            'last_location_update': provider_profile.last_location_update,
+        }, status=status.HTTP_200_OK)
+
+
+class SearchNearbyProvidersView(APIView):
+    """
+    Search for online providers near a location.
+    Used by clients to find available providers.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        tags=['Client'],
+        parameters=[
+            OpenApiParameter(name='latitude', type=float, required=True, description='Client latitude'),
+            OpenApiParameter(name='longitude', type=float, required=True, description='Client longitude'),
+            OpenApiParameter(name='service_category_id', type=int, required=False, description='Filter by service category'),
+            OpenApiParameter(name='radius_km', type=float, required=False, description='Search radius in kilometers (default: 10)'),
+        ],
+        responses={
+            200: inline_serializer(
+                'SearchNearbyProvidersResponse',
+                {
+                    'results': rest_framework_serializers.ListField(
+                        child=inline_serializer(
+                            'NearbyProviderItem',
+                            {
+                                'provider_id': rest_framework_serializers.IntegerField(),
+                                'provider_uid': rest_framework_serializers.CharField(),
+                                'full_name': rest_framework_serializers.CharField(),
+                                'phone_number': rest_framework_serializers.CharField(),
+                                'latitude': rest_framework_serializers.FloatField(),
+                                'longitude': rest_framework_serializers.FloatField(),
+                                'distance_km': rest_framework_serializers.FloatField(),
+                                'avg_rating': rest_framework_serializers.FloatField(),
+                                'total_jobs': rest_framework_serializers.IntegerField(),
+                                'profile_picture': rest_framework_serializers.CharField(allow_null=True),
+                                'primary_service': rest_framework_serializers.CharField(allow_null=True),
+                            },
+                        )
+                    ),
+                    'count': rest_framework_serializers.IntegerField(),
+                },
+            ),
+            400: OpenApiResponse(description='Invalid location data.'),
+        },
+        summary='Search nearby online providers',
+        description='Find online providers near a location, optionally filtered by service category.',
+    )
+    def get(self, request):
+        from math import radians, cos, sin, asin, sqrt
+        
+        latitude = request.query_params.get('latitude')
+        longitude = request.query_params.get('longitude')
+        service_category_id = request.query_params.get('service_category_id')
+        radius_km = request.query_params.get('radius_km', 10)
+
+        if latitude is None or longitude is None:
+            return _error_response('Location (latitude and longitude) is required.')
+
+        try:
+            client_lat = float(latitude)
+            client_lon = float(longitude)
+            radius_km = float(radius_km)
+        except (ValueError, TypeError):
+            return _error_response('Invalid latitude, longitude, or radius format.')
+
+        if not (-90 <= client_lat <= 90) or not (-180 <= client_lon <= 180):
+            return _error_response('Invalid coordinates.')
+
+        # Get all online providers with location
+        providers = ProviderProfile.objects.filter(
+            is_online=True,
+            current_latitude__isnull=False,
+            current_longitude__isnull=False,
+            profile_completed=True,
+        ).select_related('user').prefetch_related('service_offering__primary_service')
+
+        # Filter by service category if provided
+        if service_category_id:
+            from services.models import ProviderService
+            provider_ids = ProviderService.objects.filter(
+                primary_service_id=service_category_id
+            ).values_list('provider_id', flat=True)
+            providers = providers.filter(id__in=provider_ids)
+
+        # Calculate distance for each provider using Haversine formula
+        def haversine(lat1, lon1, lat2, lon2):
+            """Calculate distance between two points in kilometers"""
+            R = 6371  # Earth radius in kilometers
+            lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+            c = 2 * asin(sqrt(a))
+            return R * c
+
+        results = []
+        for provider in providers:
+            distance = haversine(
+                client_lat, client_lon,
+                provider.current_latitude, provider.current_longitude
+            )
+            
+            # Only include providers within radius
+            if distance <= radius_km:
+                # Get primary service name
+                primary_service_name = None
+                try:
+                    if hasattr(provider, 'service_offering') and provider.service_offering.primary_service:
+                        primary_service_name = provider.service_offering.primary_service.name
+                except Exception:
+                    pass
+
+                # Get profile picture URL
+                profile_picture_url = None
+                if provider.profile_picture:
+                    try:
+                        profile_picture_url = request.build_absolute_uri(provider.profile_picture.url)
+                    except Exception:
+                        profile_picture_url = provider.profile_picture.url if provider.profile_picture else None
+
+                results.append({
+                    'provider_id': provider.user.id,
+                    'provider_uid': provider.user.provider_uid,
+                    'full_name': f'{provider.user.first_name} {provider.user.last_name}'.strip() or provider.user.username,
+                    'phone_number': provider.user.phone_number,
+                    'latitude': provider.current_latitude,
+                    'longitude': provider.current_longitude,
+                    'distance_km': round(distance, 2),
+                    'avg_rating': provider.avg_rating,
+                    'total_jobs': provider.total_jobs,
+                    'profile_picture': profile_picture_url,
+                    'primary_service': primary_service_name,
+                })
+
+        # Sort by distance (closest first)
+        results.sort(key=lambda x: x['distance_km'])
+
+        return Response({
+            'results': results,
+            'count': len(results),
+        }, status=status.HTTP_200_OK)

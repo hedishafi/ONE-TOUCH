@@ -5,12 +5,20 @@ from .views import (
     LoginVerifyView,
     LogoutView,
     UserProfileView,
+    RoleSwitchView,
     SignupRequestOTPView,
     SignupVerifyView,
     TokenRefreshView,
     ProviderProfileSetupView,
     ProviderManualVerificationUploadView,
     ProviderOnboardingStatusView,
+    ServiceCategoryListView,
+    SubServiceListView,
+    ProviderGoOnlineView,
+    ProviderGoOfflineView,
+    ProviderUpdateLocationView,
+    ProviderStatusView,
+    SearchNearbyProvidersView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -29,9 +37,23 @@ urlpatterns = [
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/logout/',        LogoutView.as_view(),        name='logout'),
     path('auth/profile/',       UserProfileView.as_view(),   name='auth-profile'),
+    path('auth/role/switch/',   RoleSwitchView.as_view(),    name='role-switch'),
 
     # ── Provider Identity Verification (manual admin review) ──────────────────
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
     path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
+    
+    # ── Provider Service Catalog ───────────────────────────────────────────────
+    path('provider/service-categories/', ServiceCategoryListView.as_view(), name='service-category-list'),
+    path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='sub-service-list'),
+    
+    # ── Provider Online/Offline Status & Location ──────────────────────────────
+    path('provider/go-online/', ProviderGoOnlineView.as_view(), name='provider-go-online'),
+    path('provider/go-offline/', ProviderGoOfflineView.as_view(), name='provider-go-offline'),
+    path('provider/update-location/', ProviderUpdateLocationView.as_view(), name='provider-update-location'),
+    path('provider/status/', ProviderStatusView.as_view(), name='provider-status'),
+    
+    # ── Client Search Providers ────────────────────────────────────────────────
+    path('client/search-providers/', SearchNearbyProvidersView.as_view(), name='search-nearby-providers'),
 ]

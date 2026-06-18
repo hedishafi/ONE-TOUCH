@@ -78,15 +78,19 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
+    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'created_at')
     list_filter = ('is_available',)
     search_fields = ('user__username', 'user__phone_number', 'user__first_name', 'user__last_name', 'user__provider_uid', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Ensure only providers appear in the user dropdown"""
+        """
+        Show all users with provider capability in dropdown,
+        regardless of their current active role.
+        """
         if db_field.name == 'user':
-            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+            # Use has_provider_role to show all users with provider capability
+            kwargs['queryset'] = User.objects.filter(has_provider_role=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def provider_name_display(self, obj):
@@ -102,11 +106,6 @@ class ProviderProfileAdmin(admin.ModelAdmin):
         return obj.user.provider_uid or '—'
     provider_uid_display.short_description = 'Provider UID'
 
-    def commission_amount_display(self, obj):
-        val = obj.commission_amount
-        return f'{val} ETB' if val is not None else '—'
-    commission_amount_display.short_description = '2% Commission'
-
 
 @admin.register(PhoneOTP)
 class PhoneOTPAdmin(admin.ModelAdmin):
@@ -119,7 +118,7 @@ class PhoneOTPAdmin(admin.ModelAdmin):
 @admin.register(ProviderManualVerification)
 class ProviderManualVerificationAdmin(admin.ModelAdmin):
     change_list_template = 'admin/accounts/providermanualverification/change_list.html'
-    list_display = ('provider_identity', 'provider_uid_display', 'status', 'submitted_at', 'reviewed_at')
+    list_display = ('provider_identity', 'provider_uid_display', 'current_role_display', 'status', 'submitted_at', 'reviewed_at')
     list_filter = ('status', 'submitted_at')
     search_fields = ('provider__phone_number', 'provider__provider_uid', 'provider__first_name', 'provider__last_name', 'provider__email')
     readonly_fields = ('reviewed_at', 'submitted_at', 'updated_at', 'id_front_preview', 'id_back_preview', 'selfie_preview')
@@ -139,15 +138,50 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
     )
     actions = ['approve_selected', 'reject_selected']
 
+    def get_queryset(self, request):
+        """
+        Show verifications for all users who have provider role capability,
+        regardless of their current active role (client or provider).
+        This ensures admin can always access provider records even when user switches roles.
+        """
+        qs = super().get_queryset(request)
+        # Use has_provider_role instead of role to maintain visibility during role switching
+        return qs.filter(provider__has_provider_role=True)
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        Show all users with provider capability in dropdown,
+        regardless of their current active role.
+        """
         if db_field.name == 'provider':
-            kwargs['queryset'] = User.objects.filter(role=User.ROLE_PROVIDER)
+            # Use has_provider_role to show all users with provider capability
+            kwargs['queryset'] = User.objects.filter(has_provider_role=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
         if obj.status in {ProviderManualVerification.STATUS_APPROVED, ProviderManualVerification.STATUS_REJECTED}:
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
+            
+            # If approving, check if onboarding should be marked complete
+            if obj.status == ProviderManualVerification.STATUS_APPROVED:
+                provider = obj.provider
+                provider.verification_status = User.STATUS_VERIFIED
+                
+                # Check if profile is also completed to mark onboarding as complete
+                try:
+                    provider_profile = ProviderProfile.objects.get(user=provider)
+                    if provider_profile.profile_completed:
+                        provider.provider_onboarding_completed = True
+                except ProviderProfile.DoesNotExist:
+                    pass
+                
+                provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
+            elif obj.status == ProviderManualVerification.STATUS_REJECTED:
+                provider = obj.provider
+                provider.verification_status = User.STATUS_REJECTED
+                provider.save(update_fields=['verification_status'])
+        
         super().save_model(request, obj, form, change)
 
     def get_urls(self):
@@ -262,6 +296,15 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             verification.status = ProviderManualVerification.STATUS_APPROVED
             verification.rejection_reason = ''
             provider.verification_status = User.STATUS_VERIFIED
+            
+            # Check if profile is also completed to mark onboarding as complete
+            try:
+                provider_profile = ProviderProfile.objects.get(user=provider)
+                if provider_profile.profile_completed:
+                    provider.provider_onboarding_completed = True
+            except ProviderProfile.DoesNotExist:
+                pass
+            
             message = f'Approved verification for {provider.phone_number}.'
         else:
             if not rejection_reason:
@@ -273,7 +316,7 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
             message = f'Rejected verification for {provider.phone_number}.'
 
         verification.save(update_fields=['status', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'updated_at'])
-        provider.save(update_fields=['verification_status'])
+        provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
         self._notify_provider(verification, approved=(action == 'approve'))
         messages.success(request, message)
         return redirect(next_url)
@@ -401,6 +444,20 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
         return obj.provider.provider_uid or '—'
     provider_uid_display.short_description = 'UID'
 
+    def current_role_display(self, obj):
+        """
+        Display the user's current active role.
+        Shows a badge to indicate if provider has switched to client role.
+        """
+        role = obj.provider.role
+        if role == User.ROLE_PROVIDER:
+            return format_html('<span style="color: #0066cc; font-weight: 600;">Provider</span>')
+        elif role == User.ROLE_CLIENT:
+            return format_html('<span style="color: #ff9800; font-weight: 600;">Client</span> <span style="color: #999; font-size: 11px;">(switched)</span>')
+        else:
+            return role.title()
+    current_role_display.short_description = 'Active Role'
+
     def id_front_preview(self, obj):
         if obj.id_front_image:
             return format_html('<img src="{}" style="max-height:160px;" />', obj.id_front_image.url)
@@ -453,7 +510,16 @@ class ProviderManualVerificationAdmin(admin.ModelAdmin):
 
             provider = verification.provider
             provider.verification_status = User.STATUS_VERIFIED
-            provider.save(update_fields=['verification_status'])
+            
+            # Check if profile is also completed to mark onboarding as complete
+            try:
+                provider_profile = ProviderProfile.objects.get(user=provider)
+                if provider_profile.profile_completed:
+                    provider.provider_onboarding_completed = True
+            except ProviderProfile.DoesNotExist:
+                pass
+            
+            provider.save(update_fields=['verification_status', 'provider_onboarding_completed'])
 
             self._notify_provider(verification, approved=True)
 
@@ -488,16 +554,16 @@ class DeletedProviderRecordAdmin(admin.ModelAdmin):
     ordering = ('-deleted_at',)
 
 
-@admin.register(UserRegistrationNotification)
+# UserRegistrationNotification Admin - registered for API but hidden from sidebar
 class UserRegistrationNotificationAdmin(admin.ModelAdmin):
-    list_display = ('user_name_display', 'phone_number', 'role_display', 'provider_uid_display', 'registration_time', 'reviewed_status')
-    list_filter = ('role', 'reviewed', 'registration_time')
-    search_fields = ('user_name', 'phone_number', 'provider_uid', 'user__first_name', 'user__last_name')
-    readonly_fields = ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
-    ordering = ('-registration_time',)
-    actions = ['mark_as_reviewed']
-
+    """
+    This admin provides API endpoints for the notification bell
+    but is hidden from the admin sidebar.
+    """
+    
     def get_urls(self):
+        """Provide API endpoint for notification count"""
+        from django.urls import path
         urls = super().get_urls()
         custom_urls = [
             path(
@@ -521,69 +587,23 @@ class UserRegistrationNotificationAdmin(admin.ModelAdmin):
             'notifications': [
                 {
                     'id': notif.id,
-                    'user_name': notif.user_name,
+                    'user_id': notif.user.id,
+                    'user_name': notif.user_name or notif.user.get_full_name() or notif.phone_number,
                     'phone_number': notif.phone_number,
                     'role': notif.role,
-                    'provider_uid': notif.provider_uid,
-                    'time_ago': timesince(notif.registration_time) + ' ago',
+                    'provider_uid': notif.provider_uid if notif.role == 'provider' else '',
+                    'time_ago': timesince(notif.registration_time),
                 }
                 for notif in notifications
             ]
         }
         
         return JsonResponse(data)
+    
+    def has_module_permission(self, request):
+        """Hide from admin sidebar"""
+        return False
 
-    fieldsets = (
-        ('User Information', {
-            'fields': ('user', 'user_name', 'phone_number', 'role', 'provider_uid', 'registration_time')
-        }),
-        ('Review Status', {
-            'fields': ('reviewed', 'reviewed_at', 'reviewed_by', 'notes')
-        }),
-    )
 
-    def user_name_display(self, obj):
-        """Display user's name or phone number"""
-        return obj.user_name or obj.phone_number
-    user_name_display.short_description = 'User Name'
-
-    def role_display(self, obj):
-        """Display role in a user-friendly format"""
-        role_map = {
-            'client': 'Client',
-            'provider': 'Provider',
-            'admin': 'Admin',
-        }
-        return role_map.get(obj.role, obj.role)
-    role_display.short_description = 'Role'
-
-    def provider_uid_display(self, obj):
-        """Display provider UID or N/A for clients"""
-        if obj.role == 'provider' and obj.provider_uid:
-            return obj.provider_uid
-        return '—'
-    provider_uid_display.short_description = 'Provider UID'
-
-    def reviewed_status(self, obj):
-        """Display reviewed status with icon"""
-        if obj.reviewed:
-            return format_html('<span style="color: green;">✓ Reviewed</span>')
-        return format_html('<span style="color: orange;">⏳ Pending</span>')
-    reviewed_status.short_description = 'Status'
-
-    def save_model(self, request, obj, form, change):
-        """Auto-set reviewed_by and reviewed_at when marking as reviewed"""
-        if obj.reviewed and not obj.reviewed_at:
-            obj.reviewed_at = timezone.now()
-            obj.reviewed_by = request.user
-        super().save_model(request, obj, form, change)
-
-    def mark_as_reviewed(self, request, queryset):
-        """Bulk action to mark notifications as reviewed"""
-        updated = queryset.update(
-            reviewed=True,
-            reviewed_at=timezone.now(),
-            reviewed_by=request.user
-        )
-        self.message_user(request, f'{updated} notification(s) marked as reviewed.')
-    mark_as_reviewed.short_description = 'Mark selected as reviewed'
+# Register the admin to enable URL routing
+admin.site.register(UserRegistrationNotification, UserRegistrationNotificationAdmin)

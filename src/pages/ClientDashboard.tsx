@@ -8,7 +8,7 @@ import {
 import {
   IconSearch, IconMapPin, IconFilter, IconList, IconMap,
   IconHeart, IconArrowUp, IconArrowDown, IconGift, IconTrophy,
-  IconCreditCard, IconCircleFilled,
+  IconCreditCard, IconCircleFilled, IconHistory,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

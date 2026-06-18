@@ -49,6 +49,7 @@ interface AuthState {
   signup: (data: { email: string; password: string; phone: string; role: User['role'] }) => { success: boolean; userId?: string; error?: string };
   setUserRole: (role: 'client' | 'provider') => void;
   updateProviderOnlineStatus: (isOnline: boolean) => void;
+  refreshCurrentUser: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -224,5 +225,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set(state => ({
       providerProfile: state.providerProfile ? { ...state.providerProfile, isOnline } : null,
     }));
+  },
+
+  refreshCurrentUser: () => {
+    const user = storage.get<User | null>(STORAGE_KEYS.currentUser, null);
+    const clientProfiles = storage.get<ClientProfile[]>(STORAGE_KEYS.clientProfiles, []);
+    const providerProfiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
+    
+    set({
+      currentUser: user,
+      isAuthenticated: !!user,
+      clientProfile: user?.role === 'client' ? (clientProfiles.find(p => p.userId === user.id) ?? null) : null,
+      providerProfile: user?.role === 'provider' ? (providerProfiles.find(p => p.userId === user.id) ?? null) : null,
+    });
   },
 }));

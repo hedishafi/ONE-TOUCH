@@ -1,7 +1,8 @@
 from django.urls import reverse
 
-from accounts.admin import ServiceCategoryAdmin, SubServiceAdmin, ProviderServiceAdmin
-from accounts.models import ServiceCategory, SubService, ProviderService, ProviderProfile
+from services.admin import ServiceCategoryAdmin, SubServiceAdmin, ProviderServiceAdmin
+from services.models import ServiceCategory, SubService, ProviderService
+from accounts.models import ProviderProfile
 from accounts.tests.admin_base import AdminTestBase
 
 
@@ -14,21 +15,21 @@ class ServiceCategoryAdminTests(AdminTestBase):
 
     def test_admin_can_access_service_category_list(self):
         self.login_admin()
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
 
     def test_staff_can_access_service_category_list(self):
         self.login_staff()
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
 
     def test_non_staff_cannot_access_service_category_list(self):
         self.client.force_login(self.client_user)
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url)
 
         self.assertAdminAccessDenied(response)
@@ -36,7 +37,7 @@ class ServiceCategoryAdminTests(AdminTestBase):
     def test_admin_can_view_service_category_detail(self):
         self.login_admin()
         url = reverse(
-            'admin:accounts_servicecategory_change', args=[self.service_category.id]
+            'admin:services_servicecategory_change', args=[self.service_category.id]
         )
         response = self.client.get(url)
 
@@ -45,14 +46,14 @@ class ServiceCategoryAdminTests(AdminTestBase):
 
     def test_admin_can_filter_by_active_status(self):
         self.login_admin()
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url, {'is_active': 'True'})
 
         self.assertEqual(response.status_code, 200)
 
     def test_admin_can_search_by_name(self):
         self.login_admin()
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url, {'q': 'Plumbing'})
 
         self.assertEqual(response.status_code, 200)
@@ -60,7 +61,7 @@ class ServiceCategoryAdminTests(AdminTestBase):
 
     def test_admin_can_search_by_slug(self):
         self.login_admin()
-        url = reverse('admin:accounts_servicecategory_changelist')
+        url = reverse('admin:services_servicecategory_changelist')
         response = self.client.get(url, {'q': 'plumbing'})
 
         self.assertEqual(response.status_code, 200)
@@ -75,14 +76,14 @@ class SubServiceAdminTests(AdminTestBase):
 
     def test_admin_can_access_subservice_list(self):
         self.login_admin()
-        url = reverse('admin:accounts_subservice_changelist')
+        url = reverse('admin:services_subservice_changelist')
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
 
     def test_admin_can_view_subservice_detail(self):
         self.login_admin()
-        url = reverse('admin:accounts_subservice_change', args=[self.sub_service.id])
+        url = reverse('admin:services_subservice_change', args=[self.sub_service.id])
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -90,21 +91,21 @@ class SubServiceAdminTests(AdminTestBase):
 
     def test_admin_can_filter_by_category(self):
         self.login_admin()
-        url = reverse('admin:accounts_subservice_changelist')
+        url = reverse('admin:services_subservice_changelist')
         response = self.client.get(url, {'category': self.service_category.id})
 
         self.assertEqual(response.status_code, 200)
 
     def test_admin_can_filter_by_active_status(self):
         self.login_admin()
-        url = reverse('admin:accounts_subservice_changelist')
+        url = reverse('admin:services_subservice_changelist')
         response = self.client.get(url, {'is_active': 'True'})
 
         self.assertEqual(response.status_code, 200)
 
     def test_admin_can_search_by_name(self):
         self.login_admin()
-        url = reverse('admin:accounts_subservice_changelist')
+        url = reverse('admin:services_subservice_changelist')
         response = self.client.get(url, {'q': 'Leak Fix'})
 
         self.assertEqual(response.status_code, 200)
@@ -131,7 +132,7 @@ class ProviderServiceAdminTests(AdminTestBase):
 
     def test_admin_can_access_provider_service_list(self):
         self.login_admin()
-        url = reverse('admin:accounts_providerservice_changelist')
+        url = reverse('admin:services_providerservice_changelist')
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, 200)
@@ -139,7 +140,7 @@ class ProviderServiceAdminTests(AdminTestBase):
     def test_admin_can_view_provider_service_detail(self):
         self.login_admin()
         url = reverse(
-            'admin:accounts_providerservice_change', args=[self.provider_service.id]
+            'admin:services_providerservice_change', args=[self.provider_service.id]
         )
         response = self.client.get(url)
 
@@ -147,7 +148,7 @@ class ProviderServiceAdminTests(AdminTestBase):
 
     def test_admin_can_filter_by_primary_service(self):
         self.login_admin()
-        url = reverse('admin:accounts_providerservice_changelist')
+        url = reverse('admin:services_providerservice_changelist')
         response = self.client.get(
             url, {'primary_service': self.service_category.id}
         )
@@ -156,14 +157,14 @@ class ProviderServiceAdminTests(AdminTestBase):
 
     def test_admin_can_search_by_provider_username(self):
         self.login_admin()
-        url = reverse('admin:accounts_providerservice_changelist')
+        url = reverse('admin:services_providerservice_changelist')
         response = self.client.get(url, {'q': self.provider_user.username})
 
         self.assertEqual(response.status_code, 200)
 
     def test_admin_can_search_by_service_name(self):
         self.login_admin()
-        url = reverse('admin:accounts_providerservice_changelist')
+        url = reverse('admin:services_providerservice_changelist')
         response = self.client.get(url, {'q': 'Plumbing'})
 
         self.assertEqual(response.status_code, 200)
@@ -194,7 +195,7 @@ class ProviderServiceAdminTests(AdminTestBase):
         )
         self.login_admin()
         url = reverse(
-            'admin:accounts_providerservice_change', args=[self.provider_service.id]
+            'admin:services_providerservice_change', args=[self.provider_service.id]
         )
 
         response = self.client.post(url, {
@@ -216,7 +217,7 @@ class ProviderServiceAdminTests(AdminTestBase):
 
         self.login_admin()
         url = reverse(
-            'admin:accounts_providerservice_change', args=[self.provider_service.id]
+            'admin:services_providerservice_change', args=[self.provider_service.id]
         )
 
         response = self.client.post(url, {

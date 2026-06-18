@@ -1,6 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, Component } from 'react';
 import { ROUTES } from './utils/constants';
 import { ScrollToTop } from './components/ScrollToTop';
+import { initUserDataSync } from './utils/syncUserData';
+
+// Simple error boundary to surface runtime crashes
+class ErrorBoundary extends Component<{children: React.ReactNode}, {error: string|null}> {
+  state = { error: null };
+  static getDerivedStateFromError(e: Error) { return { error: e.message + '\n' + e.stack }; }
+  render() {
+    if (this.state.error) return (
+      <div style={{padding:32,fontFamily:'monospace',whiteSpace:'pre-wrap',background:'#fff1f0',color:'#c00',minHeight:'100vh'}}>
+        <strong>Runtime Error:</strong>{'\n'}{this.state.error}
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 // Public pages
 import { Landing } from './pages/Landing';
@@ -37,19 +53,23 @@ import {
   ClientWallet,
   ClientLoyalty,
 } from './pages/ClientDashboard';
+import { ClientProfile } from './pages/ClientProfile';
+import { ClientHelp } from './pages/ClientHelp';
+import { ClientReferral } from './pages/ClientReferral';
 import { ClientMessages } from './pages/ClientMessages';
 import { ClientSettings } from './pages/ClientSettings';
+import { SearchProviders } from './pages/SearchProviders';
 
 // Provider pages
 import { ProviderHome } from './pages/ProviderHome';
 import ProviderSignupPhoneChoice from './pages/ProviderSignupPhoneChoice';
 import {
-  ActiveJobs,
   Earnings,
   ProviderProfile,
-  ProviderWallet,
-  ProviderLoyalty,
 } from './pages/ProviderDashboard';
+import { ProviderSettings } from './pages/ProviderSettings';
+import { ProviderReviews } from './pages/ProviderReviews';
+import { ProviderHelp } from './pages/ProviderHelp';
 
 // Provider Onboarding
 import { ProviderOnboardingStep1 } from './pages/ProviderOnboarding/Step1';
@@ -71,7 +91,13 @@ import {
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
+  // Initialize user data sync on app load
+  useEffect(() => {
+    initUserDataSync();
+  }, []);
+
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
@@ -112,12 +138,16 @@ function App() {
         >
           <Route path="dashboard" element={<ClientHome />} />
           <Route path="browse" element={<BrowseServices />} />
+          <Route path="search-providers" element={<SearchProviders />} />
           <Route path="history" element={<BookingHistory />} />
           <Route path="saved" element={<SavedProviders />} />
           <Route path="wallet" element={<ClientWallet />} />
           <Route path="loyalty" element={<ClientLoyalty />} />
           <Route path="messages" element={<ClientMessages />} />
+          <Route path="profile" element={<ClientProfile />} />
           <Route path="settings" element={<ClientSettings />} />
+          <Route path="help" element={<ClientHelp />} />
+          <Route path="referral" element={<ClientReferral />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 
@@ -127,11 +157,12 @@ function App() {
           element={<ProtectedRoute allowedRoles={['provider']} />}
         >
           <Route path="dashboard" element={<ProviderHome />} />
-          <Route path="jobs" element={<ActiveJobs />} />
           <Route path="earnings" element={<Earnings />} />
+          <Route path="earnings/:tab" element={<Earnings />} />
           <Route path="profile" element={<ProviderProfile />} />
-          <Route path="wallet" element={<ProviderWallet />} />
-          <Route path="loyalty" element={<ProviderLoyalty />} />
+          <Route path="reviews" element={<ProviderReviews />} />
+          <Route path="settings" element={<ProviderSettings />} />
+          <Route path="help" element={<ProviderHelp />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 
@@ -156,6 +187,7 @@ function App() {
         <Route path="*" element={<Navigate to={ROUTES.landing} replace />} />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

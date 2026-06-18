@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - 'Hafsa-work'
+      - 'Hafsa-work-new'
       - 'feature/**'
       - 'hotfix/**'
     paths:
@@ -16,6 +17,7 @@ on:
       - main
       - develop
       - 'Hafsa-work'
+      - 'Hafsa-work-new'
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'

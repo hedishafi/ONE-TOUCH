@@ -2,7 +2,7 @@ from rest_framework.permissions import BasePermission
 
 
 class IsProvider(BasePermission):
-    """Allow access only to users with role='provider'."""
+    """Allow access only to users with provider role capability (has_provider_role=True)."""
 
     message = 'Only service providers can perform this action.'
 
@@ -10,12 +10,12 @@ class IsProvider(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == request.user.ROLE_PROVIDER
+            and request.user.has_provider_role
         )
 
 
 class IsClient(BasePermission):
-    """Allow access only to users with role='client'."""
+    """Allow access only to users with client role capability (has_client_role=True)."""
 
     message = 'Only clients can perform this action.'
 
@@ -23,7 +23,7 @@ class IsClient(BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == request.user.ROLE_CLIENT
+            and request.user.has_client_role
         )
 
 
@@ -53,7 +53,8 @@ class IsProviderOrAdmin(BasePermission):
             request.user
             and request.user.is_authenticated
             and (
-                request.user.role in (request.user.ROLE_PROVIDER, request.user.ROLE_ADMIN)
+                request.user.has_provider_role
+                or request.user.role == request.user.ROLE_ADMIN
                 or request.user.is_staff
             )
         )

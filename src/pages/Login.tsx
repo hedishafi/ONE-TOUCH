@@ -163,6 +163,8 @@ export default function Login() {
         providerUid: response.user.provider_uid,
       };
 
+      console.log('🔐 Login successful, user:', normalizedUser);
+
       // Update authStore with user data
       storage.set(STORAGE_KEYS.currentUser, normalizedUser);
       useAuthStore.setState({
@@ -170,7 +172,17 @@ export default function Login() {
         isAuthenticated: true,
       });
 
+      console.log('✅ AuthStore updated:', {
+        currentUser: useAuthStore.getState().currentUser,
+        isAuthenticated: useAuthStore.getState().isAuthenticated,
+      });
+
+      // Wait a bit for state to settle
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
       setOtpVerifying(false);
+      
+      // Call handleSuccess after state is settled
       handleSuccess();
     } catch (error: unknown) {
       setOtpVerifying(false);
@@ -225,18 +237,29 @@ export default function Login() {
   // ─── Handle successful login ──────────────────────────────────────────────
   const handleSuccess = async () => {
     const { currentUser } = useAuthStore.getState();
+    
+    if (!currentUser) {
+      console.error('❌ No currentUser found after login');
+      notifications.show({
+        title: 'Error',
+        message: 'User data not found. Please try again.',
+        color: 'red',
+      });
+      return;
+    }
+    
     notifications.show({
       title: 'Welcome back!',
       message: 'Signed in successfully.',
       color: 'teal',
     });
 
-    if (currentUser?.role === 'client') {
+    if (currentUser.role === 'client') {
       navigate(ROUTES.clientDashboard, { replace: true });
       return;
     }
 
-    if (currentUser?.role === 'provider') {
+    if (currentUser.role === 'provider') {
       try {
         const status = await authService.getProviderOnboardingStatus();
         if (status.verification_status === 'rejected' && status.rejection_reason) {
