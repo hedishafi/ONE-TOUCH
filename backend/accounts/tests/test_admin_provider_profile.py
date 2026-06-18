@@ -63,25 +63,6 @@ class ProviderProfileAdminTests(AdminTestBase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_commission_amount_display_shows_value(self):
-        profile = ProviderProfile.objects.get(user=self.provider_user)
-        profile.price_min = 100
-        profile.price_max = 200
-        profile.save()
-
-        display = self.profile_admin.commission_amount_display(profile)
-        self.assertIn('ETB', display)
-        self.assertIn('3', display)
-
-    def test_commission_amount_display_shows_dash_when_none(self):
-        profile = ProviderProfile.objects.get(user=self.provider_user)
-        profile.price_min = None
-        profile.price_max = None
-        profile.save()
-
-        display = self.profile_admin.commission_amount_display(profile)
-        self.assertEqual(display, '—')
-
     def test_readonly_fields_include_stats(self):
         expected_readonly = [
             'avg_rating',
@@ -95,24 +76,12 @@ class ProviderProfileAdminTests(AdminTestBase):
 
     def test_list_display_includes_required_fields(self):
         expected_fields = [
-            'provider_name_display',  # Changed from 'user'
-            'provider_uid_display',  # Added
+            'provider_name_display',
+            'provider_uid_display',
             'is_available',
             'avg_rating',
             'total_jobs',
-            'price_min',
-            'price_max',
-            'commission_amount_display',
             'created_at',
         ]
         for field in expected_fields:
             self.assertIn(field, self.profile_admin.list_display)
-
-    def test_commission_calculation_is_correct(self):
-        profile = ProviderProfile.objects.get(user=self.provider_user)
-        profile.price_min = 100
-        profile.price_max = 200
-        profile.save()
-
-        expected_commission = ((100 + 200) / 2) * 0.02
-        self.assertEqual(profile.commission_amount, expected_commission)

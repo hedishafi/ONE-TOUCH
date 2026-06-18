@@ -10,7 +10,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { COLORS, ROUTES } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
+import type { Category } from '../types';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 const ANIMATIONS = `
@@ -74,10 +75,12 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 export function Services() {
   const navigate = useNavigate();
-  const [selectedCategory, setSelectedCategory] = useState<typeof MOCK_CATEGORIES[0] | null>(null);
+  const { categories } = useServiceCatalog();
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const selectedSkills = selectedCategory?.subcategories ?? [];
 
   // Smooth scroll to top when toggling views
-  const handleCategorySelect = (cat: typeof MOCK_CATEGORIES[0]) => {
+  const handleCategorySelect = (cat: Category) => {
     setSelectedCategory(cat);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -164,7 +167,7 @@ export function Services() {
 
               {/* Categories Grid */}
               <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, md: 4 }} spacing="lg" mb={60}>
-                {MOCK_CATEGORIES.map((cat, i) => (
+                {categories.map((cat, i) => (
                   <Paper
                     key={cat.id}
                     className="cat-card afu-card"
@@ -213,7 +216,7 @@ export function Services() {
                     </Button>
                     <Stack gap={0}>
                       <Text fw={900} size="2xl" c={COLORS.navyBlue}>{selectedCategory.name}</Text>
-                      <Text size="sm" c="dimmed">{selectedCategory.subcategories.length} sub-services available</Text>
+                      <Text size="sm" c="dimmed">{selectedSkills.length} sub-services available</Text>
                     </Stack>
                   </Group>
                   <ThemeIcon size={60} radius="xl"
@@ -227,7 +230,7 @@ export function Services() {
                 {/* Subcategories */}
                 <Stack gap="xs">
                   <Text fw={700} size="md" c={COLORS.navyBlue} mb="md">Sub-Services:</Text>
-                  {selectedCategory.subcategories.map((sub, i) => (
+                  {selectedSkills.map((sub, i) => (
                     <Paper
                       key={sub.id}
                       className="sub-item afu-sub"

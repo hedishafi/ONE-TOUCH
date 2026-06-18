@@ -4,8 +4,6 @@ from .views import (
     LoginRequestOTPView,
     LoginVerifyView,
     LogoutView,
-    ServiceCategoryListView,
-    SubServiceListView,
     UserProfileView,
     RoleSwitchView,
     SignupRequestOTPView,
@@ -14,6 +12,13 @@ from .views import (
     ProviderProfileSetupView,
     ProviderManualVerificationUploadView,
     ProviderOnboardingStatusView,
+    ServiceCategoryListView,
+    SubServiceListView,
+    ProviderGoOnlineView,
+    ProviderGoOfflineView,
+    ProviderUpdateLocationView,
+    ProviderStatusView,
+    SearchNearbyProvidersView,
 )
 
 # All routes are prefixed with /api/v1/ from core/urls.py
@@ -38,6 +43,17 @@ urlpatterns = [
     path('provider/profile/', ProviderProfileSetupView.as_view(), name='provider-profile-setup'),
     path('provider/manual-verification/upload/', ProviderManualVerificationUploadView.as_view(), name='provider-manual-verification-upload'),
     path('provider/onboarding/status/', ProviderOnboardingStatusView.as_view(), name='provider-onboarding-status'),
-    path('provider/service-categories/', ServiceCategoryListView.as_view(), name='provider-service-categories'),
-    path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='provider-sub-services'),
+    
+    # ── Provider Service Catalog ───────────────────────────────────────────────
+    path('provider/service-categories/', ServiceCategoryListView.as_view(), name='service-category-list'),
+    path('provider/service-categories/<int:category_id>/sub-services/', SubServiceListView.as_view(), name='sub-service-list'),
+    
+    # ── Provider Online/Offline Status & Location ──────────────────────────────
+    path('provider/go-online/', ProviderGoOnlineView.as_view(), name='provider-go-online'),
+    path('provider/go-offline/', ProviderGoOfflineView.as_view(), name='provider-go-offline'),
+    path('provider/update-location/', ProviderUpdateLocationView.as_view(), name='provider-update-location'),
+    path('provider/status/', ProviderStatusView.as_view(), name='provider-status'),
+    
+    # ── Client Search Providers ────────────────────────────────────────────────
+    path('client/search-providers/', SearchNearbyProvidersView.as_view(), name='search-nearby-providers'),
 ]

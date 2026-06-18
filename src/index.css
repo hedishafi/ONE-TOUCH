@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ── Design tokens (light) ─────────────────────────────────────────────────── */
-:root {
+:root,
+[data-mantine-color-scheme="light"] {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -44,6 +45,44 @@
   /* Header */
   --ot-header-bg:      #ffffff;
   --ot-header-border:  #F1F3F5;
+}
+
+/* ── Design tokens (dark) ──────────────────────────────────────────────────── */
+[data-mantine-color-scheme="dark"] {
+  /* Page & card surfaces */
+  --ot-bg-page:        #0f1117;
+  --ot-bg-card:        #1a1d27;
+  --ot-bg-card-inner:  #1e2130;
+  --ot-bg-row:         #1e2130;
+
+  /* Borders */
+  --ot-border:         #2a2d3e;
+  --ot-border-inner:   #252838;
+  --ot-border-input:   #3a3d52;
+
+  /* Text */
+  --ot-text-navy:      #7b9cff;
+  --ot-text-sub:       #9aa5b4;
+  --ot-text-muted:     #6b7280;
+  --ot-text-body:      #e2e8f0;
+
+  /* Identity option cards */
+  --ot-id-opt-bg:      #1a1d27;
+  --ot-id-opt-border:  #2a2d3e;
+  --ot-id-opt-hover:   #00808018;
+  --ot-id-opt-sel-bg:  #7b9cff10;
+
+  /* Upload zone */
+  --ot-upload-bg:      #1e2130;
+  --ot-upload-icon-bg: #2a2d3e;
+
+  /* Nav */
+  --ot-nav-bg:         #1a1d27;
+  --ot-nav-border:     #2a2d3e;
+
+  /* Header */
+  --ot-header-bg:      #1a1d27;
+  --ot-header-border:  #2a2d3e;
 }
 
 

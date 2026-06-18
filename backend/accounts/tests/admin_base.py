@@ -9,9 +9,8 @@ from accounts.models import (
     PhoneOTP,
     ProviderManualVerification,
     ProviderProfile,
-    ServiceCategory,
-    SubService,
 )
+from services.models import ServiceCategory, SubService
 
 User = get_user_model()
 

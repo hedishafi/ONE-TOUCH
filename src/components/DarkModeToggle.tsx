@@ -11,14 +11,20 @@ export function DarkModeToggle({ size = 'md', variant = 'subtle' }: DarkModeTogg
   const isDark = colorScheme === 'dark';
 
   return (
-    <Tooltip label={isDark ? 'Switch to light mode' : 'Switch to dark mode'} position="bottom" withArrow>
+    <Tooltip
+      label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      position="bottom"
+      withArrow
+    >
       <ActionIcon
         onClick={toggleColorScheme}
         variant={variant}
         size={size}
-        color={isDark ? 'yellow' : 'blue'}
         aria-label="Toggle dark mode"
-        style={{ transition: 'all 0.2s ease' }}
+        style={{
+          transition: 'all 0.2s ease',
+          color: isDark ? '#F5E642' : '#4A5568',
+        }}
       >
         {isDark
           ? <IconSun size={18} stroke={1.8} />

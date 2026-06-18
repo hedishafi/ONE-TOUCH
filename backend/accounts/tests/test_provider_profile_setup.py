@@ -2,7 +2,8 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import ProviderProfile, ProviderService, ServiceCategory, SubService
+from accounts.models import ProviderProfile
+from services.models import ProviderService, ServiceCategory, SubService
 from accounts.tests.base import AuthScenarioBase
 
 User = get_user_model()

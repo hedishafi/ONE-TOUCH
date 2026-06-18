@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, localStorageColorSchemeManager } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
@@ -12,10 +12,13 @@ import './index.css';
 import App from './App.tsx';
 import { oneTouchTheme } from './theme';
 
+const colorSchemeManager = localStorageColorSchemeManager({ key: 'ot-color-scheme' });
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider
       theme={oneTouchTheme}
+      colorSchemeManager={colorSchemeManager}
       defaultColorScheme="light"
     >
       <Notifications position="top-right" zIndex={1000} />

@@ -3,53 +3,33 @@
  * Request Service · Chat in app (AI voice assistant with 7 stages)
  */
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box, Text, Group, Stack, Badge, Button, Paper, ThemeIcon, ActionIcon,
-  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress,
+  Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput, NavLink,
 } from '@mantine/core';
 import {
-  IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
-  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone,
+  IconPhone, IconMapPin, IconCheck, IconHistory,
+  IconLogout, IconMenu2, IconX, IconMicrophone, IconSettings,
   IconPhoneOff, IconSearch, IconChevronRight,
   IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
-  IconMessage,
+  IconMessage, IconUser, IconLifebuoy,
 } from '@tabler/icons-react';
-import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
+import { useMantineColorScheme } from '@mantine/core';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
-import { MOCK_CATEGORIES } from '../mock/mockServices';
 import { RoleSwitcher } from '../components/RoleSwitcher';
-import type { AppNotification, Job } from '../types';
+import { OSMClientMap } from '../components/OSMClientMap';
+import { DarkModeToggle } from '../components/DarkModeToggle';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
 const MAP_CTR: [number, number] = [9.032, 38.747];
-
-// Fixed nearby provider dots for the live map preview
-const PROV_DOTS: {pos:[number,number]; color:string; name:string; rating:number}[] = [
-  {pos:[9.036,38.751],color:T,              name:'Abebe T.',rating:4.9},
-  {pos:[9.029,38.743],color:COLORS.success, name:'Sara M.',  rating:4.8},
-  {pos:[9.034,38.755],color:N,              name:'Dawit K.', rating:4.7},
-  {pos:[9.027,38.748],color:T,              name:'Tigist A.',rating:4.9},
-  {pos:[9.039,38.744],color:COLORS.success, name:'Yared T.', rating:4.6},
-  {pos:[9.031,38.757],color:COLORS.warning, name:'Hana B.',  rating:4.8},
-];
-const provDot=(color:string)=>L.divIcon({
-  className:'',
-  html:`<div class="ot-prov-dot" style="--dc:${color}"></div>`,
-  iconAnchor:[9,9],iconSize:[18,18],
-});
-const userDot=L.divIcon({
-  className:'',
-  html:`<div class="ot-user-dot"></div>`,
-  iconAnchor:[12,12],iconSize:[24,24],
-});
 
 // Map icon string names to emojis for display
 const CAT_ICONS: Record<string, string> = {
@@ -118,35 +98,32 @@ const DECLINE_REASONS = [
   'Other',
 ];
 
-function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
-  const [r,setR]=useState(300);
-  useEffect(()=>{const id=setInterval(()=>setR(p=>(p>=2500?300:p+60)),90);return()=>clearInterval(id);},[]);
-  return(
-    <>
-      <Circle center={ctr} radius={r}    pathOptions={{color,fillOpacity:0.04,weight:1.5,opacity:0.6}}/>
-      <Circle center={ctr} radius={r*.5} pathOptions={{color:N,fillOpacity:0.02,weight:1,opacity:0.35}}/>
-    </>
-  );
-}
-
 const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='in_progress'?'blue':'orange';
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
 const NAV=[
-  {label:'Home',    icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
-  {label:'History', icon:<IconHistory      size={16}/>,r:ROUTES.clientHistory},
-  {label:'Saved',   icon:<IconHeart        size={16}/>,r:ROUTES.clientSaved},
-  {label:'Wallet',  icon:<IconWallet       size={16}/>,r:ROUTES.clientWallet},
-  {label:'Loyalty', icon:<IconStar         size={16}/>,r:ROUTES.clientLoyalty},
+  {label:'Dashboard',        icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
+  {label:'Explore Services', icon:<IconSearch   size={16}/>,r:ROUTES.clientBrowse},
+  {label:'My Requests',      icon:<IconHistory  size={16}/>,r:ROUTES.clientHistory},
+  {label:'Messages',         icon:<IconMessage  size={16}/>,r:ROUTES.clientMessages},
+  {label:'Settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
+  {label:'Help & Support',   icon:<IconLifebuoy size={16}/>,r:ROUTES.clientHelp},
 ];
 
 export function ClientHome() {
   const nav=useNavigate();
+  const location=useLocation();
+  const { colorScheme } = useMantineColorScheme();
+  const isDark = colorScheme === 'dark';
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
+  const { categories } = useServiceCatalog();
+
+  console.log('🏠 ClientHome rendered, currentUser:', currentUser);
 
   const [sidebar,setSidebar]=useState(false);
+  const [searchQuery,setSearchQuery]=useState('');
   const [aOpen,setAOpen]=useState(false);
   const [aStage,setAStage]=useState<AStage>('idle');
   const [desc,setDesc]=useState('');
@@ -175,10 +152,15 @@ export function ClientHome() {
   const [declineStage,setDeclineStage]=useState<'asking'|'confirmed'>('asking');
   const declineTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  const mapTile='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const quickActions = categories.slice(0, 4);
 
   useEffect(()=>{
-    if(!currentUser){nav(ROUTES.login);return;}
+    if(!currentUser){
+      console.log('❌ No currentUser, redirecting to login');
+      nav(ROUTES.login);
+      return;
+    }
+    console.log('✅ CurrentUser found, fetching notifications');
     fetchNotifications(currentUser.id);
     return()=>{if(aTimer.current)clearTimeout(aTimer.current);if(cTimer.current)clearTimeout(cTimer.current);if(declineTimer.current)clearTimeout(declineTimer.current);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,6 +169,12 @@ export function ClientHome() {
   const myJobs   =jobs.filter(j=>j.clientId===currentUser?.id);
   const activeJob=myJobs.find(j=>j.status==='pending_agreement'||j.status==='in_progress');
   const recent   =[...myJobs].sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()).slice(0,5);
+
+  function submitSearch(){
+    const q = searchQuery.trim();
+    if (!q) return;
+    nav(`${ROUTES.services}?q=${encodeURIComponent(q)}`);
+  }
 
   /* ── Voice assistant ─────────────────────────────────────────────────────── */
   function startAssist(){
@@ -214,16 +202,23 @@ export function ClientHome() {
     if(!currentUser)return;
     const prov=selectedProv??foundProviders[0]??foundProv;
     setFoundProv(prov);
-    const catId=MOCK_CATEGORIES[Math.floor(Math.random()*MOCK_CATEGORIES.length)]?.id??'cat-001';
-    const jobPayload = {clientId:currentUser.id,providerId:'provider-001',categoryId:catId,
-      subcategoryId:'sub-001',description:desc,estimatedPrice:prov.priceMin,
-      status:'pending_agreement',commissionRate:10,
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const catId = randomCategory?.id ?? '1';
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:catId,
+      subcategoryId:'sub-001',
+      description:desc,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location, Addis Ababa'},
-      isRepeatBooking:false};
-    createJob(jobPayload as unknown as Omit<Job, 'id' | 'createdAt'>);
-    const notificationPayload: AppNotification = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
+      isRepeatBooking:false,
+    } as any);
+    const notificationPayload = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
       title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
-    addNotification(notificationPayload);
+    addNotification(notificationPayload as any);
     setAStage('confirmed');
     notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
   }
@@ -265,13 +260,19 @@ export function ClientHome() {
   function confirmCall(){
     if(!currentUser)return;
     const prov=cSelectedProv??cProviders[0]??PROVIDER_POOL[0];
-    const cat=MOCK_CATEGORIES.find(c=>c.name===cCat);
-    const jobPayload = {clientId:currentUser.id,providerId:'provider-001',categoryId:cat?.id??'cat-001',
-      subcategoryId:'sub-001',description:`${cCat} service request`,
-      estimatedPrice:prov.priceMin,status:'pending_agreement',commissionRate:10,
+    const cat=categories.find(c=>c.name===cCat);
+    createJob({
+      clientId:currentUser.id,
+      providerId:'provider-001',
+      categoryId:cat?.id??'cat-001',
+      subcategoryId:'sub-001',
+      description:`${cCat} service request`,
+      estimatedPrice:prov.priceMin,
+      status:'pending_agreement',
+      commissionRate:10,
       clientLocation:{lat:MAP_CTR[0],lng:MAP_CTR[1],address:'Your location'},
-      isRepeatBooking:false};
-    createJob(jobPayload as unknown as Omit<Job, 'id' | 'createdAt'>);
+      isRepeatBooking:false,
+    } as any);
     closeCall();
     notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
   }
@@ -290,66 +291,118 @@ export function ClientHome() {
   return (
     <Box style={{minHeight:'100vh',background:'var(--ot-bg-page)'}}>
 
-      {/* Sidebar backdrop */}
-      {sidebar&&<Box onClick={()=>setSidebar(false)}
-        style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:399}}/>}
+      {/* ── Backdrop + Sidebar rendered into document.body via portal ──
+          This escapes ALL stacking contexts in the component tree so
+          z-index values are always respected absolutely.               */}
+      {createPortal(
+        <>
+          {/* Backdrop — zIndex 1000, covers page, below sidebar */}
+          {sidebar && (
+            <div
+              onClick={()=>setSidebar(false)}
+              style={{
+                position:'fixed', inset:0,
+                background:'rgba(0,0,0,0.45)',
+                zIndex:1000,
+                cursor:'pointer',
+              }}
+            />
+          )}
 
-      {/* Sidebar */}
-      <Box style={{position:'fixed',top:0,left:0,bottom:0,width:260,zIndex:400,
-        background:'var(--ot-bg-card)',borderRight:'1px solid var(--ot-border)',
-        transform:sidebar?'translateX(0)':'translateX(-260px)',
-        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
-        display:'flex',flexDirection:'column'}}>
-        <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
-          <Group justify="space-between">
-            <Group gap={8}>
-              <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
+          {/* Sidebar — zIndex 1100, always above backdrop */}
+          <div style={{
+            position:'fixed', top:0, left:0, bottom:0, width:260,
+            zIndex:1100,
+            background:'var(--ot-bg-card)',
+            borderRight:'1px solid var(--ot-border)',
+            display:'flex', flexDirection:'column',
+            transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+            transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+            boxShadow: sidebar ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
+            overflowY:'auto',
+          }}>
+            <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
+              <Group justify="space-between">
+                <Group gap={8}>
+                  <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                    <Text fw={900} size="11px" c="white">OT</Text>
+                  </Box>
+                  <Text fw={800} size="sm" c={N}>OneTouch</Text>
+                </Group>
+                <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
+              </Group>
+            </Box>
+            <Box p="md">
+              <Group gap={10} style={{cursor:'pointer'}} onClick={()=>{setSidebar(false);nav(ROUTES.clientProfile);}}>
+                <Box style={{position:'relative'}}>
+                  <Avatar radius="xl" size={48} color="teal">{clientProfile?.fullName?.charAt(0) ?? 'C'}</Avatar>
+                  <Box style={{position:'absolute',bottom:-1,right:-1,width:14,height:14,borderRadius:'50%',background:COLORS.success,border:'2px solid var(--ot-bg-card)'}}/>
+                </Box>
+                <Box style={{flex:1,minWidth:0}}>
+                  <Text size="sm" fw={700} c={N} style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {clientProfile?.fullName ?? 'Client'}
+                  </Text>
+                  <Text size="xs" c="var(--ot-text-muted)" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {currentUser?.email ?? currentUser?.phone}
+                  </Text>
+                  <Text size="10px" c={T} fw={600} mt={2}>View Profile →</Text>
+                </Box>
+              </Group>
+            </Box>
+            <Divider/>
+            <Stack gap={2} p="sm" style={{flex:1}}>
+              {NAV.map(n=>{
+                const isActive = location.pathname === n.r;
+                return (
+                  <NavLink
+                    key={n.label}
+                    label={n.label}
+                    leftSection={<Box style={{color: isActive ? T : '#ADB5BD'}}>{n.icon}</Box>}
+                    active={isActive}
+                    onClick={()=>{setSidebar(false);nav(n.r);}}
+                    styles={{
+                      root:{
+                        borderRadius:10,
+                        borderLeft:`3px solid ${isActive ? T : 'transparent'}`,
+                        paddingLeft:13,
+                        fontWeight: isActive ? 700 : 500,
+                        fontSize:14,
+                        color: isActive ? N : '#6C757D',
+                        backgroundColor: isActive ? `${T}13` : 'transparent',
+                      },
+                      label:{fontSize:14},
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+            <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
+              <RoleSwitcher />
+              <Box p={10}
+                onClick={()=>{logout();nav(ROUTES.landing);}}
+                style={{borderRadius:10,display:'flex',alignItems:'center',
+                  gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
+                <IconLogout size={18}/> Sign out
               </Box>
-              <Text fw={800} size="sm" c={N}>OneTouch</Text>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-        </Box>
-        <Box p="md">
-          <Group gap={10}>
-            <Avatar radius="xl" size="md" color="teal">{clientProfile?.fullName?.charAt(0)?.charAt(0) ?? 'C'}</Avatar>
-            <Box>
-              <Text size="sm" fw={700}>{clientProfile?.fullName??'Client'}</Text>
-              <Text size="xs" c="var(--ot-text-muted)">{currentUser?.phone}</Text>
             </Box>
-          </Group>
-        </Box>
-        <Divider/>
-        <Stack gap={2} p="sm" style={{flex:1}}>
-          {NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
-        </Stack>
-        <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <RoleSwitcher />
-          <Box p={10}
-            onClick={()=>{logout();nav(ROUTES.landing);}}
-            style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
-          </Box>
-        </Box>
-      </Box>
+          </div>
+        </>,
+        document.body
+      )}
 
-      {/* Header */}
-      <Box style={{position:'sticky',top:0,zIndex:200,background:'var(--ot-bg-card)',
-        borderBottom:'1px solid var(--ot-border)'}}>
+      {/* ── Header ── */}
+      <Box style={{
+        position:'sticky', top:0,
+        zIndex:400,  /* same as sidebar so header stays above backdrop */
+        background:'var(--ot-bg-card)',
+        borderBottom:'1px solid var(--ot-border)',
+      }}>
         <Box px={20} py={12} style={{maxWidth:960,margin:'0 auto'}}>
-          <Group justify="space-between">
+          <Group justify="space-between" wrap="nowrap">
             <Group gap={12}>
-              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(true)}><IconMenu2 size={22}/></ActionIcon>
+              <ActionIcon variant="subtle" size="lg" onClick={()=>setSidebar(v=>!v)}>
+                <IconMenu2 size={22}/>
+              </ActionIcon>
               <Group gap={8}>
                 <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <Text fw={900} size="11px" c="white">OT</Text>
@@ -357,20 +410,18 @@ export function ClientHome() {
                 <Text fw={800} size="sm" c={N} visibleFrom="sm">OneTouch</Text>
               </Group>
             </Group>
+            <Box style={{flex:1, maxWidth:360, margin:'0 10px'}} visibleFrom="sm">
+              <TextInput
+                placeholder="Search services"
+                value={searchQuery}
+                onChange={e=>setSearchQuery(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&submitSearch()}
+                leftSection={<IconSearch size={16}/>}
+                radius="xl"
+                size="sm"
+              />
+            </Box>
             <Group gap={10}>
-              {/* AI Call button */}
-              <Box
-                role="button" aria-label="Call In-App AI" tabIndex={0}
-                onClick={()=>startCall('AI Assistant')}
-                onKeyDown={e=>e.key==='Enter'&&startCall('AI Assistant')}
-                style={{display:'flex',alignItems:'center',gap:6,
-                  padding:'7px 13px',borderRadius:20,flexShrink:0,cursor:'pointer',
-                  background:`linear-gradient(135deg,${T},${N})`,
-                  color:'white',fontWeight:700,fontSize:13,
-                  boxShadow:`0 2px 10px ${T}55`,minHeight:44}}>
-                <IconMicrophone size={15} color="white"/>
-                <Text size="xs" fw={800} c="white" visibleFrom="xs">AI Call</Text>
-              </Box>
               {/* Call Center button */}
               <Box
                 component="a" href="tel:8182" aria-label="Call center 8182"
@@ -389,7 +440,8 @@ export function ClientHome() {
                   borderRadius:'50%',background:COLORS.error,display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <Text size="8px" c="white" fw={700}>{unreadCount}</Text></Box>}
               </ActionIcon>
-              <Avatar radius="xl" size="sm" color="teal" style={{cursor:'pointer'}} onClick={()=>setSidebar(true)}>
+              <DarkModeToggle size="sm" />
+              <Avatar radius="xl" size="sm" color="teal" style={{cursor:'pointer'}} onClick={()=>setSidebar(v=>!v)}>
                 {clientProfile?.fullName?.charAt(0)?.charAt(0) ?? 'C'}
               </Avatar>
             </Group>
@@ -399,6 +451,37 @@ export function ClientHome() {
 
       {/* Body */}
       <Box style={{maxWidth:960,margin:'0 auto',padding:'24px 16px 64px'}}>
+
+        {/* Welcome + quick actions */}
+        <Paper mb={20} p="md" radius="xl"
+          style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
+          <Group justify="space-between" align="center" wrap="nowrap" mb={10}>
+            <Box>
+              <Text size="xs" c="var(--ot-text-muted)">Welcome</Text>
+              <Text fw={800} size="lg" c={N}>
+                {clientProfile?.fullName || currentUser?.email || 'Client'}
+              </Text>
+            </Box>
+            <Badge size="sm" color="teal" variant="light">Client</Badge>
+          </Group>
+          <Text size="sm" fw={700} c={N} mb={8}>What do you need today?</Text>
+          <Group gap={8} wrap="wrap">
+            {quickActions.map(cat=> (
+              <Button key={cat.id} size="xs" radius="xl" variant="light"
+                onClick={()=>nav(`/services/${cat.id}`)}>
+                {cat.name}
+              </Button>
+            ))}
+            <Button size="xs" radius="xl" onClick={()=>nav('/client/search-providers')}
+              style={{background:`linear-gradient(135deg,${COLORS.success},${T})`,border:'none',color:'white'}}>
+              Find Nearby Providers
+            </Button>
+            <Button size="xs" radius="xl" onClick={()=>nav(ROUTES.services)}
+              style={{background:`linear-gradient(135deg,${T},${N})`,border:'none'}}>
+              View all services
+            </Button>
+          </Group>
+        </Paper>
 
         {/* Active job banner */}
         {activeJob&&(
@@ -411,7 +494,7 @@ export function ClientHome() {
                 </ThemeIcon>
                 <Box>
                   <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">Active Request</Text><Badge size="xs" color="yellow">Live</Badge></Group>
-                  <Text fw={700} size="sm" c="white" lineClamp={1}>{MOCK_CATEGORIES.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
+                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
                   <Text size="xs" c="rgba(255,255,255,.7)">{statusLabel(activeJob.status)} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
                 </Box>
               </Group>
@@ -422,44 +505,22 @@ export function ClientHome() {
           </Paper>
         )}
 
-        {/* Hero — Live Provider Map */}
+        {/* Hero — Live Provider Map with Auto Location Detection */}
         <Box mb={28}>
-          <Paper radius="xl"
-            style={{overflow:'hidden',border:'1px solid var(--ot-border)',
-              boxShadow:'0 4px 24px rgba(0,0,0,.07)',position:'relative'}}>
-
-            <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:300}}
-              zoomControl={false} dragging={false} scrollWheelZoom={false}
-              doubleClickZoom={false} keyboard={false} attributionControl={false}>
-              <TileLayer url={mapTile}/>
-              <AnimRing ctr={MAP_CTR} color={T}/>
-              {PROV_DOTS.map((p,i)=>(
-                <Marker key={i} position={p.pos} icon={provDot(p.color)}/>
-              ))}
-              <Marker position={MAP_CTR} icon={userDot}/>
-            </MapContainer>
-
-            {/* Top pill — providers online */}
-            <Box style={{position:'absolute',top:12,left:12,zIndex:500}}>
-              <Group gap={6} px={10} py={6}
-                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
-                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
-                <Box w={7} h={7} style={{borderRadius:'50%',background:COLORS.success,
-                  boxShadow:`0 0 0 3px ${COLORS.success}44`,flexShrink:0}}/>
-                <Text size="xs" fw={700} c={N}>{PROV_DOTS.length} providers online</Text>
-              </Group>
-            </Box>
-
-            {/* Top-right pill — location */}
-            <Box style={{position:'absolute',top:12,right:12,zIndex:500}}>
-              <Group gap={5} px={9} py={6}
-                style={{borderRadius:20,background:'rgba(255,255,255,.92)',
-                  backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
-                <IconMapPin size={12} color={T}/>
-                <Text size="xs" fw={600} c={N}>Near you</Text>
-              </Group>
-            </Box>
-          </Paper>
+          <OSMClientMap
+            onProviderSelect={(provider) => {
+              notifications.show({
+                title: 'Provider Selected',
+                message: `${provider.full_name} - ${provider.distance_km.toFixed(1)}km away`,
+                color: 'teal',
+              });
+            }}
+            onLocationDetected={(address, lat, lng) => {
+              console.log('📍 Client location detected:', address, lat, lng);
+            }}
+            height="400px"
+            searchRadius={10}
+          />
 
           {/* CTA bar below the map — no overlay, clean card */}
           <Paper mt={10} p="md" radius="xl"
@@ -469,17 +530,17 @@ export function ClientHome() {
                 <Box w={44} h={44} style={{borderRadius:14,flexShrink:0,
                   background:`linear-gradient(135deg,${N},${T})`,
                   display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <IconMessage size={22} color="white"/>
+                  <IconBriefcase size={22} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>Chat in App</Text>
-                  <Text size="xs" c="dimmed">AI finds &amp; connects you to the right pro</Text>
+                  <Text fw={800} size="sm" c={N}>Request Services</Text>
+                  <Text size="xs" c="dimmed">Browse services and request a provider</Text>
                 </Box>
               </Group>
-              <Button size="sm" radius="xl" onClick={startAssist}
+              <Button size="sm" radius="xl" onClick={()=>nav(ROUTES.services)}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
-                leftSection={<IconMessage size={14}/>}>
-                Chat Now
+                leftSection={<IconBriefcase size={14}/>}> 
+                Request Service
               </Button>
             </Group>
           </Paper>
@@ -488,7 +549,7 @@ export function ClientHome() {
         {/* Category grid */}
         <Text fw={800} size="sm" c={N} mb={14}>All Services</Text>
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
-          {MOCK_CATEGORIES.map(cat=>(
+          {categories.map(cat=>(
             <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
               role="button" aria-label={`Book ${cat.name}`} tabIndex={0}
               onKeyDown={e=>e.key==='Enter'&&openPick(cat.name)}
@@ -517,7 +578,7 @@ export function ClientHome() {
             </Group>
             <Stack gap={10}>
               {recent.map(job=>{
-                const cat=MOCK_CATEGORIES.find(c=>c.id===job.categoryId);
+                const cat=categories.find(c=>c.id===job.categoryId);
                 return(
                   <Paper key={job.id} p="md" radius="xl"
                     style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
@@ -529,7 +590,7 @@ export function ClientHome() {
                           {catEmoji(cat?.icon??'tool')}
                         </Box>
                         <Box>
-                          <Text size="sm" fw={700} lineClamp={1}>{MOCK_CATEGORIES.find(c=>c.id===job.categoryId)?.name??'Service Request'}</Text>
+                          <Text size="sm" fw={700} lineClamp={1}>{categories.find(c=>c.id===job.categoryId)?.name??'Service Request'}</Text>
                           <Group gap={10}>
                             <Text size="xs" c="var(--ot-text-muted)">{CURRENCY_SYMBOL} {job.estimatedPrice}</Text>
                             <Text size="xs" c="var(--ot-text-muted)">·</Text>
@@ -551,7 +612,7 @@ export function ClientHome() {
 
       {/* ══ VOICE ASSISTANT MODAL ══════════════════════════════════════════════ */}
       <Modal opened={aOpen} onClose={closeAssist} centered radius="xl" size="sm"
-        withCloseButton={false} styles={{content:{background:'white'},header:{display:'none'}}}>
+        withCloseButton={false} styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
 
         {/* Dialing */}
         {aStage==='dialing'&&(
@@ -672,13 +733,6 @@ export function ClientHome() {
                 <Text size="xs" c={T}>Live map search active</Text>
               </Box>
             </Group>
-            <Box style={{height:220,borderRadius:16,overflow:'hidden',border:'1px solid var(--ot-border)'}}>
-              <MapContainer center={MAP_CTR} zoom={14} style={{width:'100%',height:'100%'}}
-                zoomControl={false} dragging={false} scrollWheelZoom={false}>
-                <TileLayer url={mapTile}/>
-                <AnimRing ctr={MAP_CTR} color={T}/>
-              </MapContainer>
-            </Box>
             <Progress value={70} color="teal" size="sm" radius="xl" animated/>
           </Stack>
         )}
@@ -778,7 +832,7 @@ export function ClientHome() {
 
       {/* ══ CATEGORY CALL MODAL ════════════════════════════════════════════════ */}
       <Modal opened={cOpen} onClose={closeCall} centered radius="xl" size="sm"
-        withCloseButton={false} styles={{content:{background:'white'},header:{display:'none'}}}>
+        withCloseButton={false} styles={{content:{background:'var(--ot-bg-card)'},header:{display:'none'}}}>
         <Stack gap="md" py={24} px={8}>
 
           {cStage==='dialing'&&(
@@ -1037,26 +1091,6 @@ export function ClientHome() {
 
       <style>{`
         @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:.55}}
-        .ot-prov-dot{
-          width:18px;height:18px;border-radius:50%;
-          background:var(--dc);border:3px solid white;
-          box-shadow:0 2px 8px rgba(0,0,0,.3);
-          animation:prov-blink 2.2s ease-in-out infinite;
-        }
-        .ot-prov-dot::after{
-          content:'';position:absolute;inset:-5px;border-radius:50%;
-          border:2px solid var(--dc);opacity:0;
-          animation:prov-ring 2.2s ease-out infinite;
-        }
-        @keyframes prov-blink{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
-        @keyframes prov-ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
-        .ot-user-dot{
-          width:24px;height:24px;border-radius:50%;
-          background:${N};border:4px solid white;
-          box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4);
-          animation:user-pulse 1.8s ease-in-out infinite;
-        }
-        @keyframes user-pulse{0%,100%{box-shadow:0 0 0 4px ${T}66,0 3px 12px rgba(0,0,0,.4)}50%{box-shadow:0 0 0 8px ${T}33,0 3px 12px rgba(0,0,0,.4)}}
       `}</style>
     </Box>
   );

@@ -17,9 +17,6 @@ from .models import (
     PhoneOTP,
     ProviderProfile,
     ProviderManualVerification,
-    ProviderService,
-    ServiceCategory,
-    SubService,
     User,
     UserRegistrationNotification,
 )
@@ -81,7 +78,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(ProviderProfile)
 class ProviderProfileAdmin(admin.ModelAdmin):
-    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'price_min', 'price_max', 'commission_amount_display', 'created_at')
+    list_display = ('provider_name_display', 'provider_uid_display', 'is_available', 'avg_rating', 'total_jobs', 'created_at')
     list_filter = ('is_available',)
     search_fields = ('user__username', 'user__phone_number', 'user__first_name', 'user__last_name', 'user__provider_uid', 'address')
     readonly_fields = ('avg_rating', 'total_reviews', 'total_jobs', 'created_at', 'updated_at')
@@ -109,11 +106,6 @@ class ProviderProfileAdmin(admin.ModelAdmin):
         return obj.user.provider_uid or '—'
     provider_uid_display.short_description = 'Provider UID'
 
-    def commission_amount_display(self, obj):
-        val = obj.commission_amount
-        return f'{val} ETB' if val is not None else '—'
-    commission_amount_display.short_description = '2% Commission'
-
 
 @admin.register(PhoneOTP)
 class PhoneOTPAdmin(admin.ModelAdmin):
@@ -121,63 +113,6 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     list_filter = ('purpose', 'is_used', 'role')
     search_fields = ('phone_number',)
     readonly_fields = ('code', 'created_at')
-
-
-class SubServiceInline(admin.TabularInline):
-    model = SubService
-    fields = ('name', 'slug', 'description', 'is_active')
-    extra = 1
-
-
-@admin.register(ServiceCategory)
-class ServiceCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active', 'created_at')
-    list_filter = ('is_active',)
-    search_fields = ('name', 'slug')
-    # Allow manual editing of slug in admin — remove automatic prepopulation
-    inlines = [SubServiceInline]
-
-
-@admin.register(SubService)
-class SubServiceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'slug', 'is_active', 'created_at')
-    list_filter = ('category', 'is_active')
-    search_fields = ('name', 'slug')
-    # Allow manual editing of slug in admin — remove automatic prepopulation
-
-
-@admin.register(ProviderService)
-class ProviderServiceAdmin(admin.ModelAdmin):
-    list_display = ('provider_name_display', 'provider_uid_display', 'primary_service', 'subservice_count', 'created_at')
-    list_filter = ('primary_service',)
-    search_fields = ('provider__user__username', 'provider__user__phone_number', 'provider__user__first_name', 'provider__user__last_name', 'provider__user__provider_uid', 'primary_service__name')
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """
-        Show all provider profiles regardless of user's current active role.
-        This ensures admin can manage provider services even when user switches roles.
-        """
-        if db_field.name == 'provider':
-            # Use has_provider_role to show all provider profiles
-            kwargs['queryset'] = ProviderProfile.objects.select_related('user').filter(user__has_provider_role=True)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    def provider_name_display(self, obj):
-        """Display provider's actual name"""
-        full_name = obj.provider.user.get_full_name().strip()
-        if full_name:
-            return full_name
-        return obj.provider.user.phone_number or obj.provider.user.username
-    provider_name_display.short_description = 'Provider Name'
-
-    def provider_uid_display(self, obj):
-        """Display clean 6-digit UID"""
-        return obj.provider.user.provider_uid or '—'
-    provider_uid_display.short_description = 'Provider UID'
-
-    def subservice_count(self, obj):
-        return obj.subservices.count()
-    subservice_count.short_description = 'Subservices'
 
 
 @admin.register(ProviderManualVerification)

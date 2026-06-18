@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ActionIcon,
   Alert,
   Avatar,
   Box,
@@ -7,6 +8,7 @@ import {
   Container,
   FileButton,
   Group,
+  MultiSelect,
   NumberInput,
   Paper,
   Select,
@@ -15,84 +17,49 @@ import {
   TextInput,
   Textarea,
   Title,
-  MultiSelect,
+  Tooltip,
 } from '@mantine/core';
-import { IconAlertCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
+import { IconAlertCircle, IconInfoCircle, IconUpload, IconUserCheck } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import {
-  listServiceCategories,
-  listSubServices,
-  setupProviderProfile,
-  type ServiceCategoryItem,
-  type SubServiceItem,
-} from '../services/providerProfileService';
+import { setupProviderProfile } from '../services/providerProfileService';
+import { useServiceCatalog } from '../hooks/useServiceCatalog';
 
 export default function ProviderProfileSetup() {
+  const MIN_PRICE_RATIO = 0.5;
+
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
-  const [serviceCategoryId, setServiceCategoryId] = useState<string | null>(null);
-  const [subServices, setSubServices] = useState<string[]>([]);
-  const [priceMin, setPriceMin] = useState<number | ''>('');
+  const [serviceCategoryId, setServiceCategoryId] = useState('');
+  const [subServiceIds, setSubServiceIds] = useState<string[]>([]);
   const [priceMax, setPriceMax] = useState<number | ''>('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [categories, setCategories] = useState<ServiceCategoryItem[]>([]);
-  const [subServiceOptions, setSubServiceOptions] = useState<SubServiceItem[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [subServicesLoading, setSubServicesLoading] = useState(false);
+  const { categories, loading: catalogLoading, error: catalogError } = useServiceCatalog();
 
   const previewUrl = useMemo(() => (profilePicture ? URL.createObjectURL(profilePicture) : null), [profilePicture]);
+  const calculatedPriceMin = useMemo(
+    () => (priceMax === '' ? '' : Math.round(Number(priceMax) * MIN_PRICE_RATIO)),
+    [priceMax],
+  );
 
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        setCategoriesLoading(true);
-        const result = await listServiceCategories();
-        setCategories(result);
-      } catch {
-        setError('Failed to load service categories. Please refresh and try again.');
-      } finally {
-        setCategoriesLoading(false);
-      }
-    };
-
-    loadCategories();
-  }, []);
-
-  useEffect(() => {
-    const loadSubServices = async () => {
-      if (!serviceCategoryId) {
-        setSubServiceOptions([]);
-        setSubServices([]);
-        return;
-      }
-
-      try {
-        setSubServicesLoading(true);
-        const result = await listSubServices(Number(serviceCategoryId));
-        setSubServiceOptions(result);
-        setSubServices([]);
-      } catch {
-        setError('Failed to load sub-services for the selected category.');
-      } finally {
-        setSubServicesLoading(false);
-      }
-    };
-
-    loadSubServices();
-  }, [serviceCategoryId]);
-
-  const selectedCategoryName = categories.find((item) => String(item.id) === serviceCategoryId)?.name ?? '';
+  const selectedCategory = categories.find((category) => category.id === serviceCategoryId);
+  const subServiceOptions = selectedCategory?.subcategories?.map((sub) => ({
+    value: sub.id,
+    label: sub.name,
+  })) ?? [];
 
   const validateForm = () => {
     if (!fullName.trim()) return 'Full name is required.';
     if (!serviceCategoryId) return 'Service category is required.';
-    if (!subServices.length) return 'At least one sub service is required.';
-    if (priceMin === '' || priceMax === '') return 'Price range is required.';
-    if (Number(priceMin) > Number(priceMax)) return 'price_max must be greater than or equal to price_min.';
+    if (!subServiceIds.length) return 'Please select at least one sub service.';
+    if (priceMax === '') return 'Maximum price is required.';
+    if (Number(priceMax) <= 0) return 'Maximum price must be greater than 0.';
+    const min = Number(calculatedPriceMin);
+    const max = Number(priceMax);
+    if (min > max) return 'Calculated minimum price must be less than or equal to maximum price.';
     return null;
   };
 
@@ -107,11 +74,16 @@ export default function ProviderProfileSetup() {
       setLoading(true);
       setError(null);
 
+      const categoryName = selectedCategory?.name ?? '';
+      const subServiceNames = (selectedCategory?.subcategories ?? [])
+        .filter((sub) => subServiceIds.includes(sub.id))
+        .map((sub) => sub.name);
+
       await setupProviderProfile({
         full_name: fullName.trim(),
-        service_category: selectedCategoryName,
-        sub_services: subServices,
-        price_min: Number(priceMin),
+        service_category: categoryName,
+        sub_services: subServiceNames,
+        price_min: Number(calculatedPriceMin),
         price_max: Number(priceMax),
         bio: bio.trim(),
         profile_picture: profilePicture,
@@ -171,6 +143,12 @@ export default function ProviderProfileSetup() {
             </Alert>
           )}
 
+          {catalogError && (
+            <Alert icon={<IconAlertCircle size={16} />} color="yellow">
+              {catalogError}
+            </Alert>
+          )}
+
           <Group align="flex-start" gap="md">
             <Avatar src={previewUrl} size={72} radius="xl">
               {fullName ? fullName[0] : 'P'}
@@ -196,33 +174,51 @@ export default function ProviderProfileSetup() {
 
           <Select
             label="Service Category"
-            placeholder={categoriesLoading ? 'Loading categories...' : 'Select a service category'}
-            data={categories.map((item) => ({ value: String(item.id), label: item.name }))}
+            placeholder={catalogLoading ? 'Loading categories...' : 'Select a category'}
+            data={categories.map((category) => ({ value: category.id, label: category.name }))}
             value={serviceCategoryId}
-            onChange={setServiceCategoryId}
-            disabled={categoriesLoading}
+            onChange={(value) => {
+              setServiceCategoryId(value ?? '');
+              setSubServiceIds([]);
+            }}
+            searchable
             required
           />
 
           <MultiSelect
             label="Sub Services"
-            placeholder={subServicesLoading ? 'Loading sub-services...' : 'Select sub-services'}
-            data={subServiceOptions.map((item) => ({ value: item.name, label: item.name }))}
-            value={subServices}
-            onChange={setSubServices}
-            disabled={!serviceCategoryId || subServicesLoading}
+            placeholder={serviceCategoryId ? 'Select sub services' : 'Select a category first'}
+            data={subServiceOptions}
+            value={subServiceIds}
+            onChange={setSubServiceIds}
             searchable
             required
+            disabled={!serviceCategoryId}
           />
 
           <Group grow>
-            <NumberInput
-              label="Minimum Price (ETB)"
-              value={priceMin}
-              onChange={(value) => setPriceMin(value === '' ? '' : Number(value))}
-              min={0}
-              required
-            />
+            <Box>
+              <Group gap={6} mb={4}>
+                <Text size="sm" fw={500}>Minimum Price (ETB)</Text>
+                <Tooltip
+                  multiline
+                  w={280}
+                  withArrow
+                  label="Minimum price is automatically set to 50% of your maximum price to support a fair and consistent marketplace policy."
+                >
+                  <ActionIcon variant="subtle" size="sm" aria-label="Minimum price rule information">
+                    <IconInfoCircle size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </Group>
+              <NumberInput
+                value={calculatedPriceMin}
+                min={0}
+                readOnly
+                disabled
+                required
+              />
+            </Box>
             <NumberInput
               label="Maximum Price (ETB)"
               value={priceMax}

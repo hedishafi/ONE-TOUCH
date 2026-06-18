@@ -16,10 +16,12 @@ import { AIHelpCenter } from './AIHelpCenter';
 import { COLORS, ROUTES } from '../utils/constants';
 import { useAuthStore } from '../store/authStore';
 import type { NavItem } from '../types/nav';
+import { getRoleNavItems } from './roleNav';
+import { RoleSwitcher } from './RoleSwitcher';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  navItems: NavItem[];
+  navItems?: NavItem[];
   title?: string;
 }
 
@@ -101,6 +103,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
     .slice(0, 2)
     .toUpperCase();
   const role = currentUser?.role ?? 'client';
+  const resolvedNavItems = navItems ?? getRoleNavItems(role);
 
   function go(path: string) {
     navigate(path);
@@ -171,7 +174,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
         {/* Nav links — scrollable */}
         <AppShell.Section grow component={ScrollArea} p={8}>
           <Stack gap={2}>
-            {navItems.map((item) => {
+            {resolvedNavItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <NavLink
@@ -210,6 +213,10 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
         <AppShell.Section
           style={{ borderTop: '1px solid var(--ot-border)', padding: 10 }}
         >
+          {/* Role switcher — only shown when user has multiple roles */}
+          <Box mb={8}>
+            <RoleSwitcher />
+          </Box>
           <Group gap={10} wrap="nowrap">
             <Avatar size={34} radius="xl" color="teal" style={{ flexShrink: 0 }}>
               {initials}
@@ -279,7 +286,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {navItems.slice(0, 5).map((item) => (
+        {resolvedNavItems.slice(0, 5).map((item) => (
           <BottomNavBtn
             key={item.path + '_btm'}
             item={item}
