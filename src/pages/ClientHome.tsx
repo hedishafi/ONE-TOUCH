@@ -9,10 +9,10 @@ import {
   Avatar, Modal, Divider, SimpleGrid, Textarea, Progress, TextInput, NavLink,
 } from '@mantine/core';
 import {
-  IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet,
-  IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone, IconSettings,
+  IconPhone, IconMapPin, IconCheck, IconHistory,
+  IconLogout, IconMenu2, IconX, IconMicrophone, IconSettings,
   IconPhoneOff, IconSearch, IconChevronRight,
-  IconBell, IconBellFilled, IconSparkles, IconBriefcase,
+  IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
   IconMessage, IconUser, IconLifebuoy,
 } from '@tabler/icons-react';
