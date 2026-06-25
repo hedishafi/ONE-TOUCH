@@ -10,6 +10,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { IconLogout } from '@tabler/icons-react';
 import { AppHeader } from './AppHeader';
 import { AIHelpCenter } from './AIHelpCenter';
@@ -36,6 +37,7 @@ function BottomNavBtn({
   onClick: () => void;
 }) {
   const T = COLORS.tealBlue;
+  const { t } = useTranslation();
 
   return (
     <UnstyledButton
@@ -78,7 +80,7 @@ function BottomNavBtn({
           whiteSpace: 'nowrap',
         }}
       >
-        {item.label}
+        {t(item.label)}
       </Text>
     </UnstyledButton>
   );
@@ -89,6 +91,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const { currentUser, clientProfile, providerProfile, logout } = useAuthStore();
 
   const displayName =
@@ -179,7 +182,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
               return (
                 <NavLink
                   key={item.path}
-                  label={item.label}
+                  label={t(item.label)}
                   leftSection={
                     <Box style={{ color: isActive ? T : '#ADB5BD' }}>
                       {item.icon}
@@ -231,7 +234,7 @@ export function DashboardLayout({ children, navItems }: DashboardLayoutProps) {
                 {displayName.split(' ')[0]}
               </Text>
               <Text size="10px" c="dimmed">
-                {role === 'provider' ? 'Service Provider' : 'Client'}
+                {role === 'provider' ? t('sidebar.role_provider') : t('sidebar.role_client')}
               </Text>
             </Box>
             <ActionIcon

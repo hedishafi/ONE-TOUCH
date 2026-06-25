@@ -8,6 +8,7 @@ import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useMediaQuery } from '@mantine/hooks';
 import { DarkModeToggle } from './DarkModeToggle';
+import { useTranslation } from 'react-i18next';
 
 const NAV_STYLE = `
 @keyframes slideInDown {
@@ -41,6 +42,7 @@ const NAV_STYLE = `
 
 export function LandingNavbar() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [prevScrollY, setPrevScrollY] = useState(0);
@@ -64,9 +66,9 @@ export function LandingNavbar() {
   }, [prevScrollY]);
 
   const navLinks = [
-    { label: 'Browse Services', path: ROUTES.services },
-    { label: 'How It Works', path: ROUTES.howItWorks },
-    { label: 'About', path: ROUTES.about },
+    { label: t('landing.nav_browse'), path: ROUTES.services },
+    { label: t('landing.nav_how'), path: ROUTES.howItWorks },
+    { label: t('landing.nav_about'), path: ROUTES.about },
   ];
 
   const handleNavClick = (path: string) => {
@@ -129,7 +131,7 @@ export function LandingNavbar() {
                   fw={600}
                   onClick={() => navigate(ROUTES.login)}
                 >
-                  Login
+                  {t('nav.login')}
                 </Button>
                 <Button
                   size="sm"
@@ -149,7 +151,7 @@ export function LandingNavbar() {
                   }}
                   onClick={() => navigate(ROUTES.signup)}
                 >
-                  Sign Up
+                  {t('nav.signup')}
                 </Button>
               </Group>
             </>
@@ -184,7 +186,7 @@ export function LandingNavbar() {
       >
         <Stack gap="md" p="xl">
           <Text fw={800} size="lg" c={COLORS.navyBlue} mb="md">
-            Menu
+            {t('landing.menu')}
           </Text>
 
           {/* Mobile Navigation Links */}
@@ -226,7 +228,7 @@ export function LandingNavbar() {
               setMobileMenuOpen(false);
             }}
           >
-            Login
+            {t('nav.login')}
           </Button>
           <Button
             size="md"
@@ -242,7 +244,7 @@ export function LandingNavbar() {
               setMobileMenuOpen(false);
             }}
           >
-            Sign Up
+            {t('nav.signup')}
           </Button>
         </Stack>
       </Drawer>

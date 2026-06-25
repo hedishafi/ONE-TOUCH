@@ -20,6 +20,7 @@ import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useMantineColorScheme } from '@mantine/core';
 import { useAuthStore } from '../store/authStore';
@@ -113,11 +114,11 @@ function getNearbyProviders(): Provider[] {
 void (PROVIDER_POOL);
 
 const DECLINE_REASONS = [
-  'Not available right now',
-  'Price is too high',
-  'Found another provider',
-  'Service not needed anymore',
-  'Other',
+  'home.reason_unavailable',
+  'home.reason_price',
+  'home.reason_found_other',
+  'home.reason_not_needed',
+  'home.reason_other',
 ];
 
 function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
@@ -132,20 +133,21 @@ function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
 }
 
 const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='in_progress'?'blue':'orange';
-const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
+const statusLabelKey=(s:string)=>s==='pending_agreement'?'home.status_requested':s==='in_progress'?'home.status_in_progress':s==='completed'?'home.status_done':s==='cancelled'?'home.status_cancelled':s;
 
 const NAV=[
-  {label:'Dashboard',        icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
-  {label:'Explore Services', icon:<IconSearch   size={16}/>,r:ROUTES.clientBrowse},
-  {label:'My Requests',      icon:<IconHistory  size={16}/>,r:ROUTES.clientHistory},
-  {label:'Messages',         icon:<IconMessage  size={16}/>,r:ROUTES.clientMessages},
-  {label:'Settings',         icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
-  {label:'Help & Support',   icon:<IconLifebuoy size={16}/>,r:ROUTES.clientHelp},
+  {label:'sidebar.dashboard', icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
+  {label:'sidebar.explore',   icon:<IconSearch   size={16}/>,r:ROUTES.clientBrowse},
+  {label:'sidebar.requests',  icon:<IconHistory  size={16}/>,r:ROUTES.clientHistory},
+  {label:'sidebar.messages',  icon:<IconMessage  size={16}/>,r:ROUTES.clientMessages},
+  {label:'sidebar.settings',  icon:<IconSettings size={16}/>,r:ROUTES.clientSettings},
+  {label:'sidebar.help',      icon:<IconLifebuoy size={16}/>,r:ROUTES.clientHelp},
 ];
 
 export function ClientHome() {
   const nav=useNavigate();
   const location=useLocation();
+  const { t }=useTranslation();
   const { colorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
   const {currentUser,clientProfile,logout}=useAuthStore();
@@ -244,10 +246,10 @@ export function ClientHome() {
       isRepeatBooking:false,
     } as any);
     const notificationPayload = {id:`n-${Date.now()}`,userId:'provider-001',type:'job_update',
-      title:'New Job Request',message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
+      title:t('home.new_job_request'),message:`Client needs: ${desc.slice(0,60)}`,isRead:false,createdAt:new Date().toISOString()};
     addNotification(notificationPayload as any);
     setAStage('confirmed');
-    notifications.show({title:'Request Sent!',message:'A provider will contact you shortly.',color:'teal'});
+    notifications.show({title:t('home.toast_request_sent'),message:t('home.toast_provider_contact'),color:'teal'});
   }
   // Open decline voice modal
   function openDecline(){
@@ -301,7 +303,7 @@ export function ClientHome() {
       isRepeatBooking:false,
     } as any);
     closeCall();
-    notifications.show({title:'Booked!',message:`Your ${cCat} request is live.`,color:'teal'});
+    notifications.show({title:t('home.toast_booked'),message:t('home.toast_request_live',{cat:cCat}),color:'teal'});
   }
   function closeCall(){if(cTimer.current)clearTimeout(cTimer.current);setCOpen(false);setTimeout(()=>setCStage('idle'),300);}
   // Client declines via category call modal — open voice decline modal
@@ -367,12 +369,12 @@ export function ClientHome() {
                 </Box>
                 <Box style={{flex:1,minWidth:0}}>
                   <Text size="sm" fw={700} c={N} style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {clientProfile?.fullName ?? 'Client'}
+                    {clientProfile?.fullName ?? t('home.client')}
                   </Text>
                   <Text size="xs" c="var(--ot-text-muted)" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {currentUser?.email ?? currentUser?.phone}
                   </Text>
-                  <Text size="10px" c={T} fw={600} mt={2}>View Profile →</Text>
+                  <Text size="10px" c={T} fw={600} mt={2}>{t('home.view_profile')}</Text>
                 </Box>
               </Group>
             </Box>
@@ -383,7 +385,7 @@ export function ClientHome() {
                 return (
                   <NavLink
                     key={n.label}
-                    label={n.label}
+                    label={t(n.label)}
                     leftSection={<Box style={{color: isActive ? T : '#ADB5BD'}}>{n.icon}</Box>}
                     active={isActive}
                     onClick={()=>{setSidebar(false);nav(n.r);}}
@@ -409,7 +411,7 @@ export function ClientHome() {
                 onClick={()=>{logout();nav(ROUTES.landing);}}
                 style={{borderRadius:10,display:'flex',alignItems:'center',
                   gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-                <IconLogout size={18}/> Sign out
+                <IconLogout size={18}/> {t('home.sign_out')}
               </Box>
             </Box>
           </div>
@@ -439,7 +441,7 @@ export function ClientHome() {
             </Group>
             <Box style={{flex:1, maxWidth:360, margin:'0 10px'}} visibleFrom="sm">
               <TextInput
-                placeholder="Search services"
+                placeholder={t('home.search_services')}
                 value={searchQuery}
                 onChange={e=>setSearchQuery(e.target.value)}
                 onKeyDown={e=>e.key==='Enter'&&submitSearch()}
@@ -484,14 +486,14 @@ export function ClientHome() {
           style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)'}}>
           <Group justify="space-between" align="center" wrap="nowrap" mb={10}>
             <Box>
-              <Text size="xs" c="var(--ot-text-muted)">Welcome</Text>
+              <Text size="xs" c="var(--ot-text-muted)">{t('home.welcome')}</Text>
               <Text fw={800} size="lg" c={N}>
-                {clientProfile?.fullName || currentUser?.email || 'Client'}
+                {clientProfile?.fullName || currentUser?.email || t('home.client')}
               </Text>
             </Box>
-            <Badge size="sm" color="teal" variant="light">Client</Badge>
+            <Badge size="sm" color="teal" variant="light">{t('home.client')}</Badge>
           </Group>
-          <Text size="sm" fw={700} c={N} mb={8}>What do you need today?</Text>
+          <Text size="sm" fw={700} c={N} mb={8}>{t('home.what_need')}</Text>
           <Group gap={8} wrap="wrap">
             {quickActions.map(cat=> (
               <Button key={cat.id} size="xs" radius="xl" variant="light"
@@ -501,7 +503,7 @@ export function ClientHome() {
             ))}
             <Button size="xs" radius="xl" onClick={()=>nav(ROUTES.services)}
               style={{background:`linear-gradient(135deg,${T},${N})`,border:'none'}}>
-              View all services
+              {t('home.view_all_services')}
             </Button>
           </Group>
         </Paper>
@@ -516,9 +518,9 @@ export function ClientHome() {
                   <IconBriefcase size={22} color="white"/>
                 </ThemeIcon>
                 <Box>
-                  <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">Active Request</Text><Badge size="xs" color="yellow">Live</Badge></Group>
-                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??'Service Request'}</Text>
-                  <Text size="xs" c="rgba(255,255,255,.7)">{statusLabel(activeJob.status)} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
+                  <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">{t('home.active_request')}</Text><Badge size="xs" color="yellow">{t('home.live')}</Badge></Group>
+                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??t('home.service_request')}</Text>
+                  <Text size="xs" c="rgba(255,255,255,.7)">{t(statusLabelKey(activeJob.status))} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
                 </Box>
               </Group>
               <ActionIcon variant="subtle" size="lg" style={{color:'white'}} onClick={()=>nav(ROUTES.clientHistory)}>
@@ -553,7 +555,7 @@ export function ClientHome() {
                   backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
                 <Box w={7} h={7} style={{borderRadius:'50%',background:COLORS.success,
                   boxShadow:`0 0 0 3px ${COLORS.success}44`,flexShrink:0}}/>
-                <Text size="xs" fw={700} c={N}>{PROV_DOTS.length} providers online</Text>
+                <Text size="xs" fw={700} c={N}>{t('home.providers_online',{count:PROV_DOTS.length})}</Text>
               </Group>
             </Box>
 
@@ -564,7 +566,7 @@ export function ClientHome() {
                   background: isDark ? 'rgba(26,29,39,0.92)' : 'rgba(255,255,255,.92)',
                   backdropFilter:'blur(6px)',boxShadow:'0 2px 10px rgba(0,0,0,.12)'}}>
                 <IconMapPin size={12} color={T}/>
-                <Text size="xs" fw={600} c={N}>Near you</Text>
+                <Text size="xs" fw={600} c={N}>{t('home.near_you')}</Text>
               </Group>
             </Box>
           </Paper>
@@ -580,21 +582,21 @@ export function ClientHome() {
                   <IconBriefcase size={22} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="sm" c={N}>Request Services</Text>
-                  <Text size="xs" c="dimmed">Browse services and request a provider</Text>
+                  <Text fw={800} size="sm" c={N}>{t('home.request_services')}</Text>
+                  <Text size="xs" c="dimmed">{t('home.request_services_sub')}</Text>
                 </Box>
               </Group>
               <Button size="sm" radius="xl" onClick={()=>nav(ROUTES.services)}
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none',flexShrink:0}}
-                leftSection={<IconBriefcase size={14}/>}> 
-                Request Service
+                leftSection={<IconBriefcase size={14}/>}>
+                {t('home.request_service')}
               </Button>
             </Group>
           </Paper>
         </Box>
 
         {/* Category grid */}
-        <Text fw={800} size="sm" c={N} mb={14}>All Services</Text>
+        <Text fw={800} size="sm" c={N} mb={14}>{t('home.all_services')}</Text>
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
           {categories.map(cat=>(
             <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
@@ -618,9 +620,9 @@ export function ClientHome() {
         {recent.length>0?(
           <Box>
             <Group justify="space-between" mb={14}>
-              <Text fw={800} size="sm" c={N}>Recent Requests</Text>
+              <Text fw={800} size="sm" c={N}>{t('home.recent_requests')}</Text>
               <Text size="xs" c={T} style={{cursor:'pointer'}} onClick={()=>nav(ROUTES.clientHistory)}>
-                View all
+                {t('home.view_all')}
               </Text>
             </Group>
             <Stack gap={10}>
@@ -637,7 +639,7 @@ export function ClientHome() {
                           {catEmoji(cat?.icon??'tool')}
                         </Box>
                         <Box>
-                          <Text size="sm" fw={700} lineClamp={1}>{categories.find(c=>c.id===job.categoryId)?.name??'Service Request'}</Text>
+                          <Text size="sm" fw={700} lineClamp={1}>{categories.find(c=>c.id===job.categoryId)?.name??t('home.service_request')}</Text>
                           <Group gap={10}>
                             <Text size="xs" c="var(--ot-text-muted)">{CURRENCY_SYMBOL} {job.estimatedPrice}</Text>
                             <Text size="xs" c="var(--ot-text-muted)">·</Text>
@@ -646,7 +648,7 @@ export function ClientHome() {
                         </Box>
                       </Group>
                       <Badge size="sm" color={statusColor(job.status)} variant="light" style={{flexShrink:0}}>
-                        {statusLabel(job.status)}
+                        {t(statusLabelKey(job.status))}
                       </Badge>
                     </Group>
                   </Paper>
@@ -676,10 +678,10 @@ export function ClientHome() {
               </Box>
             </Box>
             <Stack align="center" gap={4}>
-              <Text fw={800} size="lg" c={N}>Connecting…</Text>
-              <Text size="sm" c="dimmed">Reaching OneTouch AI</Text>
+              <Text fw={800} size="lg" c={N}>{t('home.connecting')}</Text>
+              <Text size="sm" c="dimmed">{t('home.reaching_ai')}</Text>
             </Stack>
-            
+
           </Stack>
         )}
 
@@ -691,8 +693,8 @@ export function ClientHome() {
               display:'flex',alignItems:'center',justifyContent:'center'}}>
               <IconCheck size={38} color="white"/>
             </Box>
-            <Text fw={800} size="lg" c={N}>Connected!</Text>
-            <Text size="sm" c="dimmed">Preparing AI assistant…</Text>
+            <Text fw={800} size="lg" c={N}>{t('home.connected')}</Text>
+            <Text size="sm" c="dimmed">{t('home.preparing_ai')}</Text>
           </Stack>
         )}
 
@@ -705,7 +707,7 @@ export function ClientHome() {
               <Box w={8} h={8} style={{borderRadius:'50%',background:COLORS.success,
                 boxShadow:`0 0 0 3px ${COLORS.success}33`,flexShrink:0,
                 animation:'pulse 1.4s ease-in-out infinite'}}/>
-              <Text size="xs" fw={700} c={N}>AI Connected . Start Chatting</Text>
+              <Text size="xs" fw={700} c={N}>{t('home.ai_connected')}</Text>
             </Group>
             {/* Pulsing message orb */}
             <Stack align="center" py={20} gap={0}>
@@ -721,10 +723,10 @@ export function ClientHome() {
                   <IconMessage size={46} color="white"/>
                 </Box>
               </Box>
-              <Text size="xs" c="dimmed" mt={16}>Describe what you need below</Text>
+              <Text size="xs" c="dimmed" mt={16}>{t('home.describe_below')}</Text>
             </Stack>
             <Textarea autosize minRows={2} maxRows={6}
-              placeholder="e.g. My kitchen sink is leaking under the cabinet…"
+              placeholder={t('home.desc_placeholder')}
               value={desc} onChange={e=>setDesc(e.currentTarget.value)}
               radius="lg"
               styles={{input:{border:`2px solid ${T}55`,fontSize:14}}}/>
@@ -732,7 +734,7 @@ export function ClientHome() {
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 disabled={!desc.trim()} onClick={submitDesc}>
-                Continue <IconArrowRight size={16}/>
+                {t('home.continue')} <IconArrowRight size={16}/>
               </Button>
               {/* Removed End Call button */}
             </Group>
@@ -749,19 +751,19 @@ export function ClientHome() {
                 <IconSparkles size={22} color="white"/>
               </Box>
               <Box style={{flex:1}}>
-                <Text fw={700} size="sm" c={N}>One more question…</Text>
+                <Text fw={700} size="sm" c={N}>{t('home.one_more_q')}</Text>
                 <Text size="sm" c="var(--ot-text-body)" mt={4}>{fQ}</Text>
               </Box>
             </Group>
             <Textarea autosize minRows={2} maxRows={6}
-              placeholder="Your answer…"
+              placeholder={t('home.answer_placeholder')}
               value={fA} onChange={e=>setFA(e.currentTarget.value)}
               radius="lg"
               styles={{input:{border:`2px solid ${N}44`,fontSize:14}}}/>
             <Button size="md" radius="xl"
               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
               disabled={!fA.trim()} onClick={submitFollowup}>
-              Find Me a Provider
+              {t('home.find_provider')}
             </Button>
           </Stack>
         )}
@@ -776,8 +778,8 @@ export function ClientHome() {
                 <IconSearch size={20} color="white"/>
               </Box>
               <Box>
-                <Text fw={700} size="sm" c={N}>Scanning nearby providers…</Text>
-                <Text size="xs" c={T}>Live map search active</Text>
+                <Text fw={700} size="sm" c={N}>{t('home.scanning')}</Text>
+                <Text size="xs" c={T}>{t('home.live_map_search')}</Text>
               </Box>
             </Group>
             <Box style={{height:220,borderRadius:16,overflow:'hidden',border:'1px solid var(--ot-border)'}}>
@@ -797,9 +799,9 @@ export function ClientHome() {
             <Group gap={8} justify="space-between" align="center">
               <Badge size="lg" variant="filled" color="yellow"
                 leftSection={<IconSparkles size={12}/>}>
-                {foundProviders.length} Nearby Providers Found
+                {t('home.nearby_found',{count:foundProviders.length})}
               </Badge>
-              <Text size="xs" c="dimmed">Tap a card to select</Text>
+              <Text size="xs" c="dimmed">{t('home.tap_select')}</Text>
             </Group>
             <Box style={{maxHeight:340,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
               {foundProviders.map((prov)=>{
@@ -831,7 +833,7 @@ export function ClientHome() {
                               <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
                             </Group>
                             <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
-                            <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                            <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{t('home.yrs_exp',{count:prov.yearsExp})}</Text>
                           </Group>
                         </Stack>
                       </Group>
@@ -839,7 +841,7 @@ export function ClientHome() {
                         <Text size="sm" fw={900} c={active?'white':N}>
                           {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
                         </Text>
-                        {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                        {active&&<Badge size="xs" color="yellow" variant="filled">{t('home.selected')}</Badge>}
                       </Stack>
                     </Group>
                   </Paper>
@@ -850,9 +852,9 @@ export function ClientHome() {
               <Button flex={1} size="md" radius="xl"
                 style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                 disabled={!selectedProv}
-                onClick={confirmJob}>Confirm &amp; Request</Button>
+                onClick={confirmJob}>{t('home.confirm_request')}</Button>
               <Button flex={1} size="md" radius="xl" variant="light" color="red"
-                onClick={cancelFromFound}>Decline</Button>
+                onClick={cancelFromFound}>{t('home.decline')}</Button>
             </Group>
           </Stack>
         )}
@@ -865,21 +867,21 @@ export function ClientHome() {
               display:'flex',alignItems:'center',justifyContent:'center'}}>
               <IconCheck size={40} color="white"/>
             </Box>
-            <Text fw={900} size="xl" c={N} ta="center">Request Sent!</Text>
+            <Text fw={900} size="xl" c={N} ta="center">{t('home.request_sent')}</Text>
             <Text size="sm" c="dimmed" ta="center">
-              {foundProv.name} has been notified and will contact you shortly.
+              {t('home.notified_shortly',{name:foundProv.name})}
             </Text>
             <Paper p="md" radius="lg" w="100%" style={{background:`${T}10`,border:`1px solid ${T}44`}}>
               <Stack gap={6}>
-                <Text size="xs" fw={600} c={T}>What happens next?</Text>
-                <Text size="xs" c="var(--ot-text-sub)">1. Provider calls you within 10 minutes</Text>
-                <Text size="xs" c="var(--ot-text-sub)">2. Confirm arrival time together</Text>
-                <Text size="xs" c="var(--ot-text-sub)">3. Service is performed &amp; you pay in-app</Text>
+                <Text size="xs" fw={600} c={T}>{t('home.what_next')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('home.next_1')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('home.next_2')}</Text>
+                <Text size="xs" c="var(--ot-text-sub)">{t('home.next_3')}</Text>
               </Stack>
             </Paper>
             <Button size="md" radius="xl" fullWidth
               style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
-              onClick={closeAssist}>Back to Home</Button>
+              onClick={closeAssist}>{t('home.back_home')}</Button>
           </Stack>
         )}
       </Modal>
@@ -903,11 +905,11 @@ export function ClientHome() {
                 </Box>
               </Box>
               <Stack align="center" gap={4}>
-                <Text fw={800} size="lg" c={N}>Calling…</Text>
-                <Text size="sm" c="dimmed">Connecting to {cCat} provider</Text>
+                <Text fw={800} size="lg" c={N}>{t('home.calling')}</Text>
+                <Text size="sm" c="dimmed">{t('home.connecting_to',{cat:cCat})}</Text>
               </Stack>
               <Button variant="light" color="red" radius="xl" size="sm"
-                leftSection={<IconPhoneOff size={14}/>} onClick={closeCall}>Cancel</Button>
+                leftSection={<IconPhoneOff size={14}/>} onClick={closeCall}>{t('home.cancel')}</Button>
             </Stack>
           )}
 
@@ -918,8 +920,8 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconPhone size={36} color="white"/>
               </Box>
-              <Text fw={800} size="lg" c={N}>Connected!</Text>
-              <Text size="sm" c="dimmed">Gathering details…</Text>
+              <Text fw={800} size="lg" c={N}>{t('home.connected')}</Text>
+              <Text size="sm" c="dimmed">{t('home.gathering')}</Text>
             </Stack>
           )}
 
@@ -930,8 +932,8 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconMicrophone size={36} color="white"/>
               </Box>
-              <Text fw={700} size="md" c={N} ta="center">Describe your {cCat} needs…</Text>
-              <Text size="xs" c="dimmed" ta="center">Our AI is listening and matching you with the best provider nearby</Text>
+              <Text fw={700} size="md" c={N} ta="center">{t('home.describe_needs',{cat:cCat})}</Text>
+              <Text size="xs" c="dimmed" ta="center">{t('home.ai_listening')}</Text>
               <Progress value={55} color="teal" size="sm" radius="xl" w="100%" animated/>
             </Stack>
           )}
@@ -943,7 +945,7 @@ export function ClientHome() {
                 display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <IconSearch size={36} color="white"/>
               </Box>
-              <Text fw={700} size="md" c={N}>Finding best match…</Text>
+              <Text fw={700} size="md" c={N}>{t('home.finding_match')}</Text>
               <Progress value={85} color="teal" size="sm" radius="xl" w="100%" animated/>
             </Stack>
           )}
@@ -953,9 +955,9 @@ export function ClientHome() {
               <Group gap={8} justify="space-between" align="center">
                 <Badge size="lg" color="yellow" variant="filled"
                   leftSection={<IconCheck size={11}/>}>
-                  {cProviders.length} Providers Ready!
+                  {t('home.providers_ready',{count:cProviders.length})}
                 </Badge>
-                <Text size="xs" c="dimmed">Tap a card to select</Text>
+                <Text size="xs" c="dimmed">{t('home.tap_select')}</Text>
               </Group>
               <Box style={{maxHeight:320,overflowY:'auto',display:'flex',flexDirection:'column',gap:10}}>
                 {cProviders.map((prov)=>{
@@ -987,7 +989,7 @@ export function ClientHome() {
                                 <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.dist} km</Text>
                               </Group>
                               <Text size="xs" c={active?'rgba(255,255,255,.5)':'dimmed'}>·</Text>
-                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{prov.yearsExp} yrs exp</Text>
+                              <Text size="xs" c={active?'rgba(255,255,255,.8)':'var(--ot-text-body)'}>{t('home.yrs_exp',{count:prov.yearsExp})}</Text>
                             </Group>
                           </Stack>
                         </Group>
@@ -995,7 +997,7 @@ export function ClientHome() {
                           <Text size="sm" fw={900} c={active?'white':N}>
                             {CURRENCY_SYMBOL} {prov.priceMin}–{prov.priceMax}
                           </Text>
-                          {active&&<Badge size="xs" color="yellow" variant="filled">Selected</Badge>}
+                          {active&&<Badge size="xs" color="yellow" variant="filled">{t('home.selected')}</Badge>}
                         </Stack>
                       </Group>
                     </Paper>
@@ -1006,9 +1008,9 @@ export function ClientHome() {
                 <Button flex={1} size="md" radius="xl"
                   style={{background:`linear-gradient(135deg,${N},${T})`,border:'none'}}
                   disabled={!cSelectedProv}
-                  onClick={confirmCall}>Confirm</Button>
+                  onClick={confirmCall}>{t('home.confirm')}</Button>
                 <Button flex={1} size="md" radius="xl" variant="light" color="red"
-                  onClick={cancelFromCall}>Decline</Button>
+                  onClick={cancelFromCall}>{t('home.decline')}</Button>
               </Group>
             </Stack>
           )}
@@ -1036,20 +1038,20 @@ export function ClientHome() {
                 </Box>
               </Box>
               <Stack gap={4} align="center">
-                <Text fw={800} size="md" c={N}>Why did you decline?</Text>
-                <Text size="xs" c="dimmed">Select a reason — we'll improve your matches</Text>
+                <Text fw={800} size="md" c={N}>{t('home.why_decline')}</Text>
+                <Text size="xs" c="dimmed">{t('home.select_reason')}</Text>
               </Stack>
               <Stack gap={10} w="100%">
                 {DECLINE_REASONS.map(r=>(
                   <Button key={r} size="sm" radius="xl" variant="light" color="gray"
                     fullWidth onClick={()=>pickReason(r)}
                     styles={{root:{fontWeight:600,justifyContent:'flex-start',paddingLeft:20}}}>
-                    {r}
+                    {t(r)}
                   </Button>
                 ))}
               </Stack>
               <Button size="xs" radius="xl" variant="subtle" color="gray"
-                onClick={closeDecline}>Never mind</Button>
+                onClick={closeDecline}>{t('home.never_mind')}</Button>
             </Stack>
           )}
           {declineStage==='confirmed'&&(
@@ -1060,9 +1062,9 @@ export function ClientHome() {
                 <IconCheck size={40} color="white"/>
               </Box>
               <Stack gap={6} align="center">
-                <Text fw={800} size="lg" c={N}>Noted!</Text>
+                <Text fw={800} size="lg" c={N}>{t('home.noted')}</Text>
                 <Text size="sm" c="dimmed" ta="center">
-                  I've recorded your reason. Feel free to order again anytime.
+                  {t('home.reason_recorded')}
                 </Text>
               </Stack>
             </Stack>
@@ -1078,8 +1080,8 @@ export function ClientHome() {
         <Box p="xl">
           <Group justify="space-between" mb="lg">
             <Box>
-              <Text fw={900} size="lg" c={N} lh={1}>{pickCat||'Services'}</Text>
-              <Text size="xs" c="dimmed" mt={2}>How would you like to get help?</Text>
+              <Text fw={900} size="lg" c={N} lh={1}>{pickCat||t('home.services')}</Text>
+              <Text size="xs" c="dimmed" mt={2}>{t('home.how_get_help')}</Text>
             </Box>
             <ActionIcon variant="subtle" onClick={()=>setPickOpen(false)}
               aria-label="Close" size="lg"><IconX size={18}/></ActionIcon>
@@ -1101,12 +1103,12 @@ export function ClientHome() {
                   <IconPhone size={26} color="white"/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="md" c="white">Call Call Center</Text>
+                  <Text fw={800} size="md" c="white">{t('home.call_center')}</Text>
                   <Text size="xs" c="rgba(255,255,255,.8)" mt={2}>
-                    Speaks to a real agent · <Text span fw={800} c="white">📞 8182</Text>
+                    {t('home.call_center_sub')} · <Text span fw={800} c="white">📞 8182</Text>
                   </Text>
                   <Badge mt={6} size="xs" style={{background:'rgba(255,255,255,.2)',color:'white',border:'none'}}>
-                    Human assistance
+                    {t('home.human_assistance')}
                   </Badge>
                 </Box>
               </Group>
@@ -1126,11 +1128,11 @@ export function ClientHome() {
                   <IconMicrophone size={26} color={T}/>
                 </Box>
                 <Box>
-                  <Text fw={800} size="md" c={N}>Call In-App AI</Text>
-                  <Text size="xs" c="dimmed" mt={2}>AI asks your problem &amp; finds the best pro</Text>
+                  <Text fw={800} size="md" c={N}>{t('home.call_ai')}</Text>
+                  <Text size="xs" c="dimmed" mt={2}>{t('home.call_ai_sub')}</Text>
                   <Group gap={6} mt={6}>
-                    <Badge size="xs" variant="light" color="teal">Smart match</Badge>
-                    <Badge size="xs" variant="light" color="blue">Auto-locate</Badge>
+                    <Badge size="xs" variant="light" color="teal">{t('home.smart_match')}</Badge>
+                    <Badge size="xs" variant="light" color="blue">{t('home.auto_locate')}</Badge>
                   </Group>
                 </Box>
               </Group>
@@ -1138,7 +1140,7 @@ export function ClientHome() {
           </Stack>
 
           <Text size="xs" c="dimmed" ta="center" mt={14}>
-            Both options are free to use · tap outside to dismiss
+            {t('home.both_free')}
           </Text>
         </Box>
       </Modal>

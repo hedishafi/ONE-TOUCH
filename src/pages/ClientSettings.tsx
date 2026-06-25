@@ -5,25 +5,28 @@ import { useMantineColorScheme } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { COLORS } from '../utils/constants';
+import { useTranslation } from 'react-i18next';
+import { storage, STORAGE_KEYS } from '../utils/storage';
 
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
 
 // ─── Notifications Tab ────────────────────────────────────────────────────────
 function NotificationsTab() {
+  const { t } = useTranslation();
   const [prefs, setPrefs] = useState({ bookingUpdates: true, newMessages: true, promotions: false, emailNotifs: true, smsNotifs: true });
   const toggle = (k: keyof typeof prefs) => setPrefs(p => ({ ...p, [k]: !p[k] }));
   const rows = [
-    { key: 'bookingUpdates' as const, label: 'Booking Updates', desc: 'Status changes on your service requests' },
-    { key: 'newMessages' as const, label: 'New Messages', desc: 'When a provider sends you a message' },
-    { key: 'promotions' as const, label: 'Promotions', desc: 'Discounts and special offers' },
-    { key: 'emailNotifs' as const, label: 'Email Notifications', desc: 'Receive alerts via email' },
-    { key: 'smsNotifs' as const, label: 'SMS Notifications', desc: 'Receive alerts via text message' },
+    { key: 'bookingUpdates' as const, label: t('cset.booking_updates'), desc: t('cset.booking_updates_desc') },
+    { key: 'newMessages' as const, label: t('cset.new_messages'), desc: t('cset.new_messages_desc') },
+    { key: 'promotions' as const, label: t('cset.promotions'), desc: t('cset.promotions_desc') },
+    { key: 'emailNotifs' as const, label: t('cset.email_notifs'), desc: t('cset.email_notifs_desc') },
+    { key: 'smsNotifs' as const, label: t('cset.sms_notifs'), desc: t('cset.sms_notifs_desc') },
   ];
   return (
     <Stack gap="lg">
       <Card radius="lg" withBorder p="xl">
-        <Text fw={700} mb="md">Notification Preferences</Text>
+        <Text fw={700} mb="md">{t('cset.notif_prefs')}</Text>
         <Stack gap={0}>
           {rows.map((row, i) => (
             <Box key={row.key}>
@@ -35,8 +38,8 @@ function NotificationsTab() {
             </Box>
           ))}
         </Stack>
-        <Button mt="lg" size="sm" style={{ background: N }} onClick={() => notifications.show({ title: 'Saved', message: 'Notification preferences updated.', color: 'teal' })}>
-          Save Preferences
+        <Button mt="lg" size="sm" style={{ background: N }} onClick={() => notifications.show({ title: t('cset.saved_toast'), message: t('cset.saved_toast_msg'), color: 'teal' })}>
+          {t('cset.save_prefs')}
         </Button>
       </Card>
     </Stack>
@@ -45,61 +48,62 @@ function NotificationsTab() {
 
 // ─── Security Tab ─────────────────────────────────────────────────────────────
 function SecurityTab() {
+  const { t } = useTranslation();
   const [cp, setCp] = useState(''); const [np, setNp] = useState(''); const [conf, setConf] = useState('');
   const [twoFA, setTwoFA] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const changePw = () => {
-    if (!cp) { notifications.show({ title: 'Error', message: 'Enter your current password.', color: 'red' }); return; }
-    if (np.length < 8) { notifications.show({ title: 'Error', message: 'New password must be at least 8 characters.', color: 'red' }); return; }
-    if (np !== conf) { notifications.show({ title: 'Error', message: 'Passwords do not match.', color: 'red' }); return; }
+    if (!cp) { notifications.show({ title: t('cset.error'), message: t('cset.err_current'), color: 'red' }); return; }
+    if (np.length < 8) { notifications.show({ title: t('cset.error'), message: t('cset.err_min8'), color: 'red' }); return; }
+    if (np !== conf) { notifications.show({ title: t('cset.error'), message: t('cset.err_match'), color: 'red' }); return; }
     setSaving(true);
-    setTimeout(() => { setCp(''); setNp(''); setConf(''); setSaving(false); notifications.show({ title: 'Password Changed', message: 'Your password has been updated.', color: 'teal' }); }, 900);
+    setTimeout(() => { setCp(''); setNp(''); setConf(''); setSaving(false); notifications.show({ title: t('cset.pw_changed'), message: t('cset.pw_changed_msg'), color: 'teal' }); }, 900);
   };
 
   return (
     <Stack gap="lg">
       <Card radius="lg" withBorder p="xl">
-        <Group gap={8} mb="md"><IconLock size={18} color={N} /><Text fw={700}>Change Password</Text></Group>
+        <Group gap={8} mb="md"><IconLock size={18} color={N} /><Text fw={700}>{t('cset.change_password')}</Text></Group>
         <Stack gap="md">
-          <PasswordInput label="Current Password" value={cp} onChange={e => setCp(e.target.value)} placeholder="Enter current password" />
-          <PasswordInput label="New Password" value={np} onChange={e => setNp(e.target.value)} placeholder="Min 8 characters" />
-          <PasswordInput label="Confirm New Password" value={conf} onChange={e => setConf(e.target.value)} placeholder="Repeat new password" />
+          <PasswordInput label={t('cset.current_password')} value={cp} onChange={e => setCp(e.target.value)} placeholder={t('cset.current_password_ph')} />
+          <PasswordInput label={t('cset.new_password')} value={np} onChange={e => setNp(e.target.value)} placeholder={t('cset.new_password_ph')} />
+          <PasswordInput label={t('cset.confirm_password')} value={conf} onChange={e => setConf(e.target.value)} placeholder={t('cset.confirm_password_ph')} />
         </Stack>
-        <Button mt="md" size="sm" style={{ background: N }} onClick={changePw} loading={saving}>Update Password</Button>
+        <Button mt="md" size="sm" style={{ background: N }} onClick={changePw} loading={saving}>{t('cset.update_password')}</Button>
       </Card>
 
       <Card radius="lg" withBorder p="xl">
         <Group justify="space-between" wrap="nowrap">
           <Box>
-            <Text fw={700}>Two-Factor Authentication</Text>
-            <Text size="xs" c="dimmed">Add an extra layer of security to your account</Text>
+            <Text fw={700}>{t('cset.twofa')}</Text>
+            <Text size="xs" c="dimmed">{t('cset.twofa_desc')}</Text>
           </Box>
-          <Switch checked={twoFA} onChange={() => { setTwoFA(v => !v); notifications.show({ title: twoFA ? '2FA Disabled' : '2FA Enabled', message: twoFA ? 'Two-factor authentication has been turned off.' : 'Two-factor authentication is now active.', color: twoFA ? 'gray' : 'teal' }); }} color="teal" />
+          <Switch checked={twoFA} onChange={() => { setTwoFA(v => !v); notifications.show({ title: twoFA ? t('cset.twofa_off') : t('cset.twofa_on'), message: twoFA ? t('cset.twofa_off_msg') : t('cset.twofa_on_msg'), color: twoFA ? 'gray' : 'teal' }); }} color="teal" />
         </Group>
       </Card>
 
       <Card radius="lg" withBorder p="xl">
-        <Text fw={700} mb="xs">Privacy</Text>
+        <Text fw={700} mb="xs">{t('cset.privacy')}</Text>
         <Group justify="space-between" wrap="nowrap">
-          <Box><Text size="sm" fw={600}>Show my profile picture to providers</Text><Text size="xs" c="dimmed">Providers can see your photo when you book</Text></Box>
+          <Box><Text size="sm" fw={600}>{t('cset.show_photo')}</Text><Text size="xs" c="dimmed">{t('cset.show_photo_desc')}</Text></Box>
           <Switch defaultChecked color="teal" />
         </Group>
       </Card>
 
       <Card radius="lg" withBorder p="xl" style={{ border: '1px solid #FCA5A5' }}>
-        <Text fw={700} c="red" mb="xs">Danger Zone</Text>
-        <Text size="sm" c="dimmed" mb="md">Permanently delete your account and all associated data. This action cannot be undone.</Text>
-        <Button color="red" variant="light" leftSection={<IconTrash size={16} />} onClick={() => setDeleteOpen(true)}>Delete Account</Button>
+        <Text fw={700} c="red" mb="xs">{t('cset.danger_zone')}</Text>
+        <Text size="sm" c="dimmed" mb="md">{t('cset.danger_desc')}</Text>
+        <Button color="red" variant="light" leftSection={<IconTrash size={16} />} onClick={() => setDeleteOpen(true)}>{t('cset.delete_account')}</Button>
       </Card>
 
-      <Modal opened={deleteOpen} onClose={() => setDeleteOpen(false)} centered radius="xl" title="Delete Account?" styles={{ content: { background: 'var(--ot-bg-card)' } }}>
+      <Modal opened={deleteOpen} onClose={() => setDeleteOpen(false)} centered radius="xl" title={t('cset.delete_q')} styles={{ content: { background: 'var(--ot-bg-card)' } }}>
         <Stack gap="md">
-          <Text size="sm" c="dimmed">This will permanently delete your account, bookings, and all data. This cannot be undone.</Text>
+          <Text size="sm" c="dimmed">{t('cset.delete_body')}</Text>
           <Group>
-            <Button color="red" onClick={() => { setDeleteOpen(false); notifications.show({ title: 'Account Deleted', message: 'Your account has been scheduled for deletion.', color: 'red' }); }}>Yes, Delete</Button>
-            <Button variant="light" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button color="red" onClick={() => { setDeleteOpen(false); notifications.show({ title: t('cset.account_deleted'), message: t('cset.account_deleted_msg'), color: 'red' }); }}>{t('cset.yes_delete')}</Button>
+            <Button variant="light" onClick={() => setDeleteOpen(false)}>{t('cset.cancel')}</Button>
           </Group>
         </Stack>
       </Modal>
@@ -110,17 +114,21 @@ function SecurityTab() {
 // ─── Appearance Tab ───────────────────────────────────────────────────────────
 function AppearanceTab() {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
-  const [lang, setLang] = useState('en');
+  const { t, i18n } = useTranslation();
+  const changeLang = (code: string) => {
+    i18n.changeLanguage(code);
+    storage.set(STORAGE_KEYS.language, code);
+  };
   const opts = [
-    { value: 'light' as const, label: 'Light', desc: 'Clean white interface', icon: <IconSun size={22} /> },
-    { value: 'dark' as const, label: 'Dark', desc: 'Easy on the eyes', icon: <IconMoon size={22} /> },
-    { value: 'auto' as const, label: 'System', desc: 'Follows your device', icon: <IconDeviceDesktop size={22} /> },
+    { value: 'light' as const, label: t('cset.light'), desc: t('cset.light_desc'), icon: <IconSun size={22} /> },
+    { value: 'dark' as const, label: t('cset.dark'), desc: t('cset.dark_desc'), icon: <IconMoon size={22} /> },
+    { value: 'auto' as const, label: t('cset.system'), desc: t('cset.system_desc'), icon: <IconDeviceDesktop size={22} /> },
   ];
   return (
     <Stack gap="lg">
       <Card radius="lg" withBorder p="xl">
-        <Text fw={700} mb={4}>Theme</Text>
-        <Text size="sm" c="dimmed" mb="lg">Choose how OneTouch looks for you.</Text>
+        <Text fw={700} mb={4}>{t('cset.theme')}</Text>
+        <Text size="sm" c="dimmed" mb="lg">{t('cset.theme_desc')}</Text>
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
           {opts.map(opt => {
             const active = colorScheme === opt.value;
@@ -137,9 +145,9 @@ function AppearanceTab() {
       </Card>
 
       <Card radius="lg" withBorder p="xl">
-        <Text fw={700} mb="md">Language</Text>
-        <Select value={lang} onChange={v => setLang(v ?? 'en')}
-          data={[{ value: 'en', label: 'English' }, { value: 'am', label: 'Amharic' }]}
+        <Text fw={700} mb="md">{t('cset.language')}</Text>
+        <Select value={i18n.language} onChange={v => changeLang(v ?? 'en')}
+          data={[{ value: 'en', label: 'English' }, { value: 'am', label: 'አማርኛ' }]}
           style={{ maxWidth: 240 }} />
       </Card>
     </Stack>
@@ -148,20 +156,21 @@ function AppearanceTab() {
 
 // ─── CLIENT SETTINGS ─────────────────────────────────────────────────────────
 export function ClientSettings() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<string | null>('notifications');
   return (
-    <DashboardLayout title="Settings">
+    <DashboardLayout title={t('cset.settings')}>
       <Group gap="sm" mb="md">
         <Box w={44} h={44} style={{ borderRadius: 12, background: `${N}12`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <IconShieldCheck size={20} color={N} />
         </Box>
-        <Box><Text fw={800} size="lg" c={N}>Settings</Text><Text size="sm" c="dimmed">Manage your preferences and security.</Text></Box>
+        <Box><Text fw={800} size="lg" c={N}>{t('cset.settings')}</Text><Text size="sm" c="dimmed">{t('cset.subtitle')}</Text></Box>
       </Group>
       <Tabs value={tab} onChange={setTab} styles={{ tab: { fontWeight: 600, fontSize: 14, paddingTop: 10, paddingBottom: 10 }, list: { borderBottom: '2px solid var(--ot-border)', gap: 4, marginBottom: 20 } }}>
         <Tabs.List>
-          <Tabs.Tab value="notifications" leftSection={<IconBell size={16} />}>Notifications</Tabs.Tab>
-          <Tabs.Tab value="security" leftSection={<IconLock size={16} />}>Password & Security</Tabs.Tab>
-          <Tabs.Tab value="appearance" leftSection={<IconSun size={16} />}>Appearance</Tabs.Tab>
+          <Tabs.Tab value="notifications" leftSection={<IconBell size={16} />}>{t('cset.tab_notifications')}</Tabs.Tab>
+          <Tabs.Tab value="security" leftSection={<IconLock size={16} />}>{t('cset.tab_security')}</Tabs.Tab>
+          <Tabs.Tab value="appearance" leftSection={<IconSun size={16} />}>{t('cset.tab_appearance')}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="notifications"><NotificationsTab /></Tabs.Panel>
         <Tabs.Panel value="security"><SecurityTab /></Tabs.Panel>

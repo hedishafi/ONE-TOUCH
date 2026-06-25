@@ -86,18 +86,18 @@ export function BrowseServices() {
   };
 
   const catOptions = [
-    { value: '', label: 'All Categories' },
+    { value: '', label: t('cdash.all_categories') },
     ...categories.map(c => ({ value: c.id, label: c.name })),
   ];
 
   return (
-    <DashboardLayout title={t('client.browse_services')}>
+    <DashboardLayout title={t('cdash.browse_services')}>
       <Stack gap="md">
         {/* Controls */}
         <Group gap="sm" wrap="nowrap">
           <TextInput
             flex={1}
-            placeholder={t('client.search_hint')}
+            placeholder={t('cdash.search_hint')}
             leftSection={<IconSearch size={16} />}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -108,7 +108,7 @@ export function BrowseServices() {
             value={selectedCategory ?? ''}
             onChange={v => setSelectedCategory(v || null)}
             leftSection={<IconFilter size={16} />}
-            placeholder={t('client.filter_category')}
+            placeholder={t('cdash.filter_category')}
             radius="xl"
             w={180}
             style={{ flexShrink: 0 }}
@@ -138,10 +138,10 @@ export function BrowseServices() {
         {/* Results count */}
         <Group gap="xs">
           <IconCircleFilled size={8} color={COLORS.tealBlue} />
-          <Text size="sm" c="dimmed">{withDistance.length} providers near you</Text>
+          <Text size="sm" c="dimmed">{t('cdash.providers_near', { count: withDistance.length })}</Text>
           <Badge size="xs" color="teal" variant="light" style={{ marginLeft: 'auto' }}>
             <IconMapPin size={10} style={{ marginRight: 4 }} />
-            New York, NY
+            {t('cdash.location')}
           </Badge>
         </Group>
 
@@ -172,9 +172,9 @@ export function BrowseServices() {
                 <Marker key={p.userId} position={[p.lat ?? 40.7128, p.lng ?? -74.006]}>
                   <Popup>
                     <Stack gap={4} p="xs">
-                      <Text fw={700} size="sm">{p.bio?.split('.')[0] ?? 'Service Provider'}</Text>
+                      <Text fw={700} size="sm">{p.bio?.split('.')[0] ?? t('cdash.service_provider')}</Text>
                       <Badge size="xs" color={p.isOnline ? 'teal' : 'gray'}>
-                        {p.isOnline ? 'Online' : 'Offline'}
+                        {p.isOnline ? t('cdash.online') : t('cdash.offline')}
                       </Badge>
                       <Text size="xs">⭐ {p.rating} · ~{p.distance.toFixed(1)} km</Text>
                     </Stack>
@@ -214,24 +214,24 @@ export function BookingHistory() {
   const displayed = filterStatus ? myJobs.filter(j => j.status === filterStatus) : myJobs;
 
   const statusOptions = [
-    { value: '', label: 'All Statuses' },
-    { value: 'completed', label: '✅ Completed' },
-    { value: 'in_progress', label: '🔨 In Progress' },
-    { value: 'pending_agreement', label: '⏳ Pending' },
-    { value: 'cancelled', label: '❌ Cancelled' },
-    { value: 'disputed', label: '⚖️ Disputed' },
+    { value: '', label: t('cdash.all_statuses') },
+    { value: 'completed', label: t('cdash.status_completed') },
+    { value: 'in_progress', label: t('cdash.status_in_progress') },
+    { value: 'pending_agreement', label: t('cdash.status_pending') },
+    { value: 'cancelled', label: t('cdash.status_cancelled') },
+    { value: 'disputed', label: t('cdash.status_disputed') },
   ];
 
   return (
-    <DashboardLayout title={t('client.my_bookings')}>
+    <DashboardLayout title={t('cdash.my_bookings')}>
       <Stack gap="md">
         <Group justify="space-between">
-          <Text size="sm" c="dimmed">{displayed.length} {filterStatus ? 'matching' : 'total'} bookings</Text>
+          <Text size="sm" c="dimmed">{filterStatus ? t('cdash.bookings_matching', { count: displayed.length }) : t('cdash.bookings_total', { count: displayed.length })}</Text>
           <Select
             data={statusOptions}
             value={filterStatus ?? ''}
             onChange={v => setFilterStatus(v || null)}
-            placeholder="Filter by status"
+            placeholder={t('cdash.filter_status')}
             w={190}
             radius="xl"
             size="sm"
@@ -243,7 +243,7 @@ export function BookingHistory() {
               <ThemeIcon size={56} radius="xl" color="gray" variant="light">
                 <IconHistory size={28} />
               </ThemeIcon>
-              <Text c="dimmed">No bookings found</Text>
+              <Text c="dimmed">{t('cdash.no_bookings')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -281,7 +281,7 @@ export function SavedProviders() {
   const handleBook = (p: ProviderProfile) => { setBookProviderId(p.userId); };
 
   return (
-    <DashboardLayout title={t('client.saved_providers')}>
+    <DashboardLayout title={t('cdash.saved_providers')}>
       <Stack gap="md">
         {providers.length === 0 ? (
           <Center py={60}>
@@ -289,8 +289,8 @@ export function SavedProviders() {
               <ThemeIcon size={56} radius="xl" color="red" variant="light">
                 <IconHeart size={28} />
               </ThemeIcon>
-              <Text fw={600}>{t('client.no_saved')}</Text>
-              <Text c="dimmed" size="sm">Browse services and tap the heart to save providers.</Text>
+              <Text fw={600}>{t('cdash.no_saved')}</Text>
+              <Text c="dimmed" size="sm">{t('cdash.saved_hint')}</Text>
             </Stack>
           </Center>
         ) : (
@@ -337,7 +337,7 @@ export function ClientWallet() {
     setIsTopping(true);
     setTimeout(() => {
       setIsTopping(false);
-      notifications.show({ title: `+${formatCurrency(topUpAmount)} Added!`, message: 'Wallet topped up successfully.', color: 'teal' });
+      notifications.show({ title: t('cdash.topup_added', { amount: `+${formatCurrency(topUpAmount)}` }), message: t('cdash.topup_success'), color: 'teal' });
     }, 1500);
   };
 
@@ -357,15 +357,15 @@ export function ClientWallet() {
             <Text size="sm" c="rgba(255,255,255,0.7)" fw={500}>{t('wallet.balance')}</Text>
             <Text style={{ fontSize: 42 }} fw={800} c="white">{formatCurrency(balance)}</Text>
             <Group gap="xs">
-              <Badge color="yellow" variant="filled" size="sm">🔒 Escrow Protected</Badge>
-              <Badge color="teal" variant="light" size="sm">✅ Instant Top-Up</Badge>
+              <Badge color="yellow" variant="filled" size="sm">{t('cdash.escrow_protected')}</Badge>
+              <Badge color="teal" variant="light" size="sm">{t('cdash.instant_topup')}</Badge>
             </Group>
           </Stack>
         </Box>
 
         {/* Top-Up */}
         <Card radius="lg" withBorder p="lg">
-          <Text fw={700} mb="md">{t('wallet.top_up')}</Text>
+          <Text fw={700} mb="md">{t('cdash.top_up')}</Text>
           <Group gap="sm" mb="md">
             {[20, 50, 100, 200].map(amt => (
               <Button
@@ -390,7 +390,7 @@ export function ClientWallet() {
               leftSection={<IconCreditCard size={16} />}
             />
             <Button color="teal" onClick={topUp} loading={isTopping} radius="xl">
-              {t('wallet.confirm_payment')}
+              {t('cdash.confirm_payment')}
             </Button>
           </Group>
         </Card>
@@ -398,22 +398,22 @@ export function ClientWallet() {
         {/* Transaction History */}
         <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
           <Group p="lg" pb="xs" justify="space-between">
-            <Text fw={700}>{t('wallet.transaction_history')}</Text>
-            <Badge size="sm" color="gray" variant="light">{txns.length} transactions</Badge>
+            <Text fw={700}>{t('cdash.transaction_history')}</Text>
+            <Badge size="sm" color="gray" variant="light">{t('cdash.transactions_count', { count: txns.length })}</Badge>
           </Group>
           <Divider />
           <ScrollArea h={360}>
             {txns.length === 0 ? (
               <Center py={40}>
-                <Text c="dimmed" size="sm">No transactions yet</Text>
+                <Text c="dimmed" size="sm">{t('cdash.no_transactions')}</Text>
               </Center>
             ) : (
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Type</Table.Th>
-                    <Table.Th>Amount</Table.Th>
-                    <Table.Th>Date</Table.Th>
+                    <Table.Th>{t('cdash.col_type')}</Table.Th>
+                    <Table.Th>{t('cdash.col_amount')}</Table.Th>
+                    <Table.Th>{t('cdash.col_date')}</Table.Th>
 
                   </Table.Tr>
                 </Table.Thead>
@@ -466,7 +466,7 @@ export function ClientLoyalty() {
     : 100;
 
   const tierColor = (CLIENT_TIER_COLORS as Record<string, string>)[tier] ?? '#CD7F32';
-  const tierLabel = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' }[tier] ?? tier;
+  const tierLabel = t(`loyalty.${tier}`);
 
   return (
     <DashboardLayout title={t('client.loyalty')}>
@@ -494,12 +494,12 @@ export function ClientLoyalty() {
             <Stack gap="xs">
               <Group gap="xs">
                 <Badge size="lg" style={{ background: tierColor, color: 'white' }}>{tierLabel}</Badge>
-                <Text fw={800} size="xl" c={COLORS.navyBlue}>{t('loyalty.member')}</Text>
+                <Text fw={800} size="xl" c={COLORS.navyBlue}>{t('cdash.member')}</Text>
               </Group>
-              <Text size="sm" c="dimmed">{totalBookings} bookings completed</Text>
+              <Text size="sm" c="dimmed">{t('cdash.bookings_completed', { count: totalBookings })}</Text>
               {nextTierConfig && (
                 <Text size="xs" c="dimmed">
-                  {nextTierConfig.minBookings - totalBookings} more to reach {nextTierConfig.tier.charAt(0).toUpperCase() + nextTierConfig.tier.slice(1)}
+                  {t('cdash.more_to_reach', { count: nextTierConfig.minBookings - totalBookings, tier: t(`loyalty.${nextTierConfig.tier}`) })}
                 </Text>
               )}
               <Progress value={progress} color={tierColor} radius="xl" size="sm" h={6} w={200} />
@@ -517,11 +517,11 @@ export function ClientLoyalty() {
                 style={{ border: isActive ? `2px solid ${tc}` : undefined, opacity: isActive ? 1 : 0.65 }}>
                 <Stack gap="xs">
                   <Group justify="space-between">
-                    <Badge style={{ background: tc, color: 'white' }} size="sm">{ct.tier.toUpperCase()}</Badge>
-                    {isActive && <Badge color="teal" size="xs">Current</Badge>}
+                    <Badge style={{ background: tc, color: 'white' }} size="sm">{t(`loyalty.${ct.tier}`)}</Badge>
+                    {isActive && <Badge color="teal" size="xs">{t('cdash.current')}</Badge>}
                   </Group>
-                  <Text size="lg" fw={800} c={tc}>{ct.cashbackRate}% {t('loyalty.cashback')}</Text>
-                  <Text size="xs" c="dimmed">From {ct.minBookings} bookings</Text>
+                  <Text size="lg" fw={800} c={tc}>{ct.cashbackRate}% {t('cdash.cashback_word')}</Text>
+                  <Text size="xs" c="dimmed">{t('cdash.from_bookings', { count: ct.minBookings })}</Text>
                   <Divider />
                   <Stack gap={4}>
                     {ct.benefits.map((perk: string) => (
@@ -539,12 +539,12 @@ export function ClientLoyalty() {
 
         {/* Cashback History */}
         <Card radius="lg" withBorder p="lg">
-          <Text fw={700} mb="md">💰 Cashback Earned</Text>
+          <Text fw={700} mb="md">{t('cdash.cashback_earned')}</Text>
           <Stack gap="xs">
             {[
-              { label: 'Completed "Plumbing Fix"', amount: '+$4.50', date: '2 days ago', color: 'teal' },
-              { label: 'Completed "Electrical Repair"', amount: '+$7.20', date: '5 days ago', color: 'teal' },
-              { label: 'Completed "House Cleaning"', amount: '+$6.00', date: '1 week ago', color: 'teal' },
+              { label: t('cdash.cb1_label'), amount: '+$4.50', date: t('cdash.cb1_date'), color: 'teal' },
+              { label: t('cdash.cb2_label'), amount: '+$7.20', date: t('cdash.cb2_date'), color: 'teal' },
+              { label: t('cdash.cb3_label'), amount: '+$6.00', date: t('cdash.cb3_date'), color: 'teal' },
             ].map((item, i) => (
               <Group key={i} justify="space-between" p="sm" style={{ borderRadius: 10, background: '#F8F9FA' }}>
                 <Stack gap={2}>
