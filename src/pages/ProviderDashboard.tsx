@@ -12,13 +12,16 @@ import {
   IconShieldCheck, IconPhone,
   IconCurrencyDollar, IconX, IconAlertCircle,
   IconLock, IconLockOpen, IconWifiOff, IconStarFilled, IconShieldLock,
+  IconMenu2,
 } from '@tabler/icons-react';
 import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { JobCard } from '../components/JobCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { ProviderSidebar } from '../components/ProviderSidebar';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore } from '../store/jobStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
@@ -62,8 +65,10 @@ const CANCEL_REASONS = [
 // ─── ACTIVE JOBS ─────────────────────────────────────────────────────────────
 export function ActiveJobs() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { currentUser } = useAuthStore();
   const { jobs } = useJobStore();
+  const [sidebar, setSidebar] = useState(false);
 
   // Job request card state
   const [reqState, setReqState] = useState<'idle'|'pending'|'dismissed'>('pending');
@@ -159,9 +164,87 @@ export function ActiveJobs() {
 
   const N = COLORS.navyBlue;
   const T = COLORS.tealBlue;
+  const initial = (currentUser?.email || 'P').charAt(0).toUpperCase();
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.my_jobs')}>
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)' }}>
+      {/* Sidebar backdrop */}
+      {sidebar && (
+        <Box
+          onClick={() => setSidebar(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 399,
+          }}
+        />
+      )}
+
+      {/* Sidebar */}
+      <Box
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 260,
+          zIndex: 400,
+          transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+          transition: 'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+        }}
+      >
+        <ProviderSidebar onClose={() => setSidebar(false)} />
+      </Box>
+
+      {/* Header */}
+      <Box
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 200,
+          background: 'var(--ot-bg-card)',
+          borderBottom: '1px solid var(--ot-border)',
+        }}
+      >
+        <Box px={20} py={12} style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <Group justify="space-between">
+            <Group gap={12}>
+              <ActionIcon variant="subtle" size="lg" onClick={() => setSidebar(true)}>
+                <IconMenu2 size={22} />
+              </ActionIcon>
+              <Group gap={8}>
+                <Box
+                  w={32}
+                  h={32}
+                  style={{
+                    borderRadius: 9,
+                    background: N,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text fw={900} size="11px" c="white">
+                    OT
+                  </Text>
+                </Box>
+                <Text fw={800} size="sm" c={N} visibleFrom="sm">
+                  {t('provider.my_jobs')}
+                </Text>
+              </Group>
+            </Group>
+            <Group gap={10}>
+              <Avatar radius="xl" size="sm" color="teal" style={{ cursor: 'pointer' }} onClick={() => setSidebar(true)}>
+                {initial}
+              </Avatar>
+            </Group>
+          </Group>
+        </Box>
+      </Box>
+
+      {/* Body */}
+      <Box style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px 64px' }}>
       <Stack gap="md">
 
         {/* ── NEW JOB REQUEST CARD ──────────────────────────────────────── */}
@@ -570,7 +653,8 @@ export function ActiveJobs() {
           </>
         )}
       </Stack>
-    </DashboardLayout>
+      </Box>
+    </Box>
   );
 }
 
@@ -863,7 +947,9 @@ export function ProviderWallet() {
 // ─── PROVIDER LOYALTY ─────────────────────────────────────────────────────────
 export function ProviderLoyalty() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { currentUser } = useAuthStore();
+  const [sidebar, setSidebar] = useState(false);
   const profiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
   const tier = myProfile?.loyaltyTier ?? 'rising_pro';
@@ -875,9 +961,88 @@ export function ProviderLoyalty() {
     ? Math.min(100, (completedJobs / nextTier.minCompletions) * 100)
     : 100;
   const tc = PROVIDER_TIER_COLORS[tier as keyof typeof PROVIDER_TIER_COLORS] ?? COLORS.tealBlue;
+  const N = COLORS.navyBlue;
+  const initial = (currentUser?.email || 'P').charAt(0).toUpperCase();
 
   return (
-    <DashboardLayout navItems={PROVIDER_NAV} title={t('provider.loyalty')}>
+    <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)' }}>
+      {/* Sidebar backdrop */}
+      {sidebar && (
+        <Box
+          onClick={() => setSidebar(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 399,
+          }}
+        />
+      )}
+
+      {/* Sidebar */}
+      <Box
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 260,
+          zIndex: 400,
+          transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+          transition: 'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+        }}
+      >
+        <ProviderSidebar onClose={() => setSidebar(false)} />
+      </Box>
+
+      {/* Header */}
+      <Box
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 200,
+          background: 'var(--ot-bg-card)',
+          borderBottom: '1px solid var(--ot-border)',
+        }}
+      >
+        <Box px={20} py={12} style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <Group justify="space-between">
+            <Group gap={12}>
+              <ActionIcon variant="subtle" size="lg" onClick={() => setSidebar(true)}>
+                <IconMenu2 size={22} />
+              </ActionIcon>
+              <Group gap={8}>
+                <Box
+                  w={32}
+                  h={32}
+                  style={{
+                    borderRadius: 9,
+                    background: N,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text fw={900} size="11px" c="white">
+                    OT
+                  </Text>
+                </Box>
+                <Text fw={800} size="sm" c={N} visibleFrom="sm">
+                  {t('provider.loyalty')}
+                </Text>
+              </Group>
+            </Group>
+            <Group gap={10}>
+              <Avatar radius="xl" size="sm" color="teal" style={{ cursor: 'pointer' }} onClick={() => setSidebar(true)}>
+                {initial}
+              </Avatar>
+            </Group>
+          </Group>
+        </Box>
+      </Box>
+
+      {/* Body */}
+      <Box style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px 64px' }}>
       <Stack gap="lg">
         {/* Tier Card */}
         <Box
@@ -942,6 +1107,7 @@ export function ProviderLoyalty() {
           })}
         </SimpleGrid>
       </Stack>
-    </DashboardLayout>
+      </Box>
+    </Box>
   );
 }

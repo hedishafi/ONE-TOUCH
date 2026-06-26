@@ -8,19 +8,20 @@ import {
   ActionIcon, Avatar, Divider, SimpleGrid, Modal, ScrollArea, PasswordInput,
 } from '@mantine/core';
 import {
-  IconBriefcase, IconTrendingUp, IconUser, IconWallet,
+  IconHome, IconList, IconBriefcase, IconReceipt, IconUser, IconSettings,
   IconBell, IconBellFilled, IconMenu2, IconX, IconLogout,
-  IconCheck, IconClock, IconMapPin, IconCircleFilled, IconGift,
+  IconCheck, IconClock, IconMapPin, IconGift,
   IconShieldCheck, IconCurrencyDollar, IconPhoneCall, IconRadar, IconStar,
   IconStarFilled, IconAlertCircle, IconWifiOff,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
+import { ProviderSidebar } from '../components/ProviderSidebar';
 import { storage, STORAGE_KEYS } from '../utils/storage';
 import { COLORS, ROUTES } from '../utils/constants';
 import * as authService from '../services/authService';
@@ -180,15 +181,37 @@ function PulseRings({ctr, on}: {ctr:[number,number]; on:boolean}) {
 }
 
 const NAV = [
-  {label:'Dashboard',                    icon:<IconCircleFilled size={16}/>, r:ROUTES.providerDashboard},
-  {label:'Profile Setup',                icon:<IconUser         size={16}/>, r:'/provider/profile-setup'},
-  {label:'Services & Subservices',       icon:<IconBriefcase    size={16}/>, r:'/provider/profile-setup'},
-  {label:'Wallet / Commission Overview', icon:<IconWallet       size={16}/>, r:ROUTES.providerWallet},
-  {label:'Earnings',                     icon:<IconTrendingUp   size={16}/>, r:ROUTES.providerEarnings},
+  { labelKey: 'providerHome.nav_dashboard',  icon: <IconHome      size={16}/>, r: ROUTES.providerDashboard },
+  { labelKey: 'providerHome.nav_available',  icon: <IconList      size={16}/>, r: '/orders/available' },
+  { labelKey: 'providerHome.nav_my_jobs',    icon: <IconBriefcase size={16}/>, r: '/orders/active' },
+  { labelKey: 'providerHome.nav_commission', icon: <IconReceipt   size={16}/>, r: '/provider/commission' },
+  { labelKey: 'providerHome.nav_profile',    icon: <IconUser      size={16}/>, r: '/provider/profile-setup' },
+  { labelKey: 'providerHome.nav_settings',   icon: <IconSettings  size={16}/>, r: '/provider/settings' },
 ];
+
+const NAV_LABELS: Record<string, string> = {
+  'providerHome.nav_dashboard': 'Dashboard',
+  'providerHome.nav_available': 'Available Orders',
+  'providerHome.nav_my_jobs': 'My Jobs',
+  'providerHome.nav_commission': 'Commission',
+  'providerHome.nav_profile': 'Profile',
+  'providerHome.nav_settings': 'Settings',
+};
+
+const NAV_GROUPS = [
+  {
+    label: 'MAIN',
+    items: ['providerHome.nav_dashboard', 'providerHome.nav_available', 'providerHome.nav_my_jobs'],
+  },
+  {
+    label: 'ACCOUNT',
+    items: ['providerHome.nav_commission', 'providerHome.nav_profile', 'providerHome.nav_settings'],
+  },
+] as const;
 
 export function ProviderHome() {
   const nav = useNavigate();
+  const location = useLocation();
   const RESUBMIT_SUCCESS_FLAG = 'provider_verification_resubmitted';
   const {currentUser, providerProfile:authProf, updateProviderOnlineStatus, logout} = useAuthStore();
   const {jobs} = useJobStore();
@@ -374,70 +397,32 @@ export function ProviderHome() {
     <Box style={{minHeight:'100vh',background:'var(--ot-bg-page)'}}>
 
       {/* Sidebar backdrop */}
-      {sidebar&&<Box onClick={()=>setSidebar(false)}
-        style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:399}}/>}
+      {sidebar && (
+        <Box
+          onClick={() => setSidebar(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 399,
+          }}
+        />
+      )}
 
-      {/* Sidebar */}
-      <Box style={{position:'fixed',top:0,left:0,bottom:0,width:260,zIndex:400,
-        background:'var(--ot-bg-card)',borderRight:'1px solid var(--ot-border)',
-        transform:sidebar?'translateX(0)':'translateX(-260px)',
-        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
-        display:'flex',flexDirection:'column'}}>
-        <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
-          <Group justify="space-between">
-            <Group gap={8}>
-              <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
-              </Box>
-              <Text fw={800} size="sm" c={N}>OneTouch</Text>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-        </Box>
-        <Box p="md">
-          <Group gap={10}>
-            <Avatar radius="xl" size="md" color="blue">{profile?.fullName?.charAt(0)?.charAt(0) ?? 'P'}</Avatar>
-            <Box>
-              <Text size="sm" fw={700} lineClamp={1}>{profile?.fullName??currentUser?.email??'Provider'}</Text>
-              <Group gap={6}>
-                <Badge size="xs" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
-                  {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
-                </Badge>
-                <Box w={7} h={7} style={{borderRadius:'50%',background:online?COLORS.success:'#aaa'}}/>
-                <Text size="10px" c={online?COLORS.success:'dimmed'} fw={600}>{online?'Online':'Offline'}</Text>
-              </Group>
-              <Text size="10px" c="dimmed">UID: {currentUser?.providerUid ?? '—'}</Text>
-              <Text size="10px" c="dimmed">{localizedDate}</Text>
-            </Box>
-          </Group>
-        </Box>
-        <Divider/>
-        <Stack gap={2} p="sm" style={{flex:1}}>
-          {currentUser?.role === 'provider' && NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
-          <Paper p="xs" radius="md" mt="xs" style={{border:'1px solid var(--ot-border)'}}>
-            <Text size="xs" fw={700} c={N}>Identity Verification Status</Text>
-            <Badge mt={6} size="sm" variant="light" color={isVerified ? 'green' : isUnderReview ? 'yellow' : 'red'}>
-              {isVerified ? 'Verified' : isUnderReview ? 'Under Review' : 'Not Verified'}
-            </Badge>
-          </Paper>
-        </Stack>
-        <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <RoleSwitcher />
-          <Box p={10}
-            onClick={()=>{logout();nav(ROUTES.landing);}}
-            style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
-          </Box>
-        </Box>
+      {/* Sidebar - drawable on all screen sizes */}
+      <Box
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 260,
+          zIndex: 400,
+          transform: sidebar ? 'translateX(0)' : 'translateX(-260px)',
+          transition: 'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
+        }}
+      >
+        <ProviderSidebar onClose={() => setSidebar(false)} />
       </Box>
 
       {/* Header */}

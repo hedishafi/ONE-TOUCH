@@ -32,10 +32,10 @@ import {
 
 // Client pages
 import { ClientHome } from './pages/ClientHome';
+import { ClientSettings } from './pages/ClientSettings';
 import {
   BrowseServices,
   BookingHistory,
-  SavedProviders,
   ClientWallet,
   ClientLoyalty,
 } from './pages/ClientDashboard';
@@ -43,6 +43,7 @@ import {
 // Provider pages
 import { ProviderHome } from './pages/ProviderHome';
 import ProviderSignupPhoneChoice from './pages/ProviderSignupPhoneChoice';
+import { ProviderSettings } from './pages/provider/ProviderSettings';
 import {
   ActiveJobs,
   Earnings,
@@ -116,9 +117,9 @@ function App() {
           element={<ProtectedRoute allowedRoles={['client']} />}
         >
           <Route path="dashboard" element={<ClientHome />} />
+          <Route path="settings" element={<ClientSettings />} />
           <Route path="browse" element={<BrowseServices />} />
           <Route path="history" element={<BookingHistory />} />
-          <Route path="saved" element={<SavedProviders />} />
           <Route path="wallet" element={<ClientWallet />} />
           <Route path="loyalty" element={<ClientLoyalty />} />
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -135,6 +136,7 @@ function App() {
           <Route path="profile" element={<ProviderProfile />} />
           <Route path="wallet" element={<ProviderWallet />} />
           <Route path="loyalty" element={<ProviderLoyalty />} />
+          <Route path="settings" element={<ProviderSettings />} />
           <Route index element={<Navigate to="dashboard" replace />} />
         </Route>
 
