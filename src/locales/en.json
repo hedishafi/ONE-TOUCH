@@ -1,7 +1,8 @@
 {
   "brand": {
     "name": "ONE TOUCH",
-    "tagline": "Instant Services, Trusted Providers"
+    "tagline": "Instant Services, Trusted Providers",
+    "short": "OT"
   },
   "nav": {
     "login": "Login",
@@ -67,6 +68,76 @@
     "no_providers": "No providers found nearby",
     "search_placeholder": "Search providers..."
   },
+  "clientSettings": {
+    "title": "Settings",
+    "subtitle": "Manage your profile, preferences, and account details.",
+    "nav_home": "Home",
+    "nav_new_order": "New Order",
+    "nav_my_orders": "My Orders",
+    "nav_saved": "Saved Providers",
+    "nav_settings": "Settings",
+    "signOut": "Sign Out",
+    "viewOrders": "View Orders",
+    "profile": {
+      "title": "Profile",
+      "subtitle": "Update the personal details shown on your account.",
+      "fullName": "Full Name",
+      "phone": "Phone Number",
+      "email": "Email",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "phoneVerified": "Verified",
+      "avatarHint": "Tap the edit icon to update your profile picture.",
+      "memberSince": "Member since",
+      "totalOrders": "Total orders"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Language",
+      "languageHint": "Choose the language used across the app.",
+      "theme": "Theme",
+      "theme_light": "Light",
+      "theme_dark": "Dark",
+      "theme_system": "System",
+      "pushNotifications": "Push Notifications",
+      "pushNotificationsHint": "Receive booking and status alerts on this device.",
+      "smsNotifications": "SMS Notifications",
+      "smsNotificationsHint": "Receive updates through text messages."
+    ,
+      "defaultOrderMethod": {
+        "title": "Default order method",
+        "hint": "Choose how you prefer to start new bookings.",
+        "instant": "Instant",
+        "chat": "Chat",
+        "browse": "Browse"
+      }
+    },
+    "account": {
+      "title": "Account",
+      "savedProviders": "Saved Providers",
+      "deleteAccount": "Delete Account",
+      "orderHistory": "Order History"
+    },
+    "location": {
+      "title": "Location",
+      "hint": "Used to find providers near you and show distance estimates.",
+      "capture": "Capture Location",
+      "notSet": "No address set"
+    },
+    "support": {
+      "title": "Support",
+      "helpCenter": "Help Center",
+      "contactSupport": "Contact Support",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "version": "App Version"
+    },
+    "deleteDialog": {
+      "title": "Delete Account",
+      "body": "This action is permanent in the UI flow. No backend request will be sent.",
+      "confirm": "Delete"
+    }
+  },
   "provider": {
     "dashboard": "Dashboard",
     "jobs": "Active Jobs",
@@ -81,6 +152,73 @@
     "complete_work": "Complete Work",
     "accept": "Accept",
     "decline": "Decline"
+  },
+  "providerSettings": {
+    "title": "Settings",
+    "subtitle": "Manage your profile, availability, and account details.",
+    "nav_dashboard": "Dashboard",
+    "nav_jobs": "Active Jobs",
+    "nav_earnings": "Earnings",
+    "nav_profile": "Profile",
+    "nav_settings": "Settings",
+    "signOut": "Sign Out",
+    "status": {
+      "verified": "Verified",
+      "pending": "Under Review",
+      "rejected": "Not Verified",
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "profile": {
+      "title": "Profile",
+      "subtitle": "Update the profile shown to clients and refine your service presentation.",
+      "fullName": "Full Name",
+      "phone": "Phone Number",
+      "phoneVerified": "Verified",
+      "bio": "Bio",
+      "bioPlaceholder": "Write a short bio that highlights your experience and service style.",
+      "services": "Service Categories",
+      "serviceFallback": "General Service",
+      "serviceSetupHint": "Edit service categories and profile details from the setup flow.",
+      "editServices": "Edit Services"
+    },
+    "availability": {
+      "title": "Availability",
+      "onlineHint": "You are visible to new clients and can receive incoming requests.",
+      "offlineHint": "Toggle back on when you are ready to accept requests."
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Language",
+      "languageHint": "Choose the language used across the app.",
+      "theme": "Theme",
+      "themeHint": "Select how the interface should appear.",
+      "theme_light": "Light",
+      "theme_dark": "Dark",
+      "theme_system": "System",
+      "newJobAlerts": "New Job Alerts",
+      "newJobAlertsHint": "Receive updates when nearby jobs arrive.",
+      "smsNotifications": "SMS Notifications",
+      "smsNotificationsHint": "Get updates through text messages."
+    },
+    "account": {
+      "title": "Earnings & Account",
+      "commissionHistory": "Commission History",
+      "deleteAccount": "Delete Account"
+    },
+    "support": {
+      "title": "Support",
+      "helpCenter": "Help Center",
+      "contactSupport": "Contact Support",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "versionLabel": "App Version"
+    },
+    "deleteDialog": {
+      "title": "Delete Account",
+      "body": "This is a UI-only confirmation. No backend request will be sent.",
+      "confirm": "Delete"
+    }
   },
   "job": {
     "pending_agreement": "Pending Agreement",

@@ -261,67 +261,6 @@ export function BookingHistory() {
   );
 }
 
-// ─── SAVED PROVIDERS ──────────────────────────────────────────────────────────
-export function SavedProviders() {
-  const { t } = useTranslation();
-  const [savedIds, setSavedIds] = useState<string[]>([]);
-  const [providers, setProviders] = useState<ProviderProfile[]>([]);
-  const { startCall } = useCallFlowStore();
-  const [callOpen, setCallOpen] = useState(false);
-  const [bookProviderId, setBookProviderId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const ids = storage.get<string[]>(STORAGE_KEYS.savedProviders, []);
-    setSavedIds(ids);
-    const ps = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
-    setProviders(ps.filter(p => ids.includes(p.userId)));
-  }, []);
-
-  const toggleSave = (uid: string) => {
-    const next = savedIds.filter(s => s !== uid);
-    setSavedIds(next);
-    storage.set(STORAGE_KEYS.savedProviders, next);
-    setProviders(prev => prev.filter(p => p.userId !== uid));
-  };
-
-  const handleCall = (p: ProviderProfile) => { startCall(p.userId); setCallOpen(true); };
-  const handleBook = (p: ProviderProfile) => { setBookProviderId(p.userId); };
-
-  return (
-    <DashboardLayout navItems={CLIENT_NAV} title={t('client.saved_providers')}>
-      <Stack gap="md">
-        {providers.length === 0 ? (
-          <Center py={60}>
-            <Stack align="center" gap="sm">
-              <ThemeIcon size={56} radius="xl" color="red" variant="light">
-                <IconHeart size={28} />
-              </ThemeIcon>
-              <Text fw={600}>{t('client.no_saved')}</Text>
-              <Text c="dimmed" size="sm">Browse services and tap the heart to save providers.</Text>
-            </Stack>
-          </Center>
-        ) : (
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-            {providers.map(p => (
-              <ProviderCard
-                key={p.userId}
-                provider={p}
-                distance={2.4}
-                isSaved
-                onCall={handleCall}
-                onBook={handleBook}
-                onToggleSave={toggleSave}
-              />
-            ))}
-          </SimpleGrid>
-        )}
-      </Stack>
-      <CallModal opened={callOpen} onClose={() => setCallOpen(false)} onJobCreated={(pid) => { setBookProviderId(pid); setCallOpen(false); }} />
-      {bookProviderId && <JobFlowModal providerId={bookProviderId} opened={!!bookProviderId} onClose={() => setBookProviderId(null)} />}
-    </DashboardLayout>
-  );
-}
-
 // ─── CLIENT WALLET ────────────────────────────────────────────────────────────
 export function ClientWallet() {
   const { t } = useTranslation();

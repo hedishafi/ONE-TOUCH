@@ -1,7 +1,8 @@
 {
   "brand": {
     "name": "ONE TOUCH",
-    "tagline": "ፈጣን አገልግሎቶች፣ ታማኝ አቅራቢዎች"
+    "tagline": "ፈጣን አገልግሎቶች፣ ታማኝ አቅራቢዎች",
+    "short": "OT"
   },
   "nav": {
     "login": "ግባ",
@@ -67,6 +68,75 @@
     "no_providers": "ቅርብ አቅራቢዎች አልተገኙም",
     "search_placeholder": "አቅራቢዎችን ፈልግ..."
   },
+  "clientSettings": {
+    "title": "ቅንብሮች",
+    "subtitle": "መገለጫዎን፣ ምርጫዎችዎን እና የመለያ ዝርዝሮችዎን ያስተዳድሩ።",
+    "nav_home": "ዋና ገጽ",
+    "nav_new_order": "አዲስ ትዕዛዝ",
+    "nav_my_orders": "የእኔ ትዕዛዞች",
+    "nav_saved": "የተቀመጡ አቅራቢዎች",
+    "nav_settings": "ቅንብሮች",
+    "signOut": "ውጣ",
+    "profile": {
+      "title": "መገለጫ",
+      "subtitle": "በመለያዎ ላይ የሚታዩትን የግል መረጃዎች ያሻሽሉ።",
+      "fullName": "ሙሉ ስም",
+      "phone": "ስልክ ቁጥር",
+      "email": "ኢሜይል",
+      "verified": "ተረጋግጧል",
+      "unverified": "አልተረጋገጠም",
+      "phoneVerified": "ተረጋግጧል",
+      "avatarHint": "የመገለጫ ስእልዎን ለማሻሻል የማርክ አዶውን ይንኩ።",
+      "memberSince": "ከመነሻ",
+      "totalOrders": "አገልግሎቶች ጠናቀቁ"
+    },
+    "preferences": {
+      "title": "ምርጫዎች",
+      "language": "ቋንቋ",
+      "languageHint": "በመተግበሪያው ውስጥ የሚጠቀሙትን ቋንቋ ይምረጡ።",
+      "theme": "ገጽታ",
+      "theme_light": "ቀላል",
+      "theme_dark": "ጨለማ",
+      "theme_system": "ስርዓት",
+      "pushNotifications": "ፑሽ ማሳወቂያዎች",
+      "pushNotificationsHint": "የትዕዛዝ እና የሁኔታ ማሳወቂያዎችን በዚህ መሣሪያ ይቀበሉ።",
+      "smsNotifications": "ኤስኤምኤስ ማሳወቂያዎች",
+      "smsNotificationsHint": "በፅሁፍ መልዕክት ማሻሻያዎችን ይቀበሉ።"
+    ,
+      "defaultOrderMethod": {
+        "title": "የመደበኛ ትዕዛዝ ዘዴ",
+        "hint": "የምትመለከቱትን የትዕዛዝ መነሳት ይምረጡ።",
+        "instant": "ፈጣን",
+        "chat": "ቻት",
+        "browse": "ፈልግ"
+      }
+    },
+    "account": {
+      "title": "መለያ",
+      "savedProviders": "የተቀመጡ አቅራቢዎች",
+      "deleteAccount": "መለያ ሰርዝ",
+      "orderHistory": "የትዕዛዝ ታሪክ"
+    },
+    "location": {
+      "title": "ቦታ",
+      "hint": "ቅርብ አቅራቢዎችን ለማግኘት እና የርቀት ግምገማ ለማድረግ ይረዳል።",
+      "capture": "ቦታ ያስገቡ",
+      "notSet": "አድራሻ አልተፈጸምም"
+    },
+    "support": {
+      "title": "ድጋፍ",
+      "helpCenter": "የእርዳታ ማዕከል",
+      "contactSupport": "ድጋፍን ያግኙ",
+      "terms": "የአገልግሎት ውሎች",
+      "privacy": "የግላዊነት መመሪያ",
+      "version": "የመተግበሪያ ስሪት"
+    },
+    "deleteDialog": {
+      "title": "መለያ ሰርዝ",
+      "body": "ይህ እርምጃ በUI ሂደት ውስጥ ቋሚ ነው። ምንም የbackend ጥያቄ አይላክም።",
+      "confirm": "ሰርዝ"
+    }
+  },
   "provider": {
     "dashboard": "ዳሽቦርድ",
     "jobs": "ንቁ ሥራዎች",
@@ -81,6 +151,73 @@
     "complete_work": "ሥራ ጨርስ",
     "accept": "ተቀበል",
     "decline": "አትቀበል"
+  },
+  "providerSettings": {
+    "title": "ቅንብሮች",
+    "subtitle": "መገለጫዎን፣ አቅርቦትዎን እና የመለያ ዝርዝሮችዎን ያስተዳድሩ።",
+    "nav_dashboard": "ዳሽቦርድ",
+    "nav_jobs": "ንቁ ሥራዎች",
+    "nav_earnings": "ገቢ",
+    "nav_profile": "መገለጫ",
+    "nav_settings": "ቅንብሮች",
+    "signOut": "ውጣ",
+    "status": {
+      "verified": "ተረጋግጧል",
+      "pending": "በግምገማ ላይ",
+      "rejected": "አልተረጋገጠም",
+      "online": "ኦንላይን",
+      "offline": "ኦፍላይን"
+    },
+    "profile": {
+      "title": "መገለጫ",
+      "subtitle": "ለደንበኞች የሚታየውን መገለጫ ያሻሽሉ እና የአገልግሎት ማቅረብዎን ያበርቱ።",
+      "fullName": "ሙሉ ስም",
+      "phone": "ስልክ ቁጥር",
+      "phoneVerified": "ተረጋግጧል",
+      "bio": "መግለጫ",
+      "bioPlaceholder": "ተሞክሮዎን እና የአገልግሎት አቀራረብዎን የሚገልጽ አጭር መግለጫ ይጻፉ።",
+      "services": "የአገልግሎት ምድቦች",
+      "serviceFallback": "አጠቃላይ አገልግሎት",
+      "serviceSetupHint": "የአገልግሎት ምድቦችን እና የመገለጫ ዝርዝሮችን ከየማዋቀር ሂደት ያሻሽሉ።",
+      "editServices": "አገልግሎቶችን ያሻሽሉ"
+    },
+    "availability": {
+      "title": "አቅርቦት",
+      "onlineHint": "ለአዲስ ደንበኞች ታይተው ገቢ ጥያቄዎችን ይቀበላሉ።",
+      "offlineHint": "ጥያቄዎችን ለመቀበል ዝግጁ ሲሆኑ እንደገና ያብሩት።"
+    },
+    "preferences": {
+      "title": "ምርጫዎች",
+      "language": "ቋንቋ",
+      "languageHint": "በመተግበሪያው ውስጥ የሚጠቀሙትን ቋንቋ ይምረጡ።",
+      "theme": "ገጽታ",
+      "themeHint": "መገለጫው እንዴት እንደሚታይ ይምረጡ።",
+      "theme_light": "ቀላል",
+      "theme_dark": "ጨለማ",
+      "theme_system": "ስርዓት",
+      "newJobAlerts": "አዲስ ሥራ ማሳወቂያዎች",
+      "newJobAlertsHint": "ቅርብ ሥራዎች ሲመጡ ማሻሻያዎችን ይቀበሉ።",
+      "smsNotifications": "ኤስኤምኤስ ማሳወቂያዎች",
+      "smsNotificationsHint": "ማሻሻያዎችን በፅሁፍ መልዕክት ይቀበሉ።"
+    },
+    "account": {
+      "title": "ገቢ እና መለያ",
+      "commissionHistory": "የኮሚሽን ታሪክ",
+      "deleteAccount": "መለያ ሰርዝ"
+    },
+    "support": {
+      "title": "ድጋፍ",
+      "helpCenter": "የእርዳታ ማዕከል",
+      "contactSupport": "ድጋፍን ያግኙ",
+      "terms": "የአገልግሎት ውሎች",
+      "privacy": "የግላዊነት መመሪያ",
+      "versionLabel": "የመተግበሪያ ስሪት"
+    },
+    "deleteDialog": {
+      "title": "መለያ ሰርዝ",
+      "body": "ይህ የUI ማረጋገጫ ብቻ ነው። ምንም የbackend ጥያቄ አይላክም።",
+      "confirm": "ሰርዝ"
+    }
   },
   "job": {
     "pending_agreement": "ስምምነት ጠብቋል",

@@ -8,23 +8,23 @@ import {
   Avatar, Modal, Divider, SimpleGrid, Textarea, Progress,
 } from '@mantine/core';
 import {
-  IconPhone, IconMapPin, IconCheck, IconHistory, IconWallet, IconStar,
+  IconPhone, IconMapPin, IconCheck, IconHome, IconPlus, IconPackage,
   IconHeart, IconLogout, IconMenu2, IconX, IconMicrophone,
   IconPhoneOff, IconSearch, IconChevronRight,
-  IconBell, IconBellFilled, IconCircleFilled, IconSparkles, IconBriefcase,
+  IconBell, IconBellFilled, IconSettings, IconSparkles, IconBriefcase,
   IconArrowRight, IconStarFilled,
   IconMessage,
 } from '@tabler/icons-react';
 import { MapContainer, TileLayer, Circle, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import { useJobStore, useNotificationStore } from '../store/jobStore';
 import { COLORS, ROUTES, CURRENCY_SYMBOL } from '../utils/constants';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
-import { RoleSwitcher } from '../components/RoleSwitcher';
+import { ClientSidebar } from '../components/ClientSidebar';
 import type { AppNotification, Job } from '../types';
 
 const N = COLORS.navyBlue;
@@ -132,16 +132,27 @@ function AnimRing({ctr,color}:{ctr:[number,number];color:string}) {
 const statusColor=(s:string)=>s==='completed'?'teal':s==='cancelled'?'red':s==='in_progress'?'blue':'orange';
 const statusLabel=(s:string)=>s==='pending_agreement'?'Requested':s==='in_progress'?'In Progress':s==='completed'?'Done':s==='cancelled'?'Cancelled':s;
 
-const NAV=[
-  {label:'Home',    icon:<IconCircleFilled size={16}/>,r:ROUTES.clientDashboard},
-  {label:'History', icon:<IconHistory      size={16}/>,r:ROUTES.clientHistory},
-  {label:'Saved',   icon:<IconHeart        size={16}/>,r:ROUTES.clientSaved},
-  {label:'Wallet',  icon:<IconWallet       size={16}/>,r:ROUTES.clientWallet},
-  {label:'Loyalty', icon:<IconStar         size={16}/>,r:ROUTES.clientLoyalty},
+const NAV = [
+  { label: 'Home',            icon: <IconHome     size={16}/>, r: '/client/dashboard' },
+  { label: 'New Order',       icon: <IconPlus     size={16}/>, r: '/orders/create' },
+  { label: 'My Orders',       icon: <IconPackage  size={16}/>, r: '/orders' },
+  { label: 'Settings',        icon: <IconSettings size={16}/>, r: ROUTES.clientSettings },
 ];
+
+const NAV_GROUPS = [
+  {
+    label: 'MAIN',
+    items: ['Home', 'New Order', 'My Orders'],
+  },
+  {
+    label: 'ACCOUNT',
+    items: ['Settings'],
+  },
+] as const;
 
 export function ClientHome() {
   const nav=useNavigate();
+  const location = useLocation();
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
@@ -296,51 +307,9 @@ export function ClientHome() {
 
       {/* Sidebar */}
       <Box style={{position:'fixed',top:0,left:0,bottom:0,width:260,zIndex:400,
-        background:'var(--ot-bg-card)',borderRight:'1px solid var(--ot-border)',
         transform:sidebar?'translateX(0)':'translateX(-260px)',
-        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)',
-        display:'flex',flexDirection:'column'}}>
-        <Box p="lg" style={{borderBottom:'1px solid var(--ot-border)'}}>
-          <Group justify="space-between">
-            <Group gap={8}>
-              <Box w={32} h={32} style={{borderRadius:9,background:N,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <Text fw={900} size="11px" c="white">OT</Text>
-              </Box>
-              <Text fw={800} size="sm" c={N}>OneTouch</Text>
-            </Group>
-            <ActionIcon variant="subtle" onClick={()=>setSidebar(false)}><IconX size={18}/></ActionIcon>
-          </Group>
-        </Box>
-        <Box p="md">
-          <Group gap={10}>
-            <Avatar radius="xl" size="md" color="teal">{clientProfile?.fullName?.charAt(0)?.charAt(0) ?? 'C'}</Avatar>
-            <Box>
-              <Text size="sm" fw={700}>{clientProfile?.fullName??'Client'}</Text>
-              <Text size="xs" c="var(--ot-text-muted)">{currentUser?.phone}</Text>
-            </Box>
-          </Group>
-        </Box>
-        <Divider/>
-        <Stack gap={2} p="sm" style={{flex:1}}>
-          {NAV.map(n=>(
-            <Box key={n.label} p={10}
-              onClick={()=>{setSidebar(false);nav(n.r);}}
-              style={{borderRadius:10,display:'flex',alignItems:'center',gap:10,
-                fontWeight:600,fontSize:14,color:'var(--ot-text-muted)',
-                cursor:'pointer'}}>
-              {n.icon} {n.label}
-            </Box>
-          ))}
-        </Stack>
-        <Box p="md" style={{borderTop:'1px solid var(--ot-border)'}}>
-          <RoleSwitcher />
-          <Box p={10}
-            onClick={()=>{logout();nav(ROUTES.landing);}}
-            style={{borderRadius:10,display:'flex',alignItems:'center',
-              gap:10,color:'var(--ot-text-muted)',cursor:'pointer',marginTop:8}}>
-            <IconLogout size={18}/> Sign out
-          </Box>
-        </Box>
+        transition:'transform 0.26s cubic-bezier(0.22,1,0.36,1)'}}>
+        <ClientSidebar onClose={()=>setSidebar(false)} />
       </Box>
 
       {/* Header */}
