@@ -153,7 +153,7 @@ export function ClientHome() {
   const {currentUser,clientProfile,logout}=useAuthStore();
   const {jobs,createJob}=useJobStore();
   const {unreadCount,fetchNotifications,addNotification}=useNotificationStore();
-  const { categories } = useServiceCatalog();
+  const { categories, localName } = useServiceCatalog();
 
   const [sidebar,setSidebar]=useState(false);
   const [searchQuery,setSearchQuery]=useState('');
@@ -519,7 +519,7 @@ export function ClientHome() {
                 </ThemeIcon>
                 <Box>
                   <Group gap={8}><Text size="xs" c="rgba(255,255,255,.8)">{t('home.active_request')}</Text><Badge size="xs" color="yellow">{t('home.live')}</Badge></Group>
-                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId)?.name??t('home.service_request')}</Text>
+                  <Text fw={700} size="sm" c="white" lineClamp={1}>{categories.find(c=>c.id===activeJob.categoryId) ? localName(categories.find(c=>c.id===activeJob.categoryId)!) : t('home.service_request')}</Text>
                   <Text size="xs" c="rgba(255,255,255,.7)">{t(statusLabelKey(activeJob.status))} · {CURRENCY_SYMBOL} {activeJob.estimatedPrice}</Text>
                 </Box>
               </Group>
@@ -600,7 +600,7 @@ export function ClientHome() {
         <SimpleGrid cols={{base:4,sm:7}} spacing={10} mb={32}>
           {categories.map(cat=>(
             <Paper key={cat.id} p="12px 8px" radius="xl" onClick={()=>openPick(cat.name)}
-              role="button" aria-label={`Book ${cat.name}`} tabIndex={0}
+              role="button" aria-label={`Book ${localName(cat)}`} tabIndex={0}
               onKeyDown={e=>e.key==='Enter'&&openPick(cat.name)}
               style={{background:'var(--ot-bg-card)',border:'1px solid var(--ot-border)',
                 cursor:'pointer',textAlign:'center',transition:'transform .18s,box-shadow .18s'}}
@@ -610,7 +610,7 @@ export function ClientHome() {
                 (e.currentTarget as HTMLElement).style.boxShadow=''}}>
               <Stack align="center" gap={5}>
                 <Text style={{fontSize:26,lineHeight:1}}>{catEmoji(cat.icon)}</Text>
-                <Text size="10px" fw={700} c="var(--ot-text-body)" ta="center" lh={1.2}>{cat.name}</Text>
+                <Text size="10px" fw={700} c="var(--ot-text-body)" ta="center" lh={1.2}>{localName(cat)}</Text>
               </Stack>
             </Paper>
           ))}

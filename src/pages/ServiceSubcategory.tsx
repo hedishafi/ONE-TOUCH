@@ -155,7 +155,7 @@ const TRUST_BADGES = [
 export function ServiceSubcategory() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { categories, loading } = useServiceCatalog();
+  const { categories, loading, localName } = useServiceCatalog();
 
   const category = categories.find(c => c.id === categoryId);
 
@@ -210,7 +210,7 @@ export function ServiceSubcategory() {
             >
               <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.landing)} style={{ cursor: 'pointer' }}>Home</Anchor>
               <Anchor size="sm" c={COLORS.tealBlue} fw={600} onClick={() => navigate(ROUTES.services)} style={{ cursor: 'pointer' }}>Services</Anchor>
-              <Text size="sm" c="dimmed" fw={500}>{category.name}</Text>
+              <Text size="sm" c="dimmed" fw={500}>{localName(category)}</Text>
             </Breadcrumbs>
 
             <Group align="center" gap={24} wrap="wrap" style={{ animation: 'fadeUp 0.6s 0.05s ease both' }}>

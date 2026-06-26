@@ -180,7 +180,7 @@ const STEPS = [
 export function Landing() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { categories } = useServiceCatalog();
+  const { categories, localName } = useServiceCatalog();
 
   function CountUp({ end, duration = 1500, decimals = 0, suffix = '' }: { end: number; duration?: number; decimals?: number; suffix?: string }) {
     const [value, setValue] = useState(0);
@@ -442,7 +442,7 @@ export function Landing() {
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform=''}>
                   {CATEGORY_ICONS[cat.icon] ?? <IconBolt size={24} />}
                 </ThemeIcon>
-                <Text fw={700} size="sm" c={COLORS.navyBlue}>{cat.name}</Text>
+                <Text fw={700} size="sm" c={COLORS.navyBlue}>{localName(cat)}</Text>
                 <Text size="xs" c="dimmed" mt={4}>{t('landing.services_count', { count: cat.subcategories.length })}</Text>
               </Box>
             ))}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Category } from '../types';
 import { MOCK_CATEGORIES } from '../mock/mockServices';
 import {
@@ -28,38 +29,44 @@ const NAME_ICON_MAP: Record<string, string> = {
 const FALLBACK_COLORS = ['#1ABC9C', '#F39C12', '#3498DB', '#E74C3C', '#2C3E50', '#9B59B6', '#E91E63', '#00B4D8'];
 
 const resolveIcon = (category: ServiceCategory) => {
-  if (category.icon) {
-    return category.icon;
-  }
+  if (category.icon) return category.icon;
   const key = category.name.toLowerCase();
   return NAME_ICON_MAP[key] ?? 'bolt';
 };
 
 const resolveColor = (category: ServiceCategory, index: number) => {
   const mock = MOCK_CATEGORIES.find(c => c.name.toLowerCase() === category.name.toLowerCase());
-  if (mock?.color) {
-    return mock.color;
-  }
+  if (mock?.color) return mock.color;
   return FALLBACK_COLORS[index % FALLBACK_COLORS.length];
 };
 
 const normalizeCategory = (
   category: ServiceCategory,
   subservices: ServiceSubService[],
-  index: number
+  index: number,
 ): Category => ({
   id: String(category.id),
   name: category.name,
+  name_am: category.name_am ?? '',
   icon: resolveIcon(category),
   color: resolveColor(category, index),
   subcategories: subservices.map((sub) => ({
     id: String(sub.id),
     categoryId: String(category.id),
     name: sub.name,
+    name_am: sub.name_am ?? '',
   })),
 });
 
-export const useServiceCatalog = (): CatalogState => {
+/**
+ * Returns service categories from the API.
+ * Each category and subcategory includes both `name` (English) and `name_am` (Amharic).
+ * Use the `localName(item)` helper to get the display name for the active language.
+ */
+export const useServiceCatalog = (): CatalogState & { localName: (item: { name: string; name_am?: string }) => string } => {
+  const { i18n } = useTranslation();
+  const isAmharic = i18n.language === 'am';
+
   const [state, setState] = useState<CatalogState>({
     categories: [],
     loading: true,
@@ -94,10 +101,15 @@ export const useServiceCatalog = (): CatalogState => {
     };
 
     void load();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  return useMemo(() => state, [state]);
+  /** Returns the Amharic name when the UI is in Amharic, falls back to English. */
+  const localName = useMemo(
+    () => (item: { name: string; name_am?: string }) =>
+      isAmharic && item.name_am ? item.name_am : item.name,
+    [isAmharic],
+  );
+
+  return useMemo(() => ({ ...state, localName }), [state, localName]);
 };

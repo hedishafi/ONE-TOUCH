@@ -6,6 +6,7 @@ import {
   IconShieldCheck, IconArrowRight, IconUser, IconBriefcase, IconCheck, IconLock,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { COLORS, ROUTES } from '../utils/constants';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { AIHelpCenter } from '../components/AIHelpCenter';
@@ -101,6 +102,7 @@ function RoleCard({ icon, label, subtitle, benefits, accentColor, btnLabel, anim
 
 export function Signup() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <Box style={{ minHeight: '100vh', background: 'var(--ot-bg-page)', display: 'flex', flexDirection: 'column' }}>
@@ -126,7 +128,7 @@ export function Signup() {
                 style={{ background: COLORS.navyBlue, color: 'white' }}
                 onClick={() => navigate(ROUTES.login)}
               >
-                Sign In
+                {t('signup.sign_in')}
               </Button>
             </Group>
           </Group>
@@ -147,10 +149,10 @@ export function Signup() {
                 >
                   <IconShieldCheck size={18} color="#F5E642" strokeWidth={2.5} />
                 </Box>
-                <Text fw={900} size="xl" c={COLORS.navyBlue}>Create your account</Text>
+                <Text fw={900} size="xl" c={COLORS.navyBlue}>{t('signup.create_account')}</Text>
               </Group>
               <Text size="sm" c="#718096" maw={440} lh={1.7}>
-                Choose how you'll be using ONE TOUCH. Both paths are secure, verified, and fully trusted.
+                {t('signup.subtitle')}
               </Text>
             </Stack>
 
@@ -165,43 +167,47 @@ export function Signup() {
               <RoleCard
                 animClass="su-c1"
                 icon={<IconUser size={24} color={COLORS.navyBlue} />}
-                label="I Need Services"
-                subtitle="Find and book verified professionals for any task, fast and securely."
+                label={t('signup.client_label')}
+                subtitle={t('signup.client_subtitle')}
                 benefits={[
-                  'Browse local verified service providers',
-                  'Transparent pricing before you book',
-                  'Secure wallet & loyalty program',
-                  'Rate and review after every job',
+                  t('signup.client_b1'),
+                  t('signup.client_b2'),
+                  t('signup.client_b3'),
+                  t('signup.client_b4'),
                 ]}
                 accentColor={COLORS.navyBlue}
-                tagLabel="CLIENT"
-                btnLabel="Continue as Client"
+                tagLabel={t('signup.client_tag')}
+                btnLabel={t('signup.client_btn')}
                 onClick={() => navigate(ROUTES.signupClient)}
               />
               <RoleCard
                 animClass="su-c2"
                 icon={<IconBriefcase size={24} color={COLORS.tealBlue} />}
-                label="I Offer Services"
-                subtitle="Join as a verified service provider and grow your professional business."
+                label={t('signup.provider_label')}
+                subtitle={t('signup.provider_subtitle')}
                 benefits={[
-                  'Full identity & biometric verification',
-                  'Receive jobs directly on the map',
-                  'Set your services, prices, and schedule',
-                  'Transparent earnings & instant wallet',
+                  t('signup.provider_b1'),
+                  t('signup.provider_b2'),
+                  t('signup.provider_b3'),
+                  t('signup.provider_b4'),
                 ]}
                 accentColor={COLORS.tealBlue}
-                tagLabel="PROVIDER"
-                btnLabel="Continue as Provider"
+                tagLabel={t('signup.provider_tag')}
+                btnLabel={t('signup.provider_btn')}
                 onClick={() => navigate(ROUTES.signupProvider)}
               />
             </Box>
 
             {/* Footer note */}
             <Text ta="center" size="xs" c="#A0AEC0">
-              By continuing, you agree to ONE TOUCH's{' '}
-              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.termsOfService)}>Terms of Service</Text>
-              {' '}and{' '}
-              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.privacyPolicy)}>Privacy Policy</Text>.
+              {t('signup.terms_pre')}{' '}
+              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.termsOfService)}>
+                {t('signup.terms_link')}
+              </Text>
+              {' '}{t('signup.terms_and')}{' '}
+              <Text span fw={600} c={COLORS.tealBlue} style={{ cursor: 'pointer' }} onClick={() => navigate(ROUTES.privacyPolicy)}>
+                {t('signup.privacy_link')}
+              </Text>.
             </Text>
           </Stack>
         </Container>

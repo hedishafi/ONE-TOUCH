@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 # ─────────────────────────────────────────────────────────────────────────────
 class ServiceCategory(models.Model):
     name        = models.CharField(max_length=100, unique=True)
+    name_am     = models.CharField(max_length=100, blank=True, help_text='Amharic name for this category')
     slug        = models.SlugField(max_length=120, unique=True, blank=True)
     icon        = models.CharField(max_length=100, blank=True, help_text='Icon name or URL')
     description = models.TextField(blank=True)
@@ -36,6 +37,7 @@ class ServiceCategory(models.Model):
 class SubService(models.Model):
     category    = models.ForeignKey(ServiceCategory, on_delete=models.CASCADE, related_name='subservices')
     name        = models.CharField(max_length=100)
+    name_am     = models.CharField(max_length=100, blank=True, help_text='Amharic name for this sub-service')
     slug        = models.SlugField()
     description = models.TextField(blank=True)
     is_active   = models.BooleanField(default=True)

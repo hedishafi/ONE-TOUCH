@@ -63,6 +63,7 @@ export interface ProviderProfile {
 export interface Category {
   id: string;
   name: string;
+  name_am?: string;
   icon: string;
   color: string;
   subcategories: Subcategory[];
@@ -72,6 +73,7 @@ export interface Subcategory {
   id: string;
   categoryId: string;
   name: string;
+  name_am?: string;
 }
 
 export type PricingModel = 'hourly' | 'fixed' | 'custom';

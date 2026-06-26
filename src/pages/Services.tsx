@@ -75,7 +75,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 export function Services() {
   const navigate = useNavigate();
-  const { categories } = useServiceCatalog();
+  const { categories, localName } = useServiceCatalog();
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const selectedSkills = selectedCategory?.subcategories ?? [];
 
@@ -195,7 +195,7 @@ export function Services() {
                         {CATEGORY_ICONS[cat.icon] ?? <IconBolt size={24} />}
                       </ThemeIcon>
                       <div>
-                        <Text fw={700} size="sm" c={COLORS.navyBlue}>{cat.name}</Text>
+                        <Text fw={700} size="sm" c={COLORS.navyBlue}>{localName(cat)}</Text>
                         <Text size="xs" c="dimmed" mt={4}>{cat.subcategories.length} services</Text>
                       </div>
                     </Stack>
@@ -215,7 +215,7 @@ export function Services() {
                       <IconArrowLeft size={20} stroke={2.5} />
                     </Button>
                     <Stack gap={0}>
-                      <Text fw={900} size="2xl" c={COLORS.navyBlue}>{selectedCategory.name}</Text>
+                      <Text fw={900} size="2xl" c={COLORS.navyBlue}>{localName(selectedCategory)}</Text>
                       <Text size="sm" c="dimmed">{selectedSkills.length} sub-services available</Text>
                     </Stack>
                   </Group>
@@ -250,7 +250,7 @@ export function Services() {
                             <IconCheck size={16} color={selectedCategory.color} />
                           </Box>
                           <div>
-                            <Text fw={600} size="sm" c={COLORS.navyBlue}>{sub.name}</Text>
+                            <Text fw={600} size="sm" c={COLORS.navyBlue}>{localName(sub)}</Text>
                             <Text size="xs" c="dimmed" mt={2}>Find verified providers</Text>
                           </div>
                         </Group>

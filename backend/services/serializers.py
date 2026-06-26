@@ -12,7 +12,7 @@ ProviderProfile = apps.get_model('accounts', 'ProviderProfile')
 class ServiceCategorySerializer(serializers.ModelSerializer):
 	class Meta:
 		model = ServiceCategory
-		fields = ['id', 'name', 'slug', 'icon', 'description', 'created_at']
+		fields = ['id', 'name', 'name_am', 'slug', 'icon', 'description', 'created_at']
 		read_only_fields = ['id', 'slug', 'created_at']
 
 
@@ -26,7 +26,7 @@ class SkillSerializer(serializers.ModelSerializer):
 class SubServiceSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = SubService
-		fields = ['id', 'name', 'slug', 'description', 'category_id', 'is_active', 'created_at']
+		fields = ['id', 'name', 'name_am', 'slug', 'description', 'category_id', 'is_active', 'created_at']
 		read_only_fields = ['id', 'created_at']
 
 

@@ -3,6 +3,7 @@ import api from './api';
 export interface ServiceCategory {
   id: number;
   name: string;
+  name_am?: string;
   slug?: string;
   icon?: string;
   description?: string;
@@ -11,6 +12,7 @@ export interface ServiceCategory {
 export interface ServiceSubService {
   id: number;
   name: string;
+  name_am?: string;
   service_id?: number;
 }
 
