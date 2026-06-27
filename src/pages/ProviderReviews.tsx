@@ -1,5 +1,9 @@
-import { Box, Text, Group, Stack, Card, Badge, Avatar, Paper, SimpleGrid, Progress, Divider } from '@mantine/core';
-import { IconStar, IconStarFilled, IconStarHalfFilled } from '@tabler/icons-react';
+import {
+  Box, Text, Group, Stack, Card, Badge, Avatar, Paper,
+  SimpleGrid, Progress, Divider,
+} from '@mantine/core';
+import { IconStar, IconStarFilled } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { ProviderLayout } from '../components/ProviderLayout';
 import { useAuthStore } from '../store/authStore';
 import { storage, STORAGE_KEYS } from '../utils/storage';
@@ -9,6 +13,7 @@ import type { ProviderProfile } from '../types';
 const N = COLORS.navyBlue;
 const T = COLORS.tealBlue;
 
+// Mock reviews — client names and service names are data, comments are kept as-is
 const MOCK_REVIEWS = [
   { id: '1', clientName: 'Abebe T.', rating: 5, comment: 'Excellent work! Very professional and punctual. Would definitely hire again.', date: '2 days ago', service: 'Home Cleaning' },
   { id: '2', clientName: 'Sara M.', rating: 4, comment: 'Good job overall. Arrived on time and completed the work efficiently.', date: '1 week ago', service: 'Plumbing' },
@@ -22,7 +27,7 @@ function StarRow({ rating }: { rating: number }) {
     <Group gap={2}>
       {[1,2,3,4,5].map(i => (
         <Box key={i} style={{ color: i <= rating ? COLORS.warning : '#DEE2E6' }}>
-          {i <= rating ? <IconStarFilled size={14}/> : <IconStar size={14}/>}
+          {i <= rating ? <IconStarFilled size={14} /> : <IconStar size={14} />}
         </Box>
       ))}
     </Group>
@@ -30,6 +35,7 @@ function StarRow({ rating }: { rating: number }) {
 }
 
 export function ProviderReviews() {
+  const { t } = useTranslation();
   const { currentUser } = useAuthStore();
   const profiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
@@ -42,7 +48,7 @@ export function ProviderReviews() {
   }));
 
   return (
-    <ProviderLayout title="Reviews">
+    <ProviderLayout title={t('providerReviews.title')}>
       <Stack gap="lg">
 
         {/* Summary card */}
@@ -50,15 +56,19 @@ export function ProviderReviews() {
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl">
             {/* Average */}
             <Stack align="center" justify="center" gap="xs">
-              <Text style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: N }}>{avgRating.toFixed(1)}</Text>
+              <Text style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, color: N }}>
+                {avgRating.toFixed(1)}
+              </Text>
               <Group gap={4}>
                 {[1,2,3,4,5].map(i => (
                   <Box key={i} style={{ color: i <= Math.round(avgRating) ? COLORS.warning : '#DEE2E6' }}>
-                    <IconStarFilled size={20}/>
+                    <IconStarFilled size={20} />
                   </Box>
                 ))}
               </Group>
-              <Text size="sm" c="dimmed">{MOCK_REVIEWS.length} reviews</Text>
+              <Text size="sm" c="dimmed">
+                {t('providerReviews.avg_reviews', { count: MOCK_REVIEWS.length })}
+              </Text>
             </Stack>
 
             {/* Breakdown */}
@@ -66,8 +76,8 @@ export function ProviderReviews() {
               {ratingCounts.map(({ star, count, pct }) => (
                 <Group key={star} gap={8} wrap="nowrap">
                   <Text size="xs" fw={600} w={8}>{star}</Text>
-                  <IconStarFilled size={12} color={COLORS.warning}/>
-                  <Progress value={pct} color="yellow" size="sm" style={{ flex: 1 }} radius="xl"/>
+                  <IconStarFilled size={12} color={COLORS.warning} />
+                  <Progress value={pct} color="yellow" size="sm" style={{ flex: 1 }} radius="xl" />
                   <Text size="xs" c="dimmed" w={20}>{count}</Text>
                 </Group>
               ))}
@@ -76,7 +86,7 @@ export function ProviderReviews() {
         </Card>
 
         {/* Review list */}
-        <Text fw={700} size="md" c={N}>Customer Feedback</Text>
+        <Text fw={700} size="md" c={N}>{t('providerReviews.customer_feedback')}</Text>
         <Stack gap="md">
           {MOCK_REVIEWS.map(review => (
             <Paper key={review.id} p="lg" radius="xl" withBorder style={{ background: 'var(--ot-bg-card)' }}>
@@ -86,14 +96,14 @@ export function ProviderReviews() {
                   <Box>
                     <Text fw={700} size="sm" c={N}>{review.clientName}</Text>
                     <Group gap={6}>
-                      <StarRow rating={review.rating}/>
+                      <StarRow rating={review.rating} />
                       <Text size="xs" c="dimmed">· {review.date}</Text>
                     </Group>
                   </Box>
                 </Group>
                 <Badge size="sm" color="teal" variant="light">{review.service}</Badge>
               </Group>
-              <Divider mb="sm"/>
+              <Divider mb="sm" />
               <Text size="sm" c="dimmed" style={{ lineHeight: 1.7 }}>{review.comment}</Text>
             </Paper>
           ))}

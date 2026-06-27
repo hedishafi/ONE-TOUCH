@@ -1,4 +1,4 @@
-// ProviderDashboard
+// ProviderDashboard — fully translated
 
 import { useState } from 'react';
 import {
@@ -11,7 +11,7 @@ import {
   IconShieldCheck, IconPhone, IconCurrencyDollar, IconX,
   IconAlertCircle, IconLock, IconLockOpen, IconWifiOff,
   IconStarFilled, IconShieldLock, IconChartBar, IconListCheck,
-  IconPercentage, IconTrophy, IconMessageCircle,
+  IconPercentage, IconTrophy,
 } from '@tabler/icons-react';
 import { BarChart } from '@mantine/charts';
 import { useTranslation } from 'react-i18next';
@@ -38,10 +38,13 @@ const MOCK_JOB = {
   priceMin: 180, priceMax: 280, phone: '+251911234567',
 };
 
-const CANCEL_REASONS = [
-  'Already on another job', 'Location is too far',
-  'Price does not match my rate', 'Service outside my expertise',
-  'Personal emergency', 'Other',
+const CANCEL_REASON_KEYS = [
+  'providerDashboard.cancel_reason_0',
+  'providerDashboard.cancel_reason_1',
+  'providerDashboard.cancel_reason_2',
+  'providerDashboard.cancel_reason_3',
+  'providerDashboard.cancel_reason_4',
+  'providerDashboard.cancel_reason_5',
 ];
 
 // ─── Jobs Tab ─────────────────────────────────────────────────────────────────
@@ -70,11 +73,11 @@ function JobsTab() {
   function openPay() { setPass(''); setPassErr(''); setPayStep('input'); setPayOpen(true); }
   function closePay() { if (payStep === 'verifying') return; setPayOpen(false); }
   function submitPay() {
-    if (!pass.trim() || pass.trim().length < 4) { setPassErr('Enter your TeleBirr password (min 4 chars).'); return; }
+    if (!pass.trim() || pass.trim().length < 4) { setPassErr(t('providerDashboard.telebirr_err_short')); return; }
     setPassErr(''); setPayStep('verifying');
     setTimeout(() => {
       setPayStep('success'); setPhoneVisible(true); setPass('');
-      notifications.show({ title: '✅ Payment Verified', message: "Client's phone is now visible.", color: 'teal' });
+      notifications.show({ title: t('providerDashboard.payment_verified_title'), message: t('providerDashboard.payment_verified_msg'), color: 'teal' });
     }, 2200);
   }
   function submitCancel() {
@@ -93,7 +96,7 @@ function JobsTab() {
           <Group justify="space-between" mb="md">
             <Group gap={8}>
               <Box style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.success, boxShadow: `0 0 0 3px ${COLORS.success}44` }} />
-              <Text size="xs" fw={700} c={T}>New Job Request</Text>
+              <Text size="xs" fw={700} c={T}>{t('providerDashboard.new_job_request')}</Text>
             </Group>
             <Badge size="sm" color="teal" variant="light">{MOCK_JOB.service}</Badge>
           </Group>
@@ -103,7 +106,7 @@ function JobsTab() {
               <Group gap={8}>
                 <Text fw={800} size="md" c={N}>{MOCK_JOB.clientName}</Text>
                 <Group gap={3}><IconStarFilled size={12} color={COLORS.warning} /><Text size="xs" fw={700}>{MOCK_JOB.clientRating}</Text></Group>
-                <Text size="xs" c="dimmed">· {MOCK_JOB.clientJobs} jobs done</Text>
+                <Text size="xs" c="dimmed">· {t('providerDashboard.jobs_done', { count: MOCK_JOB.clientJobs })}</Text>
               </Group>
               <Text size="sm" c="dimmed" lineClamp={2}>{MOCK_JOB.description}</Text>
             </Stack>
@@ -111,21 +114,21 @@ function JobsTab() {
           <Paper p="sm" radius="lg" mb="md" style={{ background: `${N}08`, border: `1px solid ${N}18` }}>
             <Group justify="space-between" wrap="nowrap">
               <Group gap={6}><IconMapPin size={14} color={T} /><Text size="sm" fw={600} c={N}>{MOCK_JOB.location}</Text></Group>
-              <Badge size="sm" color="blue" variant="light">{MOCK_JOB.distance} km away</Badge>
+              <Badge size="sm" color="blue" variant="light">{t('providerDashboard.km_away', { dist: MOCK_JOB.distance })}</Badge>
             </Group>
             <Group justify="space-between" mt={8}>
-              <Text size="xs" c="dimmed">Estimated pay</Text>
+              <Text size="xs" c="dimmed">{t('providerDashboard.estimated_pay')}</Text>
               <Text size="sm" fw={800} c={N}>ETB {MOCK_JOB.priceMin}–{MOCK_JOB.priceMax}</Text>
             </Group>
           </Paper>
           <Paper p="sm" radius="lg" mb="lg" style={{ background: phoneVisible ? `${T}12` : `${N}06`, border: `1px solid ${phoneVisible ? T : N}22`, display: 'flex', alignItems: 'center', gap: 10 }}>
             {phoneVisible
-              ? <><IconLockOpen size={16} color={T} /><Text size="sm" fw={700} c={N}>{MOCK_JOB.phone}</Text><Badge size="xs" color="teal" variant="light" ml="auto">Visible</Badge></>
-              : <><IconLock size={16} color="gray" /><Text size="sm" c="dimmed">Client phone hidden · Confirm &amp; pay to reveal</Text></>}
+              ? <><IconLockOpen size={16} color={T} /><Text size="sm" fw={700} c={N}>{MOCK_JOB.phone}</Text><Badge size="xs" color="teal" variant="light" ml="auto">{t('providerDashboard.visible')}</Badge></>
+              : <><IconLock size={16} color="gray" /><Text size="sm" c="dimmed">{t('providerDashboard.client_phone_hidden')}</Text></>}
           </Paper>
           <Group gap={10}>
-            <Button flex={1} size="md" radius="xl" style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }} leftSection={<IconCheck size={16} />} onClick={openPay}>Confirm</Button>
-            <Button flex={1} size="md" radius="xl" variant="light" color="red" leftSection={<IconX size={16} />} onClick={() => setCancelOpen(true)}>Cancel</Button>
+            <Button flex={1} size="md" radius="xl" style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }} leftSection={<IconCheck size={16} />} onClick={openPay}>{t('providerDashboard.confirm_btn')}</Button>
+            <Button flex={1} size="md" radius="xl" variant="light" color="red" leftSection={<IconX size={16} />} onClick={() => setCancelOpen(true)}>{t('providerDashboard.cancel_btn')}</Button>
           </Group>
         </Paper>
       )}
@@ -138,8 +141,8 @@ function JobsTab() {
                 <Text fw={900} size="xs" c="white">TB</Text>
               </Box>
               <Box>
-                <Text fw={800} size="sm" c={N}>TeleBirr Secure Payment</Text>
-                <Text size="10px" c="dimmed">End-to-end encrypted</Text>
+                <Text fw={800} size="sm" c={N}>{t('providerDashboard.telebirr_title')}</Text>
+                <Text size="10px" c="dimmed">{t('providerDashboard.telebirr_encrypted')}</Text>
               </Box>
             </Group>
             {payStep !== 'verifying' && <ActionIcon variant="subtle" radius="xl" onClick={closePay}><IconX size={18} /></ActionIcon>}
@@ -147,22 +150,22 @@ function JobsTab() {
           {payStep === 'input' && (
             <>
               <Paper p="md" radius="lg" style={{ background: `${T}10`, border: `1px solid ${T}33` }}>
-                <Group justify="space-between" mb={4}><Text size="sm" c="dimmed">Service fee</Text><Text fw={800} size="lg" c={N}>ETB {MOCK_JOB.priceMin}</Text></Group>
-                <Text size="xs" c="dimmed" mt={6}>After payment, the client's phone number is immediately revealed.</Text>
+                <Group justify="space-between" mb={4}><Text size="sm" c="dimmed">{t('providerDashboard.service_fee')}</Text><Text fw={800} size="lg" c={N}>ETB {MOCK_JOB.priceMin}</Text></Group>
+                <Text size="xs" c="dimmed" mt={6}>{t('providerDashboard.telebirr_after_pay')}</Text>
               </Paper>
               <Stack align="center" gap={6}>
                 <Box w={56} h={56} style={{ borderRadius: '50%', background: 'linear-gradient(135deg,#E6007A,#FF6B35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <IconShieldLock size={26} color="white" />
                 </Box>
               </Stack>
-              <PasswordInput label="TeleBirr Password" placeholder="Enter your TeleBirr password" value={pass}
+              <PasswordInput label={t('providerDashboard.telebirr_password_label')} placeholder={t('providerDashboard.telebirr_password_placeholder')} value={pass}
                 onChange={e => { setPass(e.currentTarget.value); if (passErr) setPassErr(''); }}
                 error={passErr || undefined} radius="lg" size="md"
                 onKeyDown={e => { if (e.key === 'Enter') submitPay(); }} />
               <Button size="md" radius="xl" fullWidth disabled={!pass.trim()}
                 style={{ background: pass.trim() ? 'linear-gradient(135deg,#E6007A,#FF6B35)' : undefined, border: 'none' }}
                 leftSection={<IconCurrencyDollar size={16} />} onClick={submitPay}>
-                Pay ETB {MOCK_JOB.priceMin} via TeleBirr
+                {t('providerDashboard.pay_via_telebirr', { amount: MOCK_JOB.priceMin })}
               </Button>
             </>
           )}
@@ -171,8 +174,8 @@ function JobsTab() {
               <Box w={72} h={72} style={{ borderRadius: '50%', background: 'linear-gradient(135deg,#E6007A22,#FF6B3522)', border: '3px solid #E6007A66', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <IconShieldLock size={32} color="#E6007A" />
               </Box>
-              <Text fw={800} size="md" c={N}>Verifying with TeleBirr…</Text>
-              <Text size="xs" c="dimmed" ta="center">Please do not close this window.</Text>
+              <Text fw={800} size="md" c={N}>{t('providerDashboard.verifying_telebirr')}</Text>
+              <Text size="xs" c="dimmed" ta="center">{t('providerDashboard.do_not_close')}</Text>
             </Stack>
           )}
           {payStep === 'success' && (
@@ -180,15 +183,15 @@ function JobsTab() {
               <Box w={72} h={72} style={{ borderRadius: '50%', background: `linear-gradient(135deg,${COLORS.success},${T})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <IconCheck size={36} color="white" />
               </Box>
-              <Text fw={800} size="lg" c={N}>Payment Confirmed!</Text>
+              <Text fw={800} size="lg" c={N}>{t('providerDashboard.payment_confirmed')}</Text>
               <Paper p="md" radius="lg" w="100%" style={{ background: `${T}12`, border: `1.5px solid ${T}55`, textAlign: 'center' }}>
-                <Text size="xs" c="dimmed" mb={6} fw={600}>CLIENT'S PHONE NUMBER</Text>
+                <Text size="xs" c="dimmed" mb={6} fw={600}>{t('providerDashboard.client_phone_label')}</Text>
                 <Group gap={8} justify="center"><IconPhone size={20} color={T} /><Text fw={800} size="xl" c={N}>{MOCK_JOB.phone}</Text></Group>
               </Paper>
               <Button size="md" radius="xl" fullWidth leftSection={<IconCheck size={16} />}
                 style={{ background: `linear-gradient(135deg,${N},${T})`, border: 'none' }}
                 onClick={() => { setPayOpen(false); setReqState('dismissed'); }}>
-                Start the Job
+                {t('providerDashboard.start_job')}
               </Button>
             </Stack>
           )}
@@ -200,35 +203,40 @@ function JobsTab() {
           {!cancelDone ? (
             <>
               <Group justify="space-between">
-                <Text fw={800} size="md" c={N}>Why are you cancelling?</Text>
+                <Text fw={800} size="md" c={N}>{t('providerDashboard.cancel_why')}</Text>
                 <ActionIcon variant="subtle" onClick={() => setCancelOpen(false)}><IconX size={18} /></ActionIcon>
               </Group>
               <Stack gap={8}>
-                {CANCEL_REASONS.map(r => (
-                  <Button key={r} size="sm" radius="xl" fullWidth variant={cancelReason === r ? 'filled' : 'light'} color={cancelReason === r ? 'red' : 'gray'}
-                    styles={{ root: { justifyContent: 'flex-start', paddingLeft: 20, fontWeight: 600 } }}
-                    onClick={() => setCancelReason(r)}>{r}</Button>
-                ))}
+                {CANCEL_REASON_KEYS.map(key => {
+                  const label = t(key);
+                  return (
+                    <Button key={key} size="sm" radius="xl" fullWidth variant={cancelReason === label ? 'filled' : 'light'} color={cancelReason === label ? 'red' : 'gray'}
+                      styles={{ root: { justifyContent: 'flex-start', paddingLeft: 20, fontWeight: 600 } }}
+                      onClick={() => setCancelReason(label)}>{label}</Button>
+                  );
+                })}
               </Stack>
               <Paper p="sm" radius="lg" style={{ background: `${COLORS.warning}18`, border: `1px solid ${COLORS.warning}44` }}>
                 <Group gap={8}>
                   <IconAlertCircle size={16} color={COLORS.warning} />
-                  <Text size="xs" c="dimmed" style={{ flex: 1 }}>Not available? Switch to <Text span fw={700} c={N}>Offline</Text> so clients won't send requests.</Text>
+                  <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                    {t('providerDashboard.cancel_offline_hint_pre')} <Text span fw={700} c={N}>{t('providerDashboard.offline_word')}</Text> {t('providerDashboard.cancel_offline_hint_post')}
+                  </Text>
                 </Group>
                 <Group gap={8} mt={10}>
                   <IconWifiOff size={14} color={COLORS.warning} />
-                  <Text size="xs" fw={600} c={COLORS.warning}>Go Offline</Text>
-                  <Switch size="xs" color="orange" onChange={e => { if (e.currentTarget.checked) notifications.show({ title: 'You are now Offline', message: 'No new requests will be sent your way.', color: 'orange' }); }} />
+                  <Text size="xs" fw={600} c={COLORS.warning}>{t('providerDashboard.go_offline')}</Text>
+                  <Switch size="xs" color="orange" onChange={e => { if (e.currentTarget.checked) notifications.show({ title: t('providerDashboard.now_offline'), message: t('providerDashboard.now_offline_msg'), color: 'orange' }); }} />
                 </Group>
               </Paper>
-              <Button size="md" radius="xl" color="red" disabled={!cancelReason} onClick={submitCancel}>Submit Cancellation</Button>
+              <Button size="md" radius="xl" color="red" disabled={!cancelReason} onClick={submitCancel}>{t('providerDashboard.submit_cancellation')}</Button>
             </>
           ) : (
             <Stack align="center" gap="md" py={12}>
               <Box w={64} h={64} style={{ borderRadius: '50%', background: `linear-gradient(135deg,${COLORS.warning},#ff6b35)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <IconCheck size={32} color="white" />
               </Box>
-              <Text fw={800} size="lg" c={N}>Cancellation recorded</Text>
+              <Text fw={800} size="lg" c={N}>{t('providerDashboard.cancellation_recorded')}</Text>
             </Stack>
           )}
         </Stack>
@@ -239,7 +247,7 @@ function JobsTab() {
           <Stack align="center" gap="sm">
             <ThemeIcon size={56} radius="xl" color="gray" variant="light"><IconBriefcase size={28} /></ThemeIcon>
             <Text c="dimmed">{t('provider.no_jobs')}</Text>
-            <Text size="xs" c="dimmed">Set yourself as Online to receive job requests</Text>
+            <Text size="xs" c="dimmed">{t('providerDashboard.no_jobs_hint')}</Text>
           </Stack>
         </Center>
       ) : (
@@ -261,6 +269,7 @@ function JobsTab() {
 
 // ─── Commission Tab ───────────────────────────────────────────────────────────
 function CommissionTab() {
+  const { t } = useTranslation();
   const { currentUser } = useAuthStore();
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, [])
     .filter(tx => tx.userId === currentUser?.id && tx.type === 'commission');
@@ -274,29 +283,29 @@ function CommissionTab() {
     <Stack gap="lg">
       <Card radius="lg" withBorder p="lg">
         <Group justify="space-between" mb="xs">
-          <Text size="sm" c="dimmed" fw={500}>Total Commission Paid (10%)</Text>
+          <Text size="sm" c="dimmed" fw={500}>{t('providerDashboard.commission_total_label')}</Text>
           <ThemeIcon size={32} radius="md" variant="light" color="red"><IconPercentage size={18} /></ThemeIcon>
         </Group>
         <Text size="xl" fw={800} c="#E63946">{formatCurrency(total)}</Text>
-        <Text size="xs" c="dimmed" mt={4}>Platform fee deducted from your gross earnings</Text>
+        <Text size="xs" c="dimmed" mt={4}>{t('providerDashboard.commission_platform_fee')}</Text>
       </Card>
       <Card radius="lg" withBorder p="lg">
-        <Text fw={700} mb="md">Monthly Commission Breakdown</Text>
+        <Text fw={700} mb="md">{t('providerDashboard.commission_monthly')}</Text>
         <BarChart h={220} data={chartData} dataKey="month"
           series={[{ name: 'commission', color: '#E63946', label: 'Commission' }]}
           barProps={{ radius: [4, 4, 0, 0] }} />
       </Card>
       <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
-        <Text fw={700} p="lg" pb="xs">Commission History</Text>
+        <Text fw={700} p="lg" pb="xs">{t('providerDashboard.commission_history')}</Text>
         <Divider />
         <ScrollArea h={280}>
           <Table striped highlightOnHover>
             <Table.Thead>
-              <Table.Tr><Table.Th>Description</Table.Th><Table.Th>Amount</Table.Th><Table.Th>Date</Table.Th></Table.Tr>
+              <Table.Tr><Table.Th>{t('providerDashboard.col_description')}</Table.Th><Table.Th>{t('providerDashboard.col_amount')}</Table.Th><Table.Th>{t('providerDashboard.col_date')}</Table.Th></Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {txns.length === 0
-                ? <Table.Tr><Table.Td colSpan={3}><Text size="sm" c="dimmed" ta="center" py="md">No commission records yet</Text></Table.Td></Table.Tr>
+                ? <Table.Tr><Table.Td colSpan={3}><Text size="sm" c="dimmed" ta="center" py="md">{t('providerDashboard.no_commission')}</Text></Table.Td></Table.Tr>
                 : txns.map(tx => (
                   <Table.Tr key={tx.id}>
                     <Table.Td><Text size="sm">{tx.description}</Text></Table.Td>
@@ -314,6 +323,7 @@ function CommissionTab() {
 
 // ─── Earnings Overview Tab ────────────────────────────────────────────────────
 function EarningsOverviewTab() {
+  const { t } = useTranslation();
   const { currentUser } = useAuthStore();
   const txns = storage.get<WalletTransaction[]>(STORAGE_KEYS.walletTransactions, [])
     .filter(tx => tx.userId === currentUser?.id);
@@ -329,13 +339,13 @@ function EarningsOverviewTab() {
     <Stack gap="lg">
       <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
         {[
-          { label: 'Gross Earnings', value: formatCurrency(totalEarned), color: T, icon: <IconTrophy size={20} /> },
-          { label: 'Commission (10%)', value: `-${formatCurrency(totalComm)}`, color: '#E63946', icon: <IconCurrencyDollar size={20} /> },
-          { label: 'Net Earnings', value: formatCurrency(net), color: N, icon: <IconCheck size={20} /> },
+          { labelKey: 'providerDashboard.gross_earnings', value: formatCurrency(totalEarned), color: T, icon: <IconTrophy size={20} /> },
+          { labelKey: 'providerDashboard.commission_pct', value: `-${formatCurrency(totalComm)}`, color: '#E63946', icon: <IconCurrencyDollar size={20} /> },
+          { labelKey: 'providerDashboard.net_earnings', value: formatCurrency(net), color: N, icon: <IconCheck size={20} /> },
         ].map(kpi => (
-          <Card key={kpi.label} radius="lg" withBorder p="lg">
+          <Card key={kpi.labelKey} radius="lg" withBorder p="lg">
             <Group justify="space-between" mb="xs">
-              <Text size="sm" c="dimmed" fw={500}>{kpi.label}</Text>
+              <Text size="sm" c="dimmed" fw={500}>{t(kpi.labelKey)}</Text>
               <ThemeIcon size={32} radius="md" variant="light" color="teal">{kpi.icon}</ThemeIcon>
             </Group>
             <Text size="xl" fw={800} c={kpi.color}>{kpi.value}</Text>
@@ -343,7 +353,7 @@ function EarningsOverviewTab() {
         ))}
       </SimpleGrid>
       <Card radius="lg" withBorder p="lg">
-        <Text fw={700} mb="md">Monthly Earnings vs Commission</Text>
+        <Text fw={700} mb="md">{t('providerDashboard.monthly_chart')}</Text>
         <BarChart h={240} data={chartData} dataKey="month"
           series={[
             { name: 'earnings', color: T, label: 'Gross Earnings' },
@@ -352,16 +362,16 @@ function EarningsOverviewTab() {
           barProps={{ radius: [4, 4, 0, 0] }} />
       </Card>
       <Card radius="lg" withBorder p={0} style={{ overflow: 'hidden' }}>
-        <Text fw={700} p="lg" pb="xs">Transaction History</Text>
+        <Text fw={700} p="lg" pb="xs">{t('providerDashboard.transaction_history')}</Text>
         <Divider />
         <ScrollArea h={320}>
           <Table striped highlightOnHover>
             <Table.Thead>
-              <Table.Tr><Table.Th>Type</Table.Th><Table.Th>Amount</Table.Th><Table.Th>Date</Table.Th><Table.Th>Status</Table.Th></Table.Tr>
+              <Table.Tr><Table.Th>{t('providerDashboard.col_type')}</Table.Th><Table.Th>{t('providerDashboard.col_amount')}</Table.Th><Table.Th>{t('providerDashboard.col_date')}</Table.Th><Table.Th>{t('providerDashboard.col_status')}</Table.Th></Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {txns.length === 0
-                ? <Table.Tr><Table.Td colSpan={4}><Text size="sm" c="dimmed" ta="center" py="md">No transactions yet</Text></Table.Td></Table.Tr>
+                ? <Table.Tr><Table.Td colSpan={4}><Text size="sm" c="dimmed" ta="center" py="md">{t('providerDashboard.no_transactions')}</Text></Table.Td></Table.Tr>
                 : txns.map(tx => (
                   <Table.Tr key={tx.id}>
                     <Table.Td><Text size="sm" tt="capitalize">{tx.type.replace(/_/g, ' ')}</Text></Table.Td>
@@ -380,18 +390,19 @@ function EarningsOverviewTab() {
 
 // ─── EARNINGS ─────────────────────────────────────────────────────────────────
 export function Earnings() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string | null>('overview');
   return (
-    <ProviderLayout title="Earnings">
+    <ProviderLayout title={t('providerDashboard.earnings_title')}>
       <Tabs value={activeTab} onChange={setActiveTab}
         styles={{
           tab: { fontWeight: 600, fontSize: 14, paddingTop: 10, paddingBottom: 10 },
           list: { borderBottom: '2px solid var(--ot-border)', gap: 4, marginBottom: 20 },
         }}>
         <Tabs.List>
-          <Tabs.Tab value="overview" leftSection={<IconChartBar size={16} />}>Dashboard</Tabs.Tab>
-          <Tabs.Tab value="jobs" leftSection={<IconListCheck size={16} />}>Jobs</Tabs.Tab>
-          <Tabs.Tab value="commission" leftSection={<IconPercentage size={16} />}>Commission Overview</Tabs.Tab>
+          <Tabs.Tab value="overview" leftSection={<IconChartBar size={16} />}>{t('providerDashboard.tab_overview')}</Tabs.Tab>
+          <Tabs.Tab value="jobs" leftSection={<IconListCheck size={16} />}>{t('providerDashboard.tab_jobs')}</Tabs.Tab>
+          <Tabs.Tab value="commission" leftSection={<IconPercentage size={16} />}>{t('providerDashboard.tab_commission')}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="overview"><EarningsOverviewTab /></Tabs.Panel>
         <Tabs.Panel value="jobs"><JobsTab /></Tabs.Panel>
@@ -403,18 +414,19 @@ export function Earnings() {
 
 // ─── PROVIDER PROFILE (read-only) ─────────────────────────────────────────────
 export function ProviderProfile() {
+  const { t } = useTranslation();
   const { currentUser } = useAuthStore();
   const profiles = storage.get<ProviderProfile[]>(STORAGE_KEYS.providerProfiles, []);
   const myProfile = profiles.find(p => p.userId === currentUser?.id);
 
   return (
-    <ProviderLayout title="Profile">
+    <ProviderLayout title={t('providerDashboard.profile_title')}>
       <Stack gap="lg">
         <Paper p="sm" radius="lg" style={{ background: `${T}10`, border: `1px solid ${T}33` }}>
           <Group gap={8}>
             <IconShieldCheck size={16} color={T} />
             <Text size="sm" c={T} fw={600}>
-              Read-only view. To make changes, go to <Text span fw={800}>Settings</Text>.
+              {t('providerDashboard.profile_readonly')}
             </Text>
           </Group>
         </Paper>
@@ -431,7 +443,7 @@ export function ProviderProfile() {
               <Text fw={700} size="lg">{myProfile?.fullName ?? '—'}</Text>
               <Text c="dimmed" size="sm">{currentUser?.email}</Text>
               <Group gap="xs">
-                <Badge color="teal" size="sm" leftSection={<IconShieldCheck size={10} />}>Verified Provider</Badge>
+                <Badge color="teal" size="sm" leftSection={<IconShieldCheck size={10} />}>{t('providerDashboard.verified_provider')}</Badge>
                 <Badge color="yellow" size="sm">⭐ {myProfile?.rating ?? 4.7}</Badge>
               </Group>
             </Stack>
@@ -439,16 +451,16 @@ export function ProviderProfile() {
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Services &amp; Subservices</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.services_subservices')}</Text>
           <Stack gap="sm">
             {[
-              { label: 'Category', value: myProfile?.categoryId, badge: 'teal' as const },
-              { label: 'Subcategory', value: myProfile?.subcategoryId, badge: 'blue' as const },
-              { label: 'Pricing', value: myProfile?.pricingModel, badge: null },
-              { label: 'Coverage', value: myProfile?.coverageRadius ? `${myProfile.coverageRadius} km` : null, badge: null },
+              { labelKey: 'providerDashboard.label_category', value: myProfile?.categoryId, badge: 'teal' as const },
+              { labelKey: 'providerDashboard.label_subcategory', value: myProfile?.subcategoryId, badge: 'blue' as const },
+              { labelKey: 'providerDashboard.label_pricing', value: myProfile?.pricingModel, badge: null },
+              { labelKey: 'providerDashboard.label_coverage', value: myProfile?.coverageRadius ? `${myProfile.coverageRadius} km` : null, badge: null },
             ].map(row => (
-              <Group key={row.label} gap="xs">
-                <Text size="sm" c="dimmed" w={120}>{row.label}:</Text>
+              <Group key={row.labelKey} gap="xs">
+                <Text size="sm" c="dimmed" w={120}>{t(row.labelKey)}:</Text>
                 {row.badge
                   ? <Badge color={row.badge} variant="light">{row.value ?? '—'}</Badge>
                   : <Text size="sm" fw={600}>{row.value ?? '—'}</Text>}
@@ -458,7 +470,7 @@ export function ProviderProfile() {
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Skills &amp; Bio</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.skills_bio')}</Text>
           <Group gap="xs" mb="md">
             {['Reliable', 'Punctual', 'Professional'].map(s => (
               <Badge key={s} color="teal" variant="light">{s}</Badge>
@@ -466,19 +478,19 @@ export function ProviderProfile() {
           </Group>
           {myProfile?.bio
             ? <Text size="sm" c="dimmed" style={{ lineHeight: 1.7 }}>{myProfile.bio}</Text>
-            : <Text size="sm" c="dimmed">No bio added yet. Add one in Settings.</Text>}
+            : <Text size="sm" c="dimmed">{t('providerDashboard.no_bio')}</Text>}
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Certifications</Text>
-          <Text size="sm" c="dimmed">No certifications added yet. Add them in Settings.</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.certifications')}</Text>
+          <Text size="sm" c="dimmed">{t('providerDashboard.no_certs')}</Text>
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Portfolio</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.portfolio')}</Text>
           {(myProfile?.portfolioImages ?? []).length === 0 ? (
             <Box p="xl" style={{ borderRadius: 12, border: '2px dashed var(--ot-border)', textAlign: 'center' }}>
-              <Text c="dimmed" size="sm">No portfolio photos yet. Add them in Settings.</Text>
+              <Text c="dimmed" size="sm">{t('providerDashboard.no_portfolio')}</Text>
             </Box>
           ) : (
             <SimpleGrid cols={4} spacing="xs">
@@ -492,15 +504,15 @@ export function ProviderProfile() {
         </Card>
 
         <Card radius="lg" withBorder p="xl">
-          <Text fw={700} mb="md">Performance</Text>
+          <Text fw={700} mb="md">{t('providerDashboard.performance')}</Text>
           <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="md">
             {[
-              { label: 'Rating', value: `${myProfile?.rating ?? 0} ★`, icon: <IconStar size={16} color={COLORS.warning} /> },
-              { label: 'Jobs Completed', value: `${myProfile?.totalJobsCompleted ?? 0}`, icon: <IconCheck size={16} color={T} /> },
-              { label: 'Response Rate', value: `${myProfile?.responseRate ?? 0}%`, icon: <IconUser size={16} color={N} /> },
+              { labelKey: 'providerDashboard.label_rating', value: `${myProfile?.rating ?? 0} ★`, icon: <IconStar size={16} color={COLORS.warning} /> },
+              { labelKey: 'providerDashboard.label_jobs_completed', value: `${myProfile?.totalJobsCompleted ?? 0}`, icon: <IconCheck size={16} color={T} /> },
+              { labelKey: 'providerDashboard.label_response_rate', value: `${myProfile?.responseRate ?? 0}%`, icon: <IconUser size={16} color={N} /> },
             ].map(s => (
-              <Paper key={s.label} p="md" radius="lg" style={{ background: 'var(--ot-bg-row)', border: '1px solid var(--ot-border)' }}>
-                <Group gap={6} mb={4}>{s.icon}<Text size="xs" c="dimmed">{s.label}</Text></Group>
+              <Paper key={s.labelKey} p="md" radius="lg" style={{ background: 'var(--ot-bg-row)', border: '1px solid var(--ot-border)' }}>
+                <Group gap={6} mb={4}>{s.icon}<Text size="xs" c="dimmed">{t(s.labelKey)}</Text></Group>
                 <Text fw={800} size="lg" c={N}>{s.value}</Text>
               </Paper>
             ))}

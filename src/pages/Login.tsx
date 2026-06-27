@@ -14,6 +14,7 @@ import {
   IconShieldCheck, IconAlertCircle, IconMessageCircle,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { notifications } from '@mantine/notifications';
 import { useAuthStore } from '../store/authStore';
 import * as authService from '../services/authService';
@@ -70,6 +71,7 @@ function useCountdown(start: number) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [screen, setScreen] = useState<Screen>('phone');
 
   // ── Phone entry ────────────────────────────────────────────────────────────
@@ -109,29 +111,14 @@ export default function Login() {
     try {
       const response = await authService.loginRequestOTP({ phone_number: phone });
       setPhoneLoading(false);
-      
-      // Display actual OTP code from backend (for development/debugging)
-      if (response.otp_code) {
-        setDemoOtp(response.otp_code);
-      }
-
-      // Reset OTP fields and show OTP screen
-      setOtp('');
-      setOtpError('');
-      setOtpAttempts(0);
+      if (response.otp_code) setDemoOtp(response.otp_code);
+      setOtp(''); setOtpError(''); setOtpAttempts(0);
       beginOtpTimer();
       setScreen('otp');
-
-      notifications.show({
-        title: '📱 Verification Code Sent',
-        message: `A 6-digit code was sent to ${phone}`,
-        color: 'teal',
-        autoClose: 5000,
-      });
+      notifications.show({ title: '📱 ' + t('login.resent'), message: t('login.resent_msg', { phone }), color: 'teal', autoClose: 5000 });
     } catch (error: unknown) {
       setPhoneLoading(false);
-      const message = getErrorMessage(error, 'Failed to request OTP. Please try again.');
-      setPhoneError(message);
+      setPhoneError(getErrorMessage(error, t('login.failed_otp')));
     }
   };
 
@@ -192,33 +179,16 @@ export default function Login() {
     }
   };
 
-  // ─── Resend OTP ──────────────────────────────────────────────────────────
   const handleResend = async () => {
     if (otpSeconds > 0) return;
-
     try {
       const response = await authService.loginRequestOTP({ phone_number: phone });
-
-      // Display actual OTP code from backend
-      if (response.otp_code) {
-        setDemoOtp(response.otp_code);
-      }
-
-      // Reset countdown and attempts
-      setOtp('');
-      setOtpError('');
-      setOtpAttempts(0);
+      if (response.otp_code) setDemoOtp(response.otp_code);
+      setOtp(''); setOtpError(''); setOtpAttempts(0);
       beginOtpTimer();
-
-      notifications.show({
-        title: '📱 New Code Sent',
-        message: `A new 6-digit code was sent to ${phone}`,
-        color: 'teal',
-        autoClose: 5000,
-      });
+      notifications.show({ title: '📱 ' + t('login.resent'), message: t('login.resent_msg', { phone }), color: 'teal', autoClose: 5000 });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Failed to resend code. Please try again.');
-      setOtpError(message);
+      setOtpError(getErrorMessage(error, t('login.failed_resend')));
     }
   };
 
@@ -268,8 +238,8 @@ export default function Login() {
         }}>
           <IconShieldCheck size={28} color="#fff" />
         </Box>
-        <Text fw={800} size="xl" style={{ color: 'var(--ot-text-navy)' }}>OneTouch</Text>
-        <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>Your trusted services platform</Text>
+        <Text fw={800} size="xl" style={{ color: 'var(--ot-text-navy)' }}>{t('login.title')}</Text>
+        <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>{t('login.subtitle')}</Text>
       </Box>
     </Center>
   );
@@ -306,9 +276,9 @@ export default function Login() {
   // ── PHONE ENTRY ────────────────────────────────────────────────────────────
   if (screen === 'phone') return wrap(card(
     <>
-      <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>Sign In</Text>
+      <Text fw={700} size="lg" mb={4} style={{ color: 'var(--ot-text-navy)' }}>{t('login.title')}</Text>
       <Text size="sm" mb="md" style={{ color: 'var(--ot-text-sub)' }}>
-        Enter your phone number to receive a verification code.
+        {t('login.phone_hint')}
       </Text>
 
       {phoneError && (
@@ -317,8 +287,8 @@ export default function Login() {
 
       <Stack gap="md">
         <TextInput
-          label="Phone Number"
-          placeholder="+251 900 000 000 or 0900000000"
+          label={t('login.phone_label')}
+          placeholder={t('login.phone_placeholder')}
           value={phone}
           onChange={e => { setPhone(e.target.value); setPhoneError(''); }}
           leftSection={<IconPhone size={16} />}
@@ -334,14 +304,14 @@ export default function Login() {
           rightSection={<IconArrowRight size={16} />}
           style={{ background: `linear-gradient(135deg, ${colors.navy}, ${colors.teal})`, border: 'none' }}
         >
-          Continue
+          {t('login.continue_btn')}
         </Button>
       </Stack>
 
       <Text ta="center" size="sm" mt="xl" style={{ color: 'var(--ot-text-sub)' }}>
-        Don't have an account?{' '}
+        {t('login.no_account')}{' '}
         <Anchor onClick={() => navigate(ROUTES.signup)} style={{ color: colors.teal, cursor: 'pointer' }}>
-          Create one
+          {t('login.create_one')}
         </Anchor>
       </Text>
     </>
@@ -355,16 +325,16 @@ export default function Login() {
           <IconMessageCircle size={22} />
         </ThemeIcon>
         <Box>
-          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>Verify Your Phone</Text>
+          <Text fw={700} size="lg" style={{ color: 'var(--ot-text-navy)' }}>{t('login.verify_title')}</Text>
           <Text size="sm" style={{ color: 'var(--ot-text-sub)' }}>
-            Code sent to <strong>{phone}</strong>
+            {t('login.verify_sub', { phone: <strong>{phone}</strong> })}
           </Text>
         </Box>
       </Group>
 
       {demoOtp && (
         <Alert icon={<IconShieldCheck size={16} />} color="blue" mb="md" radius="md" style={{ fontSize: '16px', fontWeight: 600 }}>
-          Demo code: <strong>{demoOtp}</strong>
+          {t('login.demo_title')}: <strong>{demoOtp}</strong>
         </Alert>
       )}
 
@@ -375,7 +345,7 @@ export default function Login() {
       <Stack gap="xl">
         <Box>
           <Text size="sm" fw={600} c="var(--ot-text-body)" mb={12} ta="center">
-            Enter 6-digit code
+            {t('login.otp_hint')}
           </Text>
           <Center>
             <PinInput
@@ -401,22 +371,12 @@ export default function Login() {
         )}
 
         <Group justify="space-between">
-          <Anchor
-            size="sm"
-            onClick={() => setScreen('phone')}
-            style={{ color: colors.teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <IconChevronLeft size={14} /> Change number
+          <Anchor size="sm" onClick={() => setScreen('phone')} style={{ color: colors.teal, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <IconChevronLeft size={14} /> {t('login.change_number')}
           </Anchor>
-          <Anchor
-            size="sm"
-            onClick={handleResend}
-            style={{
-              color: otpSeconds > 0 || otpAttempts >= 5 ? 'var(--ot-text-muted)' : colors.teal,
-              cursor: otpSeconds > 0 || otpAttempts >= 5 ? 'default' : 'pointer',
-            }}
-          >
-            {otpSeconds > 0 ? `Resend in ${otpSeconds}s` : 'Resend code'}
+          <Anchor size="sm" onClick={handleResend}
+            style={{ color: otpSeconds > 0 || otpAttempts >= 5 ? 'var(--ot-text-muted)' : colors.teal, cursor: otpSeconds > 0 || otpAttempts >= 5 ? 'default' : 'pointer' }}>
+            {otpSeconds > 0 ? t('login.resend_in', { seconds: otpSeconds }) : t('login.resend_code')}
           </Anchor>
         </Group>
       </Stack>
